@@ -26,9 +26,12 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     return (
         <main className={styles.main}>
             <header className={`${styles.header} glass`}>
-                <div className="container" style={{ display: 'flex', alignItems: 'center' }}>
-                    <button className={styles.backBtn} onClick={() => router.back()}>←</button>
-                    <h1 className={styles.title}>{service?.name.toUpperCase() || serviceId?.toUpperCase()} 구독</h1>
+                <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', width: '100%' }}>
+                    <button className={styles.backBtn} onClick={() => router.back()} style={{ position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)' }}>←</button>
+                    <div className={styles.headerBrand}>
+                        <img src="/tidal-logo.svg" alt="Tidal" className={styles.detailLogo} />
+                        <h1 className={styles.title}>{service?.name.toUpperCase() || serviceId?.toUpperCase()}</h1>
+                    </div>
                 </div>
             </header>
 

@@ -1,4 +1,4 @@
-# Share King (쉐어킹) - User Cases
+# Dalbus (달버스) - User Cases
 
 ## User Personas
 - **The Cost-Saver**: Wants to use Tidal or Netflix but finds the individual subscription too expensive.
@@ -7,7 +7,7 @@
 ## Core User Journeys
 
 ### 1. New Subscription
-1. User lands on Share King.
+1. User lands on Dalbus.
 2. User selects "Tidal" service.
 3. User sees price (e.g., 4,900 KRW/month) and clicks "Subscribe".
 4. User authenticates via mobile (PortOne).

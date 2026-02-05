@@ -1,6 +1,6 @@
-# 쉐어킹(Share King) 화면 기획서 (Screen Specification)
+# 달버스(Dalbus) 화면 기획서 (Screen Specification)
 
-본 문서는 '쉐어킹' 웹 서비스의 주요 화면 구성, UI/UX 요소 및 사용자 흐름을 정의합니다.
+본 문서는 '달버스' 웹 서비스의 주요 화면 구성, UI/UX 요소 및 사용자 흐름을 정의합니다.
 
 ---
 

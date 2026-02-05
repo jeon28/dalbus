@@ -1,7 +1,7 @@
-# Share King (쉐어킹) - PRD (Product Requirements Document)
+# Dalbus (달버스) - PRD (Product Requirements Document)
 
 ## Overview
-"Share King" is a platform for sharing premium OTT/Service subscriptions (starting with Tidal) to reduce costs for individual users. It aims to provide a reliable, automated (eventually), and user-friendly experience similar to "Pickle Plus".
+"Dalbus" is a platform for sharing premium OTT/Service subscriptions (starting with Tidal) to reduce costs for individual users. It aims to provide a reliable, automated (eventually), and user-friendly experience similar to "Pickle Plus".
 
 ## Objectives
 - Provide a cost-effective way for users to access premium services.

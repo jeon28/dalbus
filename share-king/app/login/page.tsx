@@ -26,7 +26,7 @@ export default function LoginPage() {
     return (
         <main className={styles.main}>
             <div className={`${styles.card} glass animate-fade-in`}>
-                <h1 className={styles.title}>Welcome to<br /><span>Share King.</span></h1>
+                <h1 className={styles.title}>Welcome to<br /><span>Dalbus.</span></h1>
 
                 <form className={styles.form} onSubmit={handleSubmit}>
                     <div className={styles.inputGroup}>

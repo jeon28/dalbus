@@ -3,19 +3,30 @@
 }
 
 .header {
-    height: var(--header-height);
+    min-height: 100px;
+    padding: 20px 0;
     display: flex;
     align-items: center;
 }
 
-.backBtn {
-    font-size: 1.5rem;
-    margin-right: 15px;
+.headerBrand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.detailLogo {
+    height: 35px;
+    width: auto;
+    filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.3));
 }
 
 .title {
-    font-size: 1.2rem;
-    font-weight: 700;
+    font-size: 1.4rem;
+    font-weight: 950;
+    letter-spacing: 1px;
+    text-transform: uppercase;
 }
 
 .content {
@@ -26,88 +37,59 @@
 }
 
 .infoCard {
-    padding: 25px;
+    padding: 30px;
     border-radius: var(--radius);
+    background: #111;
+    border: 1px solid #222;
 }
 
 .priceRow {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    margin-bottom: 10px;
-}
-
-.priceRow span:first-child {
-    color: var(--text-muted);
+    margin-bottom: 12px;
 }
 
 .price {
-    font-size: 1.8rem;
-    font-weight: 800;
+    font-size: 2.2rem;
+    font-weight: 950;
     color: var(--primary);
 }
 
-.description {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    line-height: 1.5;
-}
-
-.options h3 {
-    font-size: 1rem;
-    margin-bottom: 15px;
-}
-
-.optionList {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
 .optionItem {
-    padding: 15px 20px;
-    border-radius: 15px;
+    padding: 20px;
+    border-radius: 12px;
     display: flex;
     justify-content: space-between;
-    font-weight: 600;
+    font-weight: 800;
     transition: all 0.3s ease;
+    background: #111;
+    border: 1px solid #222;
 }
 
 .optionItem:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    border-color: #444;
 }
 
 .active {
-    border: 2px solid var(--primary);
-}
-
-.agreements {
-    padding: 10px 0;
-}
-
-.checkbox {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.9rem;
-    color: var(--text-muted);
+    border: 2px solid var(--primary) !important;
+    background: rgba(0, 255, 255, 0.05);
 }
 
 .submitBtn {
     background: var(--primary);
-    color: white;
-    padding: 18px;
-    border-radius: 15px;
+    color: #000;
+    padding: 20px;
+    border-radius: 8px;
     font-size: 1.1rem;
-    font-weight: 800;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
     margin-top: 10px;
-    transition: opacity 0.3s ease, background-color 0.3s ease;
 }
 
 .submitBtn:disabled {
-    background: var(--secondary);
-    color: var(--text-muted);
-    cursor: not-allowed;
-    opacity: 0.6;
+    background: #222;
+    color: #444;
 }
