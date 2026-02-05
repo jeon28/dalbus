@@ -1,0 +1,129 @@
+.main {
+    padding-bottom: 100px;
+}
+
+.header {
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+}
+
+.title {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.content {
+    padding-top: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.section h3 {
+    font-size: 1rem;
+    margin-bottom: 15px;
+    color: var(--text-main);
+}
+
+.activeCard {
+    padding: 20px;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.cardTop {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.serviceIcon {
+    font-size: 2.5rem;
+}
+
+.serviceInfo h4 {
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+
+.serviceInfo p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.statusBadge {
+    margin-left: auto;
+    font-size: 0.75rem;
+    background: #e7f5ff;
+    color: #228be6;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+}
+
+.credentials {
+    background: var(--secondary);
+    padding: 15px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.credItem {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+}
+
+.credItem span {
+    color: var(--text-muted);
+}
+
+.notice {
+    font-size: 0.75rem;
+    color: #fa5252;
+}
+
+.menuList {
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.menuItem {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--glass-border);
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.menuItem:last-child {
+    border-bottom: none;
+}
+
+.menuItem span {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+}
+
+.bottomNav {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    height: 60px;
+    border-radius: 30px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+}
+
+.navItem {
+    font-size: 1.4rem;
+}

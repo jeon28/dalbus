@@ -1,0 +1,159 @@
+.main {
+    padding-bottom: 50px;
+}
+
+.header {
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+}
+
+.title {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.content {
+    padding-top: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.statCard {
+    padding: 15px;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.statCard span {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.statCard strong {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.tableWrapper {
+    overflow-x: auto;
+    margin-top: 15px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.table th {
+    text-align: left;
+    padding: 12px 10px;
+    border-bottom: 2px solid var(--secondary);
+    color: var(--text-muted);
+}
+
+.table td {
+    padding: 15px 10px;
+    border-bottom: 1px solid var(--secondary);
+}
+
+.status {
+    padding: 4px 8px;
+    background: var(--secondary);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.actionBtn {
+    background: var(--text-main);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+
+.inputGroup {
+    padding: 20px;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.inputGroup input {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: var(--secondary);
+}
+
+.saveBtn {
+    background: var(--primary);
+    color: white;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+.priceSection h3 {
+    font-size: 1rem;
+    margin-bottom: 15px;
+}
+
+.priceGrid {
+    padding: 20px;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.priceItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.priceItem label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.inputWrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inputWrapper input {
+    width: 100px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: var(--secondary);
+    text-align: right;
+    font-weight: 700;
+}
+
+.inputWrapper span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+@media (min-width: 768px) {
+    .stats {
+        gap: 20px;
+    }
+}

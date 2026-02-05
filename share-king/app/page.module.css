@@ -1,0 +1,150 @@
+.main {
+    padding-bottom: 80px;
+}
+
+.header {
+    height: var(--header-height);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.logo span {
+    color: var(--primary);
+}
+
+.adminLink {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: var(--secondary);
+}
+
+.userName {
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.hero {
+    padding-top: 40px;
+    padding-bottom: 30px;
+}
+
+.hero h2 {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.3;
+    margin-bottom: 10px;
+}
+
+.hero h2 span {
+    color: var(--primary);
+}
+
+.hero p {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    padding-top: 20px;
+}
+
+.card {
+    padding: 20px;
+    border-radius: var(--radius);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.card:active {
+    transform: scale(0.98);
+}
+
+.cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.icon {
+    font-size: 2rem;
+}
+
+.tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: var(--primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 10px;
+}
+
+.card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.priceContainer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.subText {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.price {
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.button {
+    margin-top: 10px;
+    background: var(--primary);
+    color: white;
+    padding: 10px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.bottomNav {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    height: 60px;
+    border-radius: 30px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+}
+
+.navItem {
+    font-size: 1.4rem;
+}
+
+@media (min-width: 768px) {
+    .grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
