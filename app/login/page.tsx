@@ -3,23 +3,31 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useServices } from '@/lib/ServiceContext';
+import { supabase } from '@/lib/supabase';
 import styles from './auth.module.css';
 
 export default function LoginPage() {
     const [id, setId] = useState('');
     const [password, setPassword] = useState('');
-    const { login } = useServices();
     const router = useRouter();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Simulate login
-        if (id && password) {
-            login(id, '사용자', `${id}@example.com`);
-            router.push('/');
+
+        if (!id || !password) {
+            alert('아이디(이메일)와 비밀번호를 입력해주세요.');
+            return;
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: id, // Assuming user enters email as ID
+            password: password,
+        });
+
+        if (error) {
+            alert('로그인 실패: ' + error.message);
         } else {
-            alert('아이디와 비밀번호를 입력해주세요.');
+            router.push('/');
         }
     };
 

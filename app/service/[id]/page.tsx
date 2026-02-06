@@ -3,12 +3,13 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
+import { supabase } from '@/lib/supabase';
 import styles from './service.module.css';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = React.use(params);
     const serviceId = resolvedParams.id;
-    const { services } = useServices();
+    const { services, user } = useServices();
     const service = services.find(s => s.id === serviceId);
 
     const [agreed, setAgreed] = useState(false);
@@ -16,11 +17,50 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [selectedPeriod, setSelectedPeriod] = useState<1 | 3>(1);
     const router = useRouter();
 
-    const handleSubscribe = () => {
+    const handleSubscribe = async () => {
+        if (!user) {
+            alert('로그인이 필요한 서비스입니다.');
+            router.push('/login');
+            return;
+        }
+
+        if (!service) {
+            alert('서비스 정보를 찾을 수 없습니다.');
+            return;
+        }
+
         setLoading(true);
-        setTimeout(() => {
-            router.push('/mypage');
-        }, 1500);
+
+        // Calculate amount
+        const basePrice = parseInt(service.price.replace(/,/g, ''));
+        const amount = selectedPeriod === 3
+            ? Math.floor(basePrice * 3 * 0.95)
+            : basePrice;
+
+        // Insert order into Supabase
+        const { error } = await supabase
+            .from('orders')
+            .insert([
+                {
+                    user_id: user.id,
+                    service_id: service.id,
+                    duration_months: selectedPeriod,
+                    amount: amount,
+                    payment_status: '완료', // Mocking successful payment
+                    work_status: '접수'
+                }
+            ]);
+
+        if (error) {
+            console.error('Error creating order:', error);
+            alert('주문 생성에 실패했습니다: ' + error.message);
+            setLoading(false);
+        } else {
+            // Simulate short delay for "payment processing"
+            setTimeout(() => {
+                router.push('/mypage');
+            }, 1000);
+        }
     };
 
     return (
@@ -63,7 +103,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             style={{ cursor: 'pointer' }}
                         >
                             <span>3개월 (5% 할인)</span>
-                            <span>{Math.floor(parseInt(service?.price.replace(',', '') || '4900') * 3 * 0.95).toLocaleString()}원</span>
+                            <span>{Math.floor(parseInt(service?.price.replace(/,/g, '') || '4900') * 3 * 0.95).toLocaleString()}원</span>
                         </div>
                     </div>
                 </section>

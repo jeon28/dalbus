@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useServices } from '@/lib/ServiceContext';
+import { supabase } from '@/lib/supabase';
 import styles from '../login/auth.module.css';
 
 export default function SignupPage() {
@@ -13,19 +13,48 @@ export default function SignupPage() {
         email: '',
         name: ''
     });
-    const { login } = useServices();
     const router = useRouter();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const { id, password, email, name } = formData;
-        if (id && password && email && name) {
-            // Simulate signup and login
-            login(id, name, email);
+
+        if (!id || !password || !email || !name) {
+            alert('모든 필드를 입력해주세요.');
+            return;
+        }
+
+        // 1. Supabase Auth Signup
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: {
+                    name: name,
+                    login_id: id
+                }
+            }
+        });
+
+        if (error) {
+            alert('회원가입 실패: ' + error.message);
+            return;
+        }
+
+        if (data.user) {
+            // 2. Create Profile in public.profiles table
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .insert([
+                    { id: data.user.id, name: name, email: email }
+                ]);
+
+            if (profileError) {
+                console.error('Error creating profile:', profileError);
+            }
+
             alert('회원가입이 완료되었습니다!');
             router.push('/');
-        } else {
-            alert('모든 필드를 입력해주세요.');
         }
     };
 

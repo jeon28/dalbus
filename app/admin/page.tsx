@@ -1,16 +1,40 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
+import { supabase } from '@/lib/supabase';
 import styles from './admin.module.css';
 
 export default function AdminPage() {
     const { services, updatePrice } = useServices();
-    const [orders] = useState([
-        { id: 'ORD001', user: '홍길동', service: 'Tidal', status: '입금확인', date: '2026.01.31' },
-        { id: 'ORD002', user: '김철수', service: 'Netflix', status: '작업중', date: '2026.01.31' },
-        { id: 'ORD003', user: '이영희', service: 'Tidal', status: '완료', date: '2026.01.30' },
-    ]);
+    const [orders, setOrders] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchOrders = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('orders')
+            .select(`
+                id,
+                payment_status,
+                work_status,
+                created_at,
+                profiles(name),
+                services(name)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching orders:', JSON.stringify(error, null, 2));
+        } else if (data) {
+            setOrders(data);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchOrders();
+    }, []);
 
     return (
         <main className={styles.main}>
@@ -24,15 +48,15 @@ export default function AdminPage() {
                 <section className={styles.stats}>
                     <div className={`${styles.statCard} glass`}>
                         <span>신규 주문</span>
-                        <strong>12</strong>
+                        <strong>{orders.filter(o => o.work_status === '접수').length}</strong>
                     </div>
                     <div className={`${styles.statCard} glass`}>
                         <span>매칭 대기</span>
-                        <strong>5</strong>
+                        <strong>{orders.filter(o => o.work_status === '작업중').length}</strong>
                     </div>
                     <div className={`${styles.statCard} glass`}>
                         <span>누적 매출</span>
-                        <strong>₩124,000</strong>
+                        <strong>₩{orders.reduce((acc, curr) => acc + (curr.payment_status === '완료' ? 4900 : 0), 0).toLocaleString()}</strong>
                     </div>
                 </section>
 
@@ -42,7 +66,7 @@ export default function AdminPage() {
                         <table className={styles.table}>
                             <thead>
                                 <tr>
-                                    <th>주문번호</th>
+                                    <th>날짜</th>
                                     <th>고객명</th>
                                     <th>서비스</th>
                                     <th>상태</th>
@@ -52,11 +76,11 @@ export default function AdminPage() {
                             <tbody>
                                 {orders.map(o => (
                                     <tr key={o.id}>
-                                        <td>{o.id}</td>
-                                        <td>{o.user}</td>
-                                        <td>{o.service}</td>
-                                        <td><span className={styles.status}>{o.status}</span></td>
-                                        <td><button className={styles.actionBtn}>매칭</button></td>
+                                        <td>{new Date(o.created_at).toLocaleDateString()}</td>
+                                        <td>{o.profiles?.name || 'Unknown'}</td>
+                                        <td>{o.services?.name || 'Service'}</td>
+                                        <td><span className={styles.status}>{o.payment_status}</span></td>
+                                        <td><button className={styles.actionBtn}>{o.work_status}</button></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -80,8 +104,8 @@ export default function AdminPage() {
                                 </div>
                             </div>
                         ))}
-                        <button className={styles.saveBtn} onClick={() => alert('가격 설정이 저장되었습니다.')}>
-                            설정 저장하기
+                        <button className={styles.saveBtn} onClick={() => alert('가격 설정은 실시간 반영됩니다.')}>
+                            설정 확인
                         </button>
                     </div>
                 </section>
