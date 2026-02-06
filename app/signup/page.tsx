@@ -51,6 +51,8 @@ export default function SignupPage() {
 
             if (profileError) {
                 console.error('Error creating profile:', profileError);
+                alert('회원정보 저장에 실패했습니다: ' + profileError.message);
+                return;
             }
 
             alert('회원가입이 완료되었습니다!');
