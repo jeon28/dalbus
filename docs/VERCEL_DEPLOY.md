@@ -64,6 +64,10 @@
 - **원인**: `anon` 키가 잘못 입력되었거나 유효기간이 만료되었습니다.
 - **해결**: Supabase 대시보드에서 `anon public` 키(eyJ... 형태)를 다시 복사하여 Vercel 환경 변수를 업데이트하세요.
 
+### ❌ 회원가입은 되는데 DB(`profiles`)에 데이터가 안 들어올 때
+- **원인**: Supabase의 **Email Confirmation**이 켜져 있으면 인증 전까지 RLS 권한이 제한됩니다.
+- **해결**: [Authentication] -> [Settings]에서 **"Confirm email"**을 **OFF**로 설정하세요.
+
 ---
 
 ## 5. 유용한 팁
