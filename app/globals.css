@@ -1,16 +1,15 @@
 :root {
-  --primary: #00ffff;
-  /* Tidal Cyan */
-  --primary-hover: #00d9d9;
-  --secondary: #1a1a1a;
-  --bg-gradient: linear-gradient(180deg, #000000 0%, #0a0a0a 100%);
-  --text-main: #ffffff;
-  --text-muted: #a0a0a0;
-  --card-bg: rgba(20, 20, 20, 0.8);
-  --glass-bg: rgba(0, 0, 0, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --shadow: 0 10px 40px rgba(0, 255, 255, 0.05);
-  --radius: 12px;
+  --primary: #000000; /* Sleek Black for White Theme */
+  --primary-hover: #333333;
+  --secondary: #f0f2f5;
+  --bg-gradient: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+  --text-main: #1a1a1a;
+  --text-muted: #666666;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  --radius: 16px;
   --header-height: 70px;
 }
 

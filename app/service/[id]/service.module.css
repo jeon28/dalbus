@@ -19,7 +19,7 @@
 .detailLogo {
     height: 35px;
     width: auto;
-    filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.3));
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.1));
 }
 
 .title {
@@ -39,8 +39,9 @@
 .infoCard {
     padding: 30px;
     border-radius: var(--radius);
-    background: #111;
-    border: 1px solid #222;
+    background: #ffffff;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
 }
 
 .priceRow {
@@ -63,23 +64,23 @@
     justify-content: space-between;
     font-weight: 800;
     transition: all 0.3s ease;
-    background: #111;
-    border: 1px solid #222;
+    background: #ffffff;
+    border: 1px solid var(--glass-border);
 }
 
 .optionItem:hover {
     transform: translateY(-2px);
-    border-color: #444;
+    border-color: var(--text-muted);
 }
 
 .active {
     border: 2px solid var(--primary) !important;
-    background: rgba(0, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.02);
 }
 
 .submitBtn {
     background: var(--primary);
-    color: #000;
+    color: #fff;
     padding: 20px;
     border-radius: 8px;
     font-size: 1.1rem;
@@ -90,6 +91,6 @@
 }
 
 .submitBtn:disabled {
-    background: #222;
-    color: #444;
+    background: #f0f0f0;
+    color: #cccccc;
 }

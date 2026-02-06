@@ -1,0 +1,71 @@
+# Vercel 배포 상세 가이드 (Dalbus)
+
+이 문서는 Dalbus 프로젝트를 Vercel에 배포하고 운영하는 과정을 상세히 설명합니다.
+
+---
+
+## 1. 사전 준비 (Prerequisites)
+
+- **GitHub 계정**: 프로젝트 소스 코드가 GitHub 저장소에 업로드되어 있어야 합니다.
+- **Vercel 계정**: [Vercel](https://vercel.com/)에 가입하고 GitHub 계정을 연동해야 합니다.
+- **환경 변수**: Supabase URL과 API Key가 필요합니다.
+
+---
+
+## 2. 배포 단계 (Step-by-Step)
+
+### Step 1: 프로젝트 가져오기 (Import)
+1. Vercel 대시보드에서 **[Add New...]** -> **[Project]**를 클릭합니다.
+2. GitHub 저장소 목록에서 `dalbus` 저장소를 찾아 **[Import]** 버튼을 누릅니다.
+   - 저장소가 보이지 않는다면 상단의 **"Git Scope"**가 본인의 계정으로 설정되어 있는지 확인하세요.
+
+### Step 2: 프로젝트 설정 (Configure)
+1. **Project Name**: 기본값(`dalbus`)을 유지하거나 원하는 이름을 입력합니다.
+2. **Framework Preset**: `Next.js`가 자동으로 선택되어야 합니다.
+3. **Root Directory**: `./` (기본값)로 설정되어 있는지 확인합니다. 만약 파일이 폴더 안에 있다면 해당 폴더를 지정해야 하지만, 현재 우리 프로젝트는 루트에 파일이 있으므로 비워둡니다.
+
+### Step 3: 환경 변수 등록 (CRITICAL)
+배포 시 가장 중요한 단계입니다. **이 설정을 빠뜨리면 빌드 요류가 발생합니다.**
+1. **Environment Variables** 섹션을 펼칩니다.
+2. 다음 변수들을 추가합니다:
+   - `NEXT_PUBLIC_SUPABASE_URL`: Supabase 프로젝트 URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase `anon` `public` API Key (eyJ...로 시작)
+   - `PORTONE_API_KEY`: 포트원 API 키 (추후 연동 시)
+   - `SOLAPI_API_KEY`: 솔라피 API 키 (추후 연동 시)
+
+### Step 4: 배포 실행 (Deploy)
+1. **[Deploy]** 버튼을 클릭합니다.
+2. 빌드 로그를 확인하며 "Congratulations!" 메시지가 뜰 때까지 기다립니다.
+
+---
+
+## 3. 배포 후 관리 및 실행
+
+### 사이트 접속
+- 배포가 완료되면 Vercel이 `https://dalbus.vercel.app`과 같은 고유 URL을 제공합니다. 
+- 이 주소로 접속하면 전 세계 어디서든 서비스를 이용할 수 있습니다.
+
+### 자동 배포 (CI/CD)
+- 로컬에서 코드를 수정하고 `git push origin main`을 실행하면, Vercel이 이를 자동으로 감지하여 **새로운 버전을 즉시 배포**합니다. 별도의 명령어를 서버에서 실행할 필요가 없습니다.
+
+---
+
+## 4. 자주 발생하는 오류 및 해결 방법
+
+### ❌ "supabaseUrl is required" 에러
+- **원인**: Vercel 설정에 `NEXT_PUBLIC_SUPABASE_URL` 환경 변수가 등록되지 않았습니다.
+- **해결**: [Settings] -> [Environment Variables] 메뉴에서 변수를 추가하고 다시 배포(Redeploy) 하세요.
+
+### ❌ "No Next.js version detected" 에러
+- **원인**: `package.json` 파일을 Vercel이 찾지 못했습니다.
+- **해결**: 프로젝트 루트 경로에 `package.json`이 있는지 확인하고, Vercel의 **Root Directory** 설정이 `./`인지 확인하세요.
+
+### ❌ "Invalid API key" 에러
+- **원인**: `anon` 키가 잘못 입력되었거나 유효기간이 만료되었습니다.
+- **해결**: Supabase 대시보드에서 `anon public` 키(eyJ... 형태)를 다시 복사하여 Vercel 환경 변수를 업데이트하세요.
+
+---
+
+## 5. 유용한 팁
+- **Custom Domain**: 본인이 소유한 도메인(예: `dalbus.com`)이 있다면 Vercel [Settings] -> [Domains] 메뉴에서 연결할 수 있습니다.
+- **Logs**: 서비스 운영 중 발생하는 에러는 Vercel 대시보드의 [Logs] 탭에서 실시간으로 확인할 수 있습니다.
