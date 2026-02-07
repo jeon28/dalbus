@@ -25,9 +25,17 @@ export default function Header() {
                             FAQ
                         </Link>
                         {isAdmin && (
-                            <Link href="/admin/orders" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                주문내역
-                            </Link>
+                            <>
+                                <Link href="/admin/orders" className="transition-colors hover:text-primary font-bold text-foreground/80">
+                                    주문내역
+                                </Link>
+                                <Link href="/admin/members" className="transition-colors hover:text-primary font-bold text-foreground/80">
+                                    회원정보
+                                </Link>
+                                <Link href="/admin/services" className="transition-colors hover:text-primary font-bold text-foreground/80">
+                                    서비스 관리
+                                </Link>
+                            </>
                         )}
                     </nav>
                 </div>
