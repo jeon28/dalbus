@@ -4,43 +4,84 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import { supabase } from '@/lib/supabase';
 import styles from './admin.module.css';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function AdminPage() {
-    const { services, updatePrice } = useServices();
+    const { services, updatePrice, isAdmin, loginAdmin, logoutAdmin } = useServices();
+
+    // Auth Form State
+    const [loginId, setLoginId] = useState('');
+    const [loginPw, setLoginPw] = useState('');
+
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchOrders = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('orders')
-            .select(`
-                id,
-                payment_status,
-                assignment_status,
-                created_at,
-                profiles(name),
-                products(name)
-            `)
-            .order('created_at', { ascending: false });
+    const handleLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (loginId === 'dalbus' && loginPw === '1q2w3e4r5t!!') {
+            loginAdmin();
+        } else {
+            alert('아이디 또는 비밀번호가 올바르지 않습니다.');
+        }
+    };
 
-        if (error) {
-            console.error('Error fetching orders:', JSON.stringify(error, null, 2));
-        } else if (data) {
+    const fetchStats = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch('/api/admin/orders');
+            if (!response.ok) throw new Error('Failed to fetch orders');
+            const data = await response.json();
             setOrders(data);
+        } catch (error) {
+            console.error('Error fetching stats:', error);
         }
         setLoading(false);
     };
 
     useEffect(() => {
-        fetchOrders();
-    }, []);
+        if (isAdmin) {
+            fetchStats();
+        }
+    }, [isAdmin]);
+
+    if (!isAdmin) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                <Card className="w-[350px] shadow-xl">
+                    <CardHeader>
+                        <CardTitle className="text-center">관리자 로그인</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <Input
+                                placeholder="아이디"
+                                value={loginId}
+                                onChange={(e) => setLoginId(e.target.value)}
+                            />
+                            <Input
+                                type="password"
+                                placeholder="비밀번호"
+                                value={loginPw}
+                                onChange={(e) => setLoginPw(e.target.value)}
+                            />
+                            <Button type="submit" className="w-full bg-black hover:bg-gray-800 text-white">
+                                로그인
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <main className={styles.main}>
             <header className={`${styles.header} glass`}>
-                <div className="container">
+                <div className="container flex justify-between items-center">
                     <h1 className={styles.title}>관리자 대시보드</h1>
+                    <Button variant="outline" size="sm" onClick={logoutAdmin}>로그아웃</Button>
                 </div>
             </header>
 
@@ -51,8 +92,11 @@ export default function AdminPage() {
                         <strong>{orders.filter(o => o.assignment_status === 'waiting').length}</strong>
                     </div>
                     <div className={`${styles.statCard} glass`}>
-                        <span>매칭 완료</span>
-                        <strong>{orders.filter(o => o.assignment_status === 'assigned').length}</strong>
+                        <span>오늘의 매출</span>
+                        <strong>₩{orders.reduce((acc, curr) => {
+                            const isToday = new Date(curr.created_at).toDateString() === new Date().toDateString();
+                            return acc + (isToday && (curr.payment_status === 'paid' || curr.payment_status === 'pending') ? curr.amount : 0);
+                        }, 0).toLocaleString()}</strong>
                     </div>
                     <div className={`${styles.statCard} glass`}>
                         <span>누적 매출</span>
@@ -60,33 +104,11 @@ export default function AdminPage() {
                     </div>
                 </section>
 
-                <section className={styles.orderSection}>
-                    <h3>최근 주문 내역</h3>
-                    <div className={styles.tableWrapper}>
-                        <table className={styles.table}>
-                            <thead>
-                                <tr>
-                                    <th>날짜</th>
-                                    <th>고객명</th>
-                                    <th>서비스</th>
-                                    <th>상태</th>
-                                    <th>작업</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {orders.map(o => (
-                                    <tr key={o.id}>
-                                        <td>{new Date(o.created_at).toLocaleDateString()}</td>
-                                        <td>{o.profiles?.name || 'Unknown'}</td>
-                                        <td>{o.products?.name || 'Product'}</td>
-                                        <td><span className={styles.status}>{o.payment_status}</span></td>
-                                        <td><button className={styles.actionBtn}>{o.assignment_status}</button></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                <div className="mb-8">
+                    <p className="text-gray-500">
+                        * 주문 내역 확인은 상단 메뉴의 <strong>[주문내역]</strong> 페이지를 이용해주세요.
+                    </p>
+                </div>
 
                 <section className={styles.priceSection}>
                     <h3>서비스 가격 설정</h3>

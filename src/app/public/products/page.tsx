@@ -71,7 +71,7 @@ export default function ProductsPage() {
                             </CardContent>
                             <CardFooter className="pt-0 p-6">
                                 <Link href={`/service/${product.id}`} className="w-full">
-                                    <Button className="w-full">신청하기</Button>
+                                    <Button className="w-full">구매하기</Button>
                                 </Link>
                             </CardFooter>
                         </Card>

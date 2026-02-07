@@ -27,6 +27,9 @@ interface ServiceContextType {
     login: (id: string, name: string, email: string) => void;
     logout: () => void;
     refreshServices: () => Promise<void>;
+    isAdmin: boolean;
+    loginAdmin: () => void;
+    logoutAdmin: () => void;
 }
 
 const ServiceContext = createContext<ServiceContextType | undefined>(undefined);
@@ -34,6 +37,7 @@ const ServiceContext = createContext<ServiceContextType | undefined>(undefined);
 export function ServiceProvider({ children }: { children: ReactNode }) {
     const [services, setServices] = useState<Service[]>([]);
     const [user, setUser] = useState<User | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [isHydrated, setIsHydrated] = useState(false);
 
     // Fetch services (products) from Supabase
@@ -130,6 +134,14 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('dalbus-user');
     };
 
+    const loginAdmin = () => {
+        setIsAdmin(true);
+    };
+
+    const logoutAdmin = () => {
+        setIsAdmin(false);
+    };
+
     return (
         <ServiceContext.Provider value={{
             services,
@@ -138,7 +150,10 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             user,
             login,
             logout,
-            refreshServices: fetchServices
+            refreshServices: fetchServices,
+            isAdmin,
+            loginAdmin,
+            logoutAdmin
         }}>
             {children}
         </ServiceContext.Provider>

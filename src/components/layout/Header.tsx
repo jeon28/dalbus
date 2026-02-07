@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useServices } from '@/lib/ServiceContext';
 
 export default function Header() {
+    const { user, isAdmin, logout } = useServices();
+
     return (
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex h-14 items-center">
@@ -19,6 +24,11 @@ export default function Header() {
                         <Link href="/public/faq" className="transition-colors hover:text-foreground/80 text-foreground/60">
                             FAQ
                         </Link>
+                        {isAdmin && (
+                            <Link href="/admin/orders" className="transition-colors hover:text-primary font-bold text-foreground/80">
+                                주문내역
+                            </Link>
+                        )}
                     </nav>
                 </div>
                 <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
@@ -26,14 +36,30 @@ export default function Header() {
                         {/* Search or other items */}
                     </div>
                     <nav className="flex items-center gap-2">
-                        <Link href="/login">
-                            <Button variant="ghost" size="sm">
-                                로그인
-                            </Button>
-                        </Link>
-                        <Link href="/signup">
-                            <Button size="sm">회원가입</Button>
-                        </Link>
+                        {user ? (
+                            <>
+                                <Link href="/mypage">
+                                    <Button variant="ghost" size="sm">마이페이지</Button>
+                                </Link>
+                                <Button variant="outline" size="sm" onClick={logout}>로그아웃</Button>
+                            </>
+                        ) : (
+                            <>
+                                <Link href="/login">
+                                    <Button variant="ghost" size="sm">
+                                        로그인
+                                    </Button>
+                                </Link>
+                                <Link href="/signup">
+                                    <Button size="sm">회원가입</Button>
+                                </Link>
+                            </>
+                        )}
+                        {isAdmin && (
+                            <Link href="/admin">
+                                <Button variant="destructive" size="sm">관리자</Button>
+                            </Link>
+                        )}
                     </nav>
                 </div>
             </div>
