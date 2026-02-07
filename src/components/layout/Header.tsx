@@ -24,6 +24,9 @@ export default function Header() {
                         <Link href="/public/faq" className="transition-colors hover:text-foreground/80 text-foreground/60">
                             FAQ
                         </Link>
+                        <Link href="/public/qna" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                            Q&A
+                        </Link>
                         {isAdmin && (
                             <>
                                 <Link href="/admin/orders" className="transition-colors hover:text-primary font-bold text-foreground/80">
@@ -34,6 +37,9 @@ export default function Header() {
                                 </Link>
                                 <Link href="/admin/services" className="transition-colors hover:text-primary font-bold text-foreground/80">
                                     서비스 관리
+                                </Link>
+                                <Link href="/admin/qna" className="transition-colors hover:text-primary font-bold text-foreground/80">
+                                    Q&A 관리
                                 </Link>
                             </>
                         )}
