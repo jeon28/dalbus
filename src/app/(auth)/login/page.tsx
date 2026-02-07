@@ -38,12 +38,13 @@ export default function LoginPage() {
 
                 <form className={styles.form} onSubmit={handleSubmit}>
                     <div className={styles.inputGroup}>
-                        <label>아이디</label>
+                        <label>아이디 (이메일)</label>
                         <input
-                            type="text"
-                            placeholder="아이디를 입력하세요"
+                            type="email"
+                            placeholder="name@example.com"
                             value={id}
                             onChange={(e) => setId(e.target.value)}
+                            required
                         />
                     </div>
                     <div className={styles.inputGroup}>

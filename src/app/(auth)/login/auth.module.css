@@ -59,14 +59,28 @@
     border-color: var(--primary);
 }
 
+.inputGroup input.inputError {
+    border-color: #ff0000;
+    background: #fffbfe;
+}
+
+.errorText {
+    font-size: 0.75rem;
+    color: #ff0000;
+    margin-top: 2px;
+    font-weight: 600;
+}
+
 .submitBtn {
     background: var(--primary);
-    color: white;
+    color: #000000;
     padding: 15px;
     border-radius: 12px;
     font-size: 1.1rem;
     font-weight: 800;
     margin-top: 10px;
+    border: none;
+    cursor: pointer;
 }
 
 .footer {

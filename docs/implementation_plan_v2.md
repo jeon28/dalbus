@@ -1,78 +1,64 @@
-# [Dalbus v2.0] Implementation Plan
+# [Dalbus v2.0] Implementation Master Plan
+This plan details the step-by-step execution to upgrade Dalbus to v2.0, adhering to `techspec.md` and `prd.md`.
 
-## Overview
-This plan outlines the steps to upgrade the Dalbus project to match the **v2.0 Documentation** (`prd.md`, `techspec.md`, `screen_spec.md`). The upgrade involves a complete database schema overhaul and a Next.js App Router structural refactor.
+## Phase 1: Database & Environment Setup
+- [ ] **Environment Variables**: Verify `.env.local` contains all keys from `techspec.md` Section 3.2.
+- [ ] **Database Migration**:
+    - [ ] Create `supabase/migrations/001_create_tables.sql` with schema from `techspec.md`.
+    - [ ] Create `supabase/migrations/002_rls_policies.sql` with RLS policies.
+    - [ ] Run migrations in Supabase SQL Editor.
+    - [ ] Verify tables: `profiles`, `products`, `product_plans`, `orders`, `accounts`, etc.
+- [ ] **Types Generation**:
+    - [ ] Generate or manually create `types/database.ts` reflecting the new schema.
+    - [ ] Create `types/index.ts` for domain models.
 
----
+## Phase 2: Project Structure Refactor (Current State: Partially Done)
+- [ ] **Public Routes** `app/(public)`:
+    - [ ] `page.tsx` (Landing) - Ensure it uses new components.
+    - [ ] `products/page.tsx` (List) - Create if missing.
+    - [ ] `products/[slug]/page.tsx` (Detail) - Create if missing.
+    - [ ] `notices/page.tsx` & `faq/page.tsx` - Create placeholders.
+- [ ] **Auth Routes** `app/(auth)`:
+    - [ ] `login/page.tsx` - Refactor to use proper form handling.
+    - [ ] `signup/page.tsx` - Refactor for new fields (name, phone).
+    - [ ] `layout.tsx` - Ensure auth-specific layout (centered box).
+- [ ] **Protected Routes** `app/(protected)`:
+    - [ ] `mypage/page.tsx` - Dashboard for user subscriptions.
+    - [ ] `admin/page.tsx` - Admin dashboard.
+    - [ ] `payment/page.tsx` - Payment processing page.
+- [ ] **Cleanup**: Remove legacy files in `app/` root (e.g., old `login`, `service` folders) after confirming moves.
 
-## 1. Database Migration (Supabase)
+## Phase 3: Core Implementation
+### 3.1 Shared Components & Libs
+- [ ] **Supabase Client**: Ensure `lib/supabase/client.ts` and `server.ts` are correctly implemented for App Router.
+- [ ] **UI Components**: Install/Update `shadcn/ui` components (Button, Input, Card, etc.).
+- [ ] **Layout Components**:
+    - [ ] `components/layout/Header.tsx` (Responsive, Auth handling).
+    - [ ] `components/layout/Footer.tsx`.
 
-### Objective
-Transition from the v1 `services` schema to the v2 `products/plans/orders` schema.
+### 3.2 Feature: Landing & Products
+- [ ] **Landing Page**: Fetch active `products` from DB. Display Hero, Pricing, Steps.
+- [ ] **Product List**: Grid view of products.
+- [ ] **Product Detail**: Fetch product + plans. Select plan -> Go to Payment.
 
-### Action Items
-- [ ] **Run Migration Script**: Execute `supabase_migration_v2.sql` in the Supabase SQL Editor.
-  - **Note**: This will DROP existing tables (`services`, `shared_accounts`, `orders`). Ensure no critical production data exists.
-- [ ] **Verify Schema**: Check for presence of `products`, `product_plans`, `accounts`, `notices`, `faqs`.
-- [ ] **Disable Email Confirmation**: In Supabase Auth Settings, keep "Confirm email" **OFF** for smooth dev testing.
+### 3.3 Feature: Authentication
+- [ ] **Sign Up**: Register with Email, Password, Name, Phone. Trigger `profiles` creation (via DB trigger).
+- [ ] **Login**: Supabase Auth login.
+- [ ] **Middleware**: Protect `(protected)` routes. Redirect unauthenticated users to `/login`.
 
----
+### 3.4 Feature: Payments (PortOne)
+- [ ] **Payment Page**: Integrate PortOne SDK.
+- [ ] **Payment Webhook**: `api/payment/webhook/route.ts` to handle verification and `orders` creation.
 
-## 2. Project Structure Refactor
+### 3.5 Feature: Admin & My Page
+- [ ] **My Page**: Show `orders` and assigned `accounts`.
+- [ ] **Admin**: Order management and Account assignment.
 
-### Objective
-Adopt the Route Group pattern `(public)`, `(auth)`, `(protected)` defined in `techspec.md`.
+## Phase 4: Verification & Launch
+- [ ] **Manual Test**: Full user flow (Sign up -> View Product -> Buy -> Check My Page).
+- [ ] **Admin Test**: Assign account to order -> Verify SMS/Notification (mocked).
+- [ ] **Security Check**: Verify RLS (User cannot see others' orders).
 
-### File Moves & Creations
-
-#### 2.1 Public Routes `(public)`
-- `app/page.tsx` → `app/(public)/page.tsx`
-- New: `app/(public)/products/page.tsx` (Service List)
-- New: `app/(public)/products/[slug]/page.tsx` (Service Detail)
-- New: `app/(public)/notices/` & `app/(public)/faq/`
-
-#### 2.2 Auth Routes `(auth)`
-- `app/login/page.tsx` → `app/(auth)/login/page.tsx`
-- `app/signup/page.tsx` → `app/(auth)/signup/page.tsx`
-- New: `app/(auth)/reset-password/`
-
-#### 2.3 Protected Routes `(protected)`
-- `app/mypage/page.tsx` → `app/(protected)/mypage/page.tsx`
-- `app/service/[id]/` (Old Ordering Logic) → **Refactor into `app/(public)/products/[slug]/` + `app/(protected)/orders/`**
-- `app/admin/` → `app/(protected)/admin/` (Ensure check for `admin` role)
-
-#### 2.4 Lib & Components
-- Update `lib/supabase.ts` to `lib/supabase/client.ts`, `server.ts`.
-- Create `types/database.ts` (or generate via Supabase CLI).
-
----
-
-## 3. Feature Implementation Phases
-
-### Phase 3.1: Core Infrastructure
-- [ ] Apply new Folder Structure.
-- [ ] Update `middleware.ts` to protect `(protected)` routes and redirect unauthenticated users.
-- [ ] Create `types/index.ts` matching the new DB schema.
-
-### Phase 3.2: Public & Auth Features
-- [ ] Update **Landing Page** (`SCR_LAND_001`) with new design and data fetching from `products`.
-- [ ] Update **Product List/Detail** to fetch from `products` & `product_plans`.
-- [ ] Verify **Login/Signup** works with the new `profiles` table trigger.
-
-### Phase 3.3: Ordering & Payment
-- [ ] Implement **PortOne V2 SDK** in `app/(protected)/payment/`.
-- [ ] Create API Route `api/payment/webhook` to handle verification and `orders` insertion.
-
-### Phase 3.4: My Page & Admin
-- [ ] Update **My Page** to fetch from `orders` linked to `accounts`.
-- [ ] Build **Admin Dashboard** (`SCR_ADM_xxx`) for managing `products` and `accounts`.
-
----
-
-## 4. Execution Step-by-Step
-
-1. **User Action**: Run `supabase_migration_v2.sql` in Supabase.
-2. **Dev Action**: Move files to `app/(public)`, `(auth)`, `(protected)`.
-3. **Dev Action**: Fix import paths and `globals.css` references.
-4. **Dev Action**: Implement `products` fetching in Landing page.
-5. **Verification**: Check if Landing page loads real data from Supabase.
+## Current Next Step:
+Start with **Phase 1: Database & Environment Setup**.
+Then proceed to **Phase 3.1** and **3.2** to get the public site checking against real DB.

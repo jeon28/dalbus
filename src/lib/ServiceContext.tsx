@@ -36,26 +36,27 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isHydrated, setIsHydrated] = useState(false);
 
-    // Fetch services from Supabase
+    // Fetch services (products) from Supabase
     const fetchServices = async () => {
         const { data, error } = await supabase
-            .from('services')
+            .from('products')
             .select('*')
-            .order('created_at', { ascending: true });
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true });
 
         if (error) {
-            console.error('Error fetching services:', JSON.stringify(error, null, 2));
+            console.error('Error fetching products:', JSON.stringify(error, null, 2));
             return;
         }
 
         if (data) {
-            const mappedServices: Service[] = data.map(s => ({
-                id: s.id,
-                name: s.name,
-                icon: s.icon || 'default',
-                price: s.price.toLocaleString(),
-                tag: s.tag,
-                color: s.color
+            const mappedServices: Service[] = data.map(p => ({
+                id: p.id,
+                name: p.name,
+                icon: p.image_url || 'default',
+                price: p.original_price.toLocaleString(),
+                tag: (p.tags && p.tags.length > 0) ? p.tags[0] : '',
+                color: 'default' // Default color if not in schema
             }));
             setServices(mappedServices);
         }
@@ -103,8 +104,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         const numericPrice = parseInt(newPrice.replace(/,/g, ''));
 
         const { error } = await supabase
-            .from('services')
-            .update({ price: numericPrice })
+            .from('products')
+            .update({ original_price: numericPrice })
             .eq('id', id);
 
         if (error) {
@@ -113,7 +114,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        // Optimistic update or refetch
+        // Optimistic update
         setServices(prev => prev.map(s => s.id === id ? { ...s, price: newPrice } : s));
     };
 

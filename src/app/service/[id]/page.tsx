@@ -43,11 +43,11 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             .insert([
                 {
                     user_id: user.id,
-                    service_id: service.id,
-                    duration_months: selectedPeriod,
+                    product_id: service.id,
+                    plan_id: service.id, // Temporary fallback if plan_id is not yet handled properly
                     amount: amount,
-                    payment_status: '완료', // Mocking successful payment
-                    work_status: '접수'
+                    payment_status: 'paid',
+                    assignment_status: 'waiting'
                 }
             ]);
 

@@ -17,10 +17,10 @@ export default function AdminPage() {
             .select(`
                 id,
                 payment_status,
-                work_status,
+                assignment_status,
                 created_at,
                 profiles(name),
-                services(name)
+                products(name)
             `)
             .order('created_at', { ascending: false });
 
@@ -48,15 +48,15 @@ export default function AdminPage() {
                 <section className={styles.stats}>
                     <div className={`${styles.statCard} glass`}>
                         <span>신규 주문</span>
-                        <strong>{orders.filter(o => o.work_status === '접수').length}</strong>
+                        <strong>{orders.filter(o => o.assignment_status === 'waiting').length}</strong>
                     </div>
                     <div className={`${styles.statCard} glass`}>
-                        <span>매칭 대기</span>
-                        <strong>{orders.filter(o => o.work_status === '작업중').length}</strong>
+                        <span>매칭 완료</span>
+                        <strong>{orders.filter(o => o.assignment_status === 'assigned').length}</strong>
                     </div>
                     <div className={`${styles.statCard} glass`}>
                         <span>누적 매출</span>
-                        <strong>₩{orders.reduce((acc, curr) => acc + (curr.payment_status === '완료' ? 4900 : 0), 0).toLocaleString()}</strong>
+                        <strong>₩{orders.reduce((acc, curr) => acc + (curr.payment_status === 'paid' ? curr.amount : 0), 0).toLocaleString()}</strong>
                     </div>
                 </section>
 
@@ -78,9 +78,9 @@ export default function AdminPage() {
                                     <tr key={o.id}>
                                         <td>{new Date(o.created_at).toLocaleDateString()}</td>
                                         <td>{o.profiles?.name || 'Unknown'}</td>
-                                        <td>{o.services?.name || 'Service'}</td>
+                                        <td>{o.products?.name || 'Product'}</td>
                                         <td><span className={styles.status}>{o.payment_status}</span></td>
-                                        <td><button className={styles.actionBtn}>{o.work_status}</button></td>
+                                        <td><button className={styles.actionBtn}>{o.assignment_status}</button></td>
                                     </tr>
                                 ))}
                             </tbody>
