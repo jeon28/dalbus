@@ -1,0 +1,81 @@
+
+> dalbus@1.0.0 build
+> next build
+
+   ??Next.js 15.5.12
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ??Compiled successfully in 6.4s
+   Linting and checking validity of types ...
+
+./src/app/(protected)/admin/orders/page.tsx
+24:8  Warning: React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/admin/services/page.tsx
+102:53  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/(protected)/admin/services/[id]/page.tsx
+40:8  Warning: React Hook useEffect has a missing dependency: 'fetchProduct'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/mypage/page.tsx
+31:8  Warning: React Hook useEffect has a missing dependency: 'fetchUserSubscriptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/public/products/page.tsx
+37:41  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/public/qna/page.tsx
+35:8  Warning: React Hook useEffect has a missing dependency: 'fetchQnas'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/service/[id]/page.tsx
+145:46  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/19) ...
+   Generating static pages (4/19) 
+   Generating static pages (9/19) 
+   Generating static pages (14/19) 
+ ??Generating static pages (19/19)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+????/                                      158 B         102 kB
+????/_not-found                             1 kB         103 kB
+????/admin                               5.06 kB         166 kB
+????/admin/members                       2.28 kB         155 kB
+????/admin/orders                        4.99 kB         171 kB
+????/admin/qna                           1.94 kB         166 kB
+????/admin/services                      5.36 kB         169 kB
+??? /admin/services/[id]                 2.67 kB         171 kB
+????/admin/services/new                   1.7 kB         170 kB
+??? /api/admin/members                     158 B         102 kB
+??? /api/admin/orders                      158 B         102 kB
+??? /api/admin/plans                       158 B         102 kB
+??? /api/admin/plans/[id]                  158 B         102 kB
+??? /api/admin/products                    158 B         102 kB
+??? /api/admin/products/[id]               158 B         102 kB
+??? /api/admin/qna/[id]/answer             158 B         102 kB
+??? /api/qna                               158 B         102 kB
+??? /api/qna/[id]                          158 B         102 kB
+??? /api/qna/[id]/verify                   158 B         102 kB
+????/login                               1.37 kB         157 kB
+????/mypage                                 3 kB         159 kB
+????/public                              2.69 kB         108 kB
+????/public/faq                          2.64 kB         163 kB
+????/public/notices                      2.43 kB         163 kB
+????/public/products                     4.52 kB         168 kB
+????/public/qna                          1.86 kB         170 kB
+????/public/qna/write                       5 kB         169 kB
+??? /service/[id]                        9.26 kB         176 kB
+????/signup                              2.19 kB         158 kB
++ First Load JS shared by all             102 kB
+  ??chunks/1255-a390e12b70b4a9fb.js        46 kB
+  ??chunks/4bd1b696-f785427dddbba9fb.js  54.2 kB
+  ??other shared chunks (total)          2.03 kB
+
+
+?? (Static)   prerendered as static content
+?  (Dynamic)  server-rendered on demand
+

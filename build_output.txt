@@ -1,0 +1,38 @@
+
+> dalbus@1.0.0 build
+> next build
+
+   ??Next.js 15.5.12
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ??Compiled successfully in 4.3s
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./src/app/(protected)/admin/orders/page.tsx
+24:8  Warning: React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/admin/services/page.tsx
+102:53  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/(protected)/admin/services/[id]/page.tsx
+40:8  Warning: React Hook useEffect has a missing dependency: 'fetchProduct'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/mypage/page.tsx
+31:8  Warning: React Hook useEffect has a missing dependency: 'fetchUserSubscriptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/api/admin/members/route.ts
+1:10  Error: 'NextRequest' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/public/products/page.tsx
+37:41  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/public/qna/page.tsx
+35:8  Warning: React Hook useEffect has a missing dependency: 'fetchQnas'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/service/[id]/page.tsx
+145:46  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
