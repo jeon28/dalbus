@@ -5,7 +5,6 @@ import { useServices } from '@/lib/ServiceContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea"; // Assuming we have or use Input for now
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -64,7 +63,7 @@ export default function QnAWritePage() {
                 const err = await res.json();
                 alert(`등록 실패: ${err.error || '알 수 없는 오류'}`);
             }
-        } catch (e) {
+        } catch {
             alert('오류가 발생했습니다.');
         }
         setLoading(false);

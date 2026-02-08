@@ -3,8 +3,8 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
-    const { searchParams } = new URL(req.url);
+export async function GET(_req: NextRequest) {
+    const { searchParams } = new URL(_req.url);
     const excludeSecret = searchParams.get('exclude_secret') === 'true';
     const userId = searchParams.get('user_id'); // Optional: fetch my posts
 
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json(data);
-    } catch (e) {
+    } catch {
         return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 }

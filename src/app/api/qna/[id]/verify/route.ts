@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         } else {
             return NextResponse.json({ success: false, message: 'Password incorrect' }, { status: 401 });
         }
-    } catch (e) {
+    } catch {
         return NextResponse.json({ error: 'Check failed' }, { status: 500 });
     }
 }

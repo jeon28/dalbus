@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 // In a real app, this data would come from a database or CMS
 const REVIEWS = [
@@ -39,7 +39,7 @@ export default function ReviewCarousel() {
                     {REVIEWS.map((review, i) => (
                         <Card key={i} className="h-full">
                             <CardContent className="flex flex-col gap-4 p-6">
-                                <p className="text-muted-foreground italic">"{review.content}"</p>
+                                <p className="text-muted-foreground italic">&quot;{review.content}&quot;</p>
                                 <div className="flex items-center gap-4 mt-auto">
                                     <Avatar>
                                         <AvatarFallback>{review.avatar}</AvatarFallback>

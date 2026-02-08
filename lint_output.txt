@@ -1,0 +1,86 @@
+
+> dalbus@1.0.0 lint
+> next lint
+
+`next lint` is deprecated and will be removed in Next.js 16.
+For new projects, use create-next-app to choose your preferred linter.
+For existing projects, migrate to the ESLint CLI:
+npx @next/codemod@canary next-lint-to-eslint-cli .
+
+
+./src/app/(auth)/login/page.tsx
+22:17  Error: 'data' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/(protected)/admin/members/page.tsx
+10:44  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/(protected)/admin/orders/page.tsx
+6:10  Error: 'supabase' is defined but never used.  @typescript-eslint/no-unused-vars
+14:12  Error: 'loading' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+25:8  Warning: React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/admin/page.tsx
+5:10  Error: 'supabase' is defined but never used.  @typescript-eslint/no-unused-vars
+18:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+19:12  Error: 'loading' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/(protected)/admin/qna/page.tsx
+8:16  Error: 'MessageCircle' is defined but never used.  @typescript-eslint/no-unused-vars
+13:38  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/(protected)/admin/services/new/page.tsx
+65:25  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/(protected)/admin/services/page.tsx
+13:46  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+101:53  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/(protected)/admin/services/[id]/page.tsx
+23:44  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+39:8  Warning: React Hook useEffect has a missing dependency: 'fetchProduct'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+58:27  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+80:25  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+116:25  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+217:61  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+217:69  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+217:127  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/(protected)/mypage/page.tsx
+30:8  Warning: React Hook useEffect has a missing dependency: 'fetchUserSubscriptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+49:64  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/admin/members/route.ts
+6:27  Error: '_req' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/admin/plans/route.ts
+28:14  Error: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/admin/plans/[id]/route.ts
+29:14  Error: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/admin/products/route.ts
+7:27  Error: 'req' is defined but never used.  @typescript-eslint/no-unused-vars
+49:14  Error: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/admin/products/[id]/route.ts
+53:14  Error: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/admin/qna/[id]/answer/route.ts
+28:14  Error: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/qna/[id]/route.ts
+43:14  Error: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/api/qna/[id]/verify/route.ts
+26:14  Error: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/public/products/page.tsx
+37:41  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/public/qna/page.tsx
+35:8  Warning: React Hook useEffect has a missing dependency: 'fetchQnas'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/service/[id]/page.tsx
+145:46  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

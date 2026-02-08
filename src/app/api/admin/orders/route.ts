@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     // In a real app, we should verify the user is an admin session here.
     // However, since we are using client-side "fake" auth for this request, 
     // we will rely on the fact that this API is internal. 

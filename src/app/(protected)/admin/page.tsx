@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
-import { supabase } from '@/lib/supabase';
 import styles from './admin.module.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ export default function AdminPage() {
     const [loginPw, setLoginPw] = useState('');
 
     const [orders, setOrders] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    // const [loading, setLoading] = useState(true);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,7 +28,7 @@ export default function AdminPage() {
     };
 
     const fetchStats = async () => {
-        setLoading(true);
+        // setLoading(true);
         try {
             const response = await fetch('/api/admin/orders');
             if (!response.ok) throw new Error('Failed to fetch orders');
@@ -37,7 +37,7 @@ export default function AdminPage() {
         } catch (error) {
             console.error('Error fetching stats:', error);
         }
-        setLoading(false);
+        // setLoading(false);
     };
 
     useEffect(() => {

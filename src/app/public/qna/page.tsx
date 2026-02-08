@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-import { Lock, Unlock, Edit, Trash2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Lock } from 'lucide-react';
 
 interface QnA {
     id: string;
@@ -22,14 +21,14 @@ interface QnA {
 
 export default function QnAPage() {
     const { user, isAdmin } = useServices();
-    const router = useRouter();
+    // const router = useRouter();
     const [qnas, setQnas] = useState<QnA[]>([]);
     const [loading, setLoading] = useState(true);
     const [excludeSecret, setExcludeSecret] = useState(false);
 
     // For password verification modal
-    const [verifyId, setVerifyId] = useState<string | null>(null);
-    const [password, setPassword] = useState('');
+    // const [verifyId, setVerifyId] = useState<string | null>(null);
+    // const [password, setPassword] = useState('');
 
     useEffect(() => {
         fetchQnas();
@@ -49,6 +48,7 @@ export default function QnAPage() {
         setLoading(false);
     };
 
+    /*
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!verifyId) return;
@@ -70,10 +70,11 @@ export default function QnAPage() {
             } else {
                 alert('비밀번호가 일치하지 않습니다.');
             }
-        } catch (e) {
+        } catch {
             alert('오류가 발생했습니다.');
         }
     };
+    */
 
     return (
         <div className="container py-12 max-w-4xl mx-auto">

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -5,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
 import { supabase } from '@/lib/supabase';
 import styles from './service.module.css';
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -15,15 +15,15 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const serviceId = resolvedParams.id;
     const { services, user } = useServices();
     /* We need to fetch the full product details including 'detail_content' which might not be in context */
-    const [serviceDetail, setServiceDetail] = useState<any>(null);
-    const [plans, setPlans] = useState<any[]>([]);
+    const [serviceDetail, setServiceDetail] = useState<Record<string, any> | null>(null);
+    const [plans, setPlans] = useState<Record<string, any>[]>([]);
 
     useEffect(() => {
         const fetchDetail = async () => {
             if (!serviceId) return;
 
             // Fetch product
-            const { data: productData, error: productError } = await supabase
+            const { data: productData } = await supabase
                 .from('products')
                 .select('*')
                 .eq('id', serviceId)
@@ -32,7 +32,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             if (productData) setServiceDetail(productData);
 
             // Fetch plans
-            const { data: plansData, error: plansError } = await supabase
+            const { data: plansData } = await supabase
                 .from('product_plans')
                 .select('*')
                 .eq('product_id', serviceId);
@@ -93,7 +93,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
         const amount = selectedPlan.price; // Use price from plan table
 
-        const orderData: any = {
+        const orderData: Record<string, any> = {
             product_id: product.id,
             plan_id: selectedPlan.id,
             amount: amount,

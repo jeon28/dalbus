@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         return NextResponse.json(data);
-    } catch (e) {
+    } catch {
         return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 }

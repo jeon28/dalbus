@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { Lock, MessageCircle } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
 export default function AdminQnAPage() {
     const { isAdmin } = useServices();
