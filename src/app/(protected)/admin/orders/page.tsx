@@ -43,7 +43,7 @@ export default function OrderHistoryPage() {
         } else {
             fetchOrders();
         }
-    }, [isAdmin]);
+    }, [isAdmin, router]);
 
     const fetchOrders = async () => {
         try {
@@ -79,7 +79,7 @@ export default function OrderHistoryPage() {
                 setAvailableAccounts(available);
                 setIsMatchModalOpen(true);
             }
-        } catch (e) {
+        } catch {
             alert('계정 목록 불러오기 실패');
         }
     };
@@ -115,7 +115,7 @@ export default function OrderHistoryPage() {
             alert('배정되었습니다.');
             setIsMatchModalOpen(false);
             fetchOrders();
-        } catch (e) {
+        } catch {
             alert('배정 실패');
         }
     };
@@ -130,7 +130,7 @@ export default function OrderHistoryPage() {
             });
             if (!res.ok) throw new Error('Update failed');
             fetchOrders();
-        } catch (e) {
+        } catch {
             alert('입금 확인 실패');
         }
     };
@@ -145,7 +145,7 @@ export default function OrderHistoryPage() {
             });
             if (!res.ok) throw new Error('Update failed');
             fetchOrders();
-        } catch (e) {
+        } catch {
             alert('상태 변경 실패');
         }
     };

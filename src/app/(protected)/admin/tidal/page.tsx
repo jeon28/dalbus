@@ -90,10 +90,10 @@ export default function TidalAccountsPage() {
             fetchAccounts();
             fetchPendingOrders();
         }
-    }, [isAdmin]);
+    }, [isAdmin, router]);
 
     const fetchAccounts = async () => {
-        setLoading(true);
+
         try {
             const res = await fetch('/api/admin/accounts');
             if (!res.ok) throw new Error('Failed to fetch accounts');
@@ -128,7 +128,7 @@ export default function TidalAccountsPage() {
         } catch (error) {
             console.error(error);
         }
-        setLoading(false);
+
     };
 
     const fetchPendingOrders = async () => {
@@ -230,7 +230,7 @@ export default function TidalAccountsPage() {
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             fetchPendingOrders();
-        } catch (e) {
+        } catch {
             alert('삭제 실패');
         }
     };
@@ -254,7 +254,7 @@ export default function TidalAccountsPage() {
             setIsAddModalOpen(false);
             fetchAccounts();
             setNewAccount({ login_id: '', login_pw: '', payment_email: '', memo: '', product_id: '', max_slots: 6 });
-        } catch (error) {
+        } catch {
             alert('계정 생성 실패');
         }
     };
@@ -294,7 +294,7 @@ export default function TidalAccountsPage() {
             setIsAssignModalOpen(false);
             fetchAccounts();
             fetchPendingOrders();
-        } catch (error) {
+        } catch {
             alert('배정 실패');
         }
     };
@@ -324,7 +324,7 @@ export default function TidalAccountsPage() {
             if (!res.ok) throw new Error('Failed');
             setIsMoveModalOpen(false);
             fetchAccounts();
-        } catch (error) {
+        } catch {
             alert('이동 실패');
         }
     };
@@ -629,6 +629,47 @@ export default function TidalAccountsPage() {
                         {/* Slot Password Input Removed as requested */}
                     </div>
                     <DialogFooter><Button onClick={handleMove} disabled={!selectedTargetAccount || selectedTargetSlot === null}>이동 확인</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isOrderDetailOpen} onOpenChange={setIsOrderDetailOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>주문 상세 정보</DialogTitle></DialogHeader>
+                    {viewOrder && (
+                        <div className="py-4 space-y-2 text-sm">
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">주문번호</span>
+                                <span className="col-span-2">{viewOrder.order_number}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">구매자</span>
+                                <span className="col-span-2">{viewOrder.buyer_name} / {viewOrder.buyer_email}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">연락처</span>
+                                <span className="col-span-2">{viewOrder.buyer_phone}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">상품</span>
+                                <span className="col-span-2">{viewOrder.products?.name}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">금액</span>
+                                <span className="col-span-2">₩{viewOrder.amount?.toLocaleString()}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">이용 기간</span>
+                                <span className="col-span-2">{viewOrder.start_date} ~ {viewOrder.end_date}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">상태</span>
+                                <span className="col-span-2">{viewOrder.payment_status} / {viewOrder.assignment_status}</span>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setIsOrderDetailOpen(false)}>닫기</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </main>

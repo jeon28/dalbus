@@ -9,12 +9,12 @@ export async function PUT(
 
     try {
         const body = await req.json();
-        const updates: any = {};
+        const updates: Record<string, string> = {};
 
         if (body.payment_status) updates.payment_status = body.payment_status;
         if (body.assignment_status) updates.assignment_status = body.assignment_status;
 
-        // Backward compatibility support if 'status' was used for assignment
+        // Backward compatibility
         if (body.status && !body.assignment_status) updates.assignment_status = body.status;
 
         if (Object.keys(updates).length === 0) {
@@ -29,7 +29,8 @@ export async function PUT(
         if (error) throw error;
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
