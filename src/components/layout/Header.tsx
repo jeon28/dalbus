@@ -41,6 +41,9 @@ export default function Header() {
                                 <Link href="/admin/qna" className="transition-colors hover:text-primary font-bold text-foreground/80">
                                     Q&A 관리
                                 </Link>
+                                <Link href="/admin/tidal" className="transition-colors hover:text-primary font-bold text-foreground/80">
+                                    Tidal 계정
+                                </Link>
                             </>
                         )}
                     </nav>
