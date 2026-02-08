@@ -7,6 +7,7 @@ import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
+import Image from 'next/image';
 import { Trash2, Edit } from 'lucide-react';
 
 export default function ServiceListPage() {
@@ -99,7 +100,9 @@ export default function ServiceListPage() {
                                             <td>{p.sort_order}</td>
                                             <td>
                                                 {p.image_url && (
-                                                    <img src={p.image_url} alt={p.name} className="w-8 h-8 object-contain rounded" />
+                                                    <div className="relative w-8 h-8 flex-shrink-0">
+                                                        <Image src={p.image_url} alt={p.name} fill className="object-contain rounded" />
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="font-medium">{p.name}</td>

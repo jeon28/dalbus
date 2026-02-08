@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
@@ -22,15 +22,8 @@ export default function MyPage() {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    useEffect(() => {
-        if (isHydrated && user) {
-            fetchUserSubscriptions();
-        } else if (isHydrated && !user) {
-            setLoading(false);
-        }
-    }, [isHydrated, user]);
-
-    const fetchUserSubscriptions = async () => {
+    const fetchUserSubscriptions = useCallback(async () => {
+        if (!user) return;
         setLoading(true);
 
         // Fetch orders and related shared accounts
@@ -50,7 +43,7 @@ export default function MyPage() {
             const mapped: UserSubscription[] = data.map((item: any) => {
                 const account = item.shared_accounts?.[0];
                 return {
-                    service_name: item.services?.name || 'Service',
+                    service_name: (item.services as any)?.name || 'Service',
                     end_date: account?.end_date || '-',
                     account_id: account?.account_id || '매칭 대기 중',
                     account_pw: account?.account_pw || '매칭 대기 중',
@@ -60,7 +53,15 @@ export default function MyPage() {
             setSubscriptions(mapped);
         }
         setLoading(false);
-    };
+    }, [user]);
+
+    useEffect(() => {
+        if (isHydrated && user) {
+            fetchUserSubscriptions();
+        } else if (isHydrated && !user) {
+            setLoading(false);
+        }
+    }, [isHydrated, user, fetchUserSubscriptions]);
 
     if (!isHydrated || loading) return <div className="container" style={{ color: 'white', padding: '100px', textAlign: 'center' }}>Loading...</div>;
 

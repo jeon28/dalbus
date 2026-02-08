@@ -18,8 +18,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (error) throw error;
 
         return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
 
@@ -35,7 +36,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
         if (error) throw error;
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

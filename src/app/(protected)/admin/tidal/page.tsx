@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
-import { Plus, ChevronDown, ChevronUp, UserPlus, Trash2, ArrowRightLeft, Save } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -24,19 +24,65 @@ import {
 } from "@/components/ui/select";
 import { differenceInMonths, parseISO } from 'date-fns';
 
+interface Assignment {
+    id: string;
+    slot_number: number;
+    slot_password?: string;
+    order_id?: string;
+    orders?: Order;
+}
+
+interface Account {
+    id: string;
+    login_id: string;
+    login_pw: string;
+    payment_email: string;
+    memo: string;
+    product_id: string;
+    max_slots: number;
+    used_slots: number;
+    order_accounts?: Assignment[];
+}
+
+interface Order {
+    id: string;
+    order_number: string;
+    buyer_name: string;
+    buyer_email: string;
+    buyer_phone: string;
+    amount?: number;
+    payment_status?: string;
+    assignment_status?: string;
+    start_date: string;
+    end_date: string;
+    products?: {
+        name: string;
+    };
+    profiles?: {
+        name: string;
+        phone?: string;
+        email?: string;
+    };
+}
+interface GridValue {
+    login_id?: string;
+    login_pw?: string;
+    order_number?: string;
+    buyer_name?: string;
+    start_date?: string;
+    end_date?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any;
+}
+
 export default function TidalAccountsPage() {
     const { isAdmin } = useServices();
     const router = useRouter();
-    const [accounts, setAccounts] = useState<any[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-    const [loading, setLoading] = useState(true);
 
     // Grid State: Store edits locally before save
-    // Structure: { [accountId_slotIndex]: { ...fieldValues } }
-    // Or better: Just use a deeply cloned accounts state? 
-    // Let's use a separate state 'gridValues' to store CURRENT input values.
-    // keys: `${accountId}_${slotIndex}`
-    const [gridValues, setGridValues] = useState<Record<string, any>>({});
+    const [gridValues, setGridValues] = useState<Record<string, GridValue>>({});
     const [editingSlots, setEditingSlots] = useState<Record<string, boolean>>({});
 
     const startEdit = (accountId: string, slotIdx: number) => {
@@ -58,20 +104,19 @@ export default function TidalAccountsPage() {
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
 
-    const [selectedAccount, setSelectedAccount] = useState<any>(null);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
-    const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+    const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
     const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
-    const [viewOrder, setViewOrder] = useState<any>(null);
+    const [viewOrder, setViewOrder] = useState<Order | null>(null);
 
     // Order Data
-    const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+    const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
 
     // Move Data
-    const [moveTargets, setMoveTargets] = useState<any[]>([]);
+    const [moveTargets, setMoveTargets] = useState<Account[]>([]);
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
-    const [slotPasswordModal, setSlotPasswordModal] = useState('');
 
     // Forms
     const [newAccount, setNewAccount] = useState({
@@ -82,6 +127,8 @@ export default function TidalAccountsPage() {
         product_id: '',
         max_slots: 6
     });
+
+    const [slotPasswordModal, setSlotPasswordModal] = useState('');
 
     useEffect(() => {
         if (!isAdmin) {
@@ -101,10 +148,10 @@ export default function TidalAccountsPage() {
             setAccounts(data);
 
             // Initialize Grid Values from fetched data
-            const initialGrid: Record<string, any> = {};
-            data.forEach((acc: any) => {
+            const initialGrid: Record<string, GridValue> = {};
+            data.forEach((acc: Account) => {
                 for (let i = 0; i < acc.max_slots; i++) {
-                    const assignment = acc.order_accounts?.find((oa: any) => oa.slot_number === i);
+                    const assignment = acc.order_accounts?.find((oa: Assignment) => oa.slot_number === i);
                     // For Slot 1 (i===0), default to Master Password if no specific slot password exists
                     let defaultPw = assignment?.slot_password || '';
                     if (i === 0 && !defaultPw) {
@@ -136,7 +183,7 @@ export default function TidalAccountsPage() {
             const res = await fetch('/api/admin/orders');
             if (res.ok) {
                 const data = await res.json();
-                const waiting = data.filter((o: any) =>
+                const waiting = data.filter((o: Order) =>
                     o.payment_status === 'paid' &&
                     o.assignment_status === 'waiting'
                 );
@@ -157,7 +204,7 @@ export default function TidalAccountsPage() {
         setExpandedRows(newSet);
     };
 
-    const updateGridValue = (accountId: string, slotIdx: number, field: string, value: any) => {
+    const updateGridValue = (accountId: string, slotIdx: number, field: string, value: string | number | null) => {
         const key = `${accountId}_${slotIdx}`;
         setGridValues(prev => ({
             ...prev,
@@ -216,8 +263,9 @@ export default function TidalAccountsPage() {
             alert('저장되었습니다.');
             setEditingSlots(prev => ({ ...prev, [key]: false })); // Exit edit mode
             fetchAccounts();
-        } catch (e: any) {
-            alert('저장 실패: ' + e.message);
+        } catch (e) {
+            const error = e as Error;
+            alert('저장 실패: ' + error.message);
         }
     };
 
@@ -239,7 +287,7 @@ export default function TidalAccountsPage() {
         try {
             const prodRes = await fetch('/api/admin/products');
             const products = await prodRes.json();
-            const tidal = products.find((p: any) => p.name.includes('Tidal')) || products[0];
+            const tidal = products.find((p: { name: string; id: string }) => p.name.includes('Tidal')) || products[0];
 
             const payload = { ...newAccount, product_id: tidal?.id };
 
@@ -261,14 +309,14 @@ export default function TidalAccountsPage() {
 
     // --- Modals --- (Assign/Move)
 
-    const openAssignModal = (account: any, slotIndex: number) => {
+    const openAssignModal = (account: Account, slotIndex: number) => {
         setSelectedAccount(account);
         setSelectedSlot(slotIndex);
         setSlotPasswordModal('');
         setIsAssignModalOpen(true);
     };
 
-    const openOrderDetail = (order: any) => {
+    const openOrderDetail = (order: Order) => {
         setViewOrder(order);
         setIsOrderDetailOpen(true);
     };
@@ -299,7 +347,7 @@ export default function TidalAccountsPage() {
         }
     };
 
-    const openMoveModal = (currentAssignment: any) => {
+    const openMoveModal = (currentAssignment: Assignment) => {
         setSelectedAssignment(currentAssignment);
         setMoveTargets(accounts.filter(a => a.used_slots < a.max_slots));
         setSelectedTargetAccount('');
@@ -311,6 +359,10 @@ export default function TidalAccountsPage() {
     const handleMove = async () => {
         // ... Move logic ...
         try {
+            if (!selectedAssignment?.orders?.id) {
+                alert('이동할 주문 정보가 없습니다.');
+                return;
+            }
             const res = await fetch('/api/admin/accounts/move', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -336,7 +388,7 @@ export default function TidalAccountsPage() {
         if (!acc) return [];
         const takenSlots = new Set<number>();
         if (acc.order_accounts) {
-            acc.order_accounts.forEach((oa: any) => takenSlots.add(oa.slot_number));
+            acc.order_accounts.forEach((oa: Assignment) => takenSlots.add(oa.slot_number));
         }
         const available = [];
         for (let i = 0; i < acc.max_slots; i++) {
@@ -419,7 +471,7 @@ export default function TidalAccountsPage() {
                                             </thead>
                                             <tbody>
                                                 {slots.map((_, sIdx) => {
-                                                    const assignment = acc.order_accounts?.find((oa: any) => oa.slot_number === sIdx);
+                                                    const assignment = acc.order_accounts?.find((oa: Assignment) => oa.slot_number === sIdx);
                                                     const key = `${acc.id}_${sIdx}`;
                                                     const val = gridValues[key] || {}; // Current Input Values
                                                     const isEditing = editingSlots[key];
@@ -432,7 +484,7 @@ export default function TidalAccountsPage() {
                                                             const end = parseISO(val.end_date);
                                                             const diff = differenceInMonths(end, start);
                                                             if (diff > 0) period = `${diff}개월`;
-                                                        } catch (e) { }
+                                                        } catch { }
                                                     }
 
                                                     return (
@@ -481,7 +533,7 @@ export default function TidalAccountsPage() {
                                                                     </Button>
                                                                 ) : (
                                                                     assignment?.orders ? (
-                                                                        <button className="underline hover:text-blue-600" onClick={() => openOrderDetail(assignment.orders)}>
+                                                                        <button className="underline hover:text-blue-600" onClick={() => assignment.orders && openOrderDetail(assignment.orders)}>
                                                                             {val.order_number || 'No Number'}
                                                                         </button>
                                                                     ) : (

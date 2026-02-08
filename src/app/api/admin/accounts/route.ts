@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const dynamic = 'force-dynamic';
 
 // GET: Fetch all accounts
-export async function GET(_req: NextRequest) {
+export async function GET() {
     try {
         const { data, error } = await supabaseAdmin
             .from('accounts')
@@ -43,8 +43,9 @@ export async function GET(_req: NextRequest) {
         // For simpler UI, we can just return accounts first.
 
         return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
 
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
         if (error) throw error;
 
         return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

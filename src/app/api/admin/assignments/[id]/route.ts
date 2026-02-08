@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         if (targetOrderId) {
-            const orderUpdates: any = {};
+            const orderUpdates: Record<string, string | number | null> = {};
             if (buyer_name !== undefined) orderUpdates.buyer_name = buyer_name;
             if (buyer_phone !== undefined) orderUpdates.buyer_phone = buyer_phone;
             if (buyer_email !== undefined) orderUpdates.buyer_email = buyer_email;
@@ -57,8 +57,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
 
@@ -107,7 +108,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             .eq('id', assignment.order_id);
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

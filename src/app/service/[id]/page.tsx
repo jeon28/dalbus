@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
 import { supabase } from '@/lib/supabase';
@@ -142,7 +143,13 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 <div className="container relative flex flex-col items-center w-full">
                     <button className={styles.backBtn} onClick={() => router.back()} style={{ position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)' }}>←</button>
                     <div className={styles.headerBrand}>
-                        {product.image_url ? <img src={product.image_url} alt={product.name} className={styles.detailLogo} /> : <span className="text-4xl">🎧</span>}
+                        {product.image_url ? (
+                            <div className="relative w-12 h-12 mr-2">
+                                <Image src={product.image_url} alt={product.name} fill className="object-contain" />
+                            </div>
+                        ) : (
+                            <span className="text-4xl">🎧</span>
+                        )}
                         <h1 className={styles.title}>{product.name}</h1>
                     </div>
                 </div>

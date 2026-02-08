@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Image from 'next/image';
 import { Badge } from "@/components/ui/badge";
 import { useServices } from '@/lib/ServiceContext';
 
@@ -32,18 +33,13 @@ export default function ProductsPage() {
                     services.map((product) => (
                         <Card key={product.id} className="flex flex-col overflow-hidden glass hover:shadow-lg transition-all duration-300">
                             <CardHeader className="pb-4">
-                                <div className="h-20 w-full flex items-center justify-center mb-4 bg-muted/30 rounded-lg overflow-hidden p-2">
+                                <div className="h-20 w-full relative flex items-center justify-center mb-4 bg-muted/30 rounded-lg overflow-hidden p-2">
                                     {product.icon && product.icon.startsWith('/') ? (
-                                        <img
+                                        <Image
                                             src={product.icon}
                                             alt={product.name}
+                                            fill
                                             className="h-full w-auto object-contain transition-transform duration-500 hover:scale-110"
-                                            onError={(e) => {
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.display = 'none';
-                                                const fallback = target.nextElementSibling as HTMLElement;
-                                                if (fallback) fallback.style.display = 'block';
-                                            }}
                                         />
                                     ) : null}
                                     <div

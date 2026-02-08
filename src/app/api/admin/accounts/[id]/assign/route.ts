@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             slot_number,
             slot_password,
             // Manual creation fields
-            buyer_id, buyer_name, buyer_phone, buyer_email, start_date, end_date
+            buyer_name, buyer_phone, buyer_email, start_date, end_date
         } = body;
 
         let targetOrderId = order_id;
@@ -118,8 +118,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         return NextResponse.json({ success: true });
 
-    } catch (error: any) {
-        console.error('Assign Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        const e = error as Error;
+        console.error('Assign Error:', e);
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

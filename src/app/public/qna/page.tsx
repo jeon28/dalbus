@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import { supabase } from '@/lib/supabase';
 import { Button } from "@/components/ui/button";
@@ -31,11 +31,7 @@ export default function QnAPage() {
     // const [verifyId, setVerifyId] = useState<string | null>(null);
     // const [password, setPassword] = useState('');
 
-    useEffect(() => {
-        fetchQnas();
-    }, [excludeSecret]);
-
-    const fetchQnas = async () => {
+    const fetchQnas = useCallback(async () => {
         setLoading(true);
         try {
             let query = supabase
@@ -58,7 +54,11 @@ export default function QnAPage() {
             console.error(e);
         }
         setLoading(false);
-    };
+    }, [excludeSecret]);
+
+    useEffect(() => {
+        fetchQnas();
+    }, [excludeSecret, fetchQnas]);
 
     /*
     const handleVerify = async (e: React.FormEvent) => {

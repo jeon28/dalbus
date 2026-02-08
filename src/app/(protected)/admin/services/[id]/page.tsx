@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../../admin.module.css';
 import { useRouter, useParams } from 'next/navigation'; // Use useParams
@@ -31,15 +31,7 @@ export default function EditServicePage() {
         is_active: true
     });
 
-    useEffect(() => {
-        if (!isAdmin) {
-            router.push('/admin');
-        } else if (id) {
-            fetchProduct();
-        }
-    }, [isAdmin, id, router]);
-
-    const fetchProduct = async () => {
+    const fetchProduct = useCallback(async () => {
         setLoading(true);
         try {
             const response = await fetch(`/api/admin/products/${id}`);
@@ -52,7 +44,15 @@ export default function EditServicePage() {
             router.push('/admin/services');
         }
         setLoading(false);
-    };
+    }, [id, router]);
+
+    useEffect(() => {
+        if (!isAdmin) {
+            router.push('/admin');
+        } else if (id) {
+            fetchProduct();
+        }
+    }, [isAdmin, id, router, fetchProduct]);
 
     const handleProductChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, type, checked } = e.target;
