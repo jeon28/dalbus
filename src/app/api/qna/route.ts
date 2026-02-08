@@ -4,6 +4,12 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest) {
+    // Diagnostic: Check if admin key exists
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error('CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing in environment');
+        return NextResponse.json({ error: 'Server configuration error: Missing API Key' }, { status: 500 });
+    }
+
     const { searchParams } = new URL(_req.url);
     const excludeSecret = searchParams.get('exclude_secret') === 'true';
     const userId = searchParams.get('user_id'); // Optional: fetch my posts
@@ -24,6 +30,7 @@ export async function GET(_req: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
+        console.error('Supabase query error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

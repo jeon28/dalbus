@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
+import { supabase } from '@/lib/supabase';
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
@@ -37,10 +38,21 @@ export default function QnAPage() {
     const fetchQnas = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/qna?exclude_secret=${excludeSecret}`);
-            if (res.ok) {
-                const data = await res.json();
-                setQnas(data);
+            let query = supabase
+                .from('qna')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (excludeSecret) {
+                query = query.eq('is_secret', false);
+            }
+
+            const { data, error } = await query;
+
+            if (error) {
+                console.error('Error fetching Q&A:', error);
+            } else {
+                setQnas(data || []);
             }
         } catch (e) {
             console.error(e);
