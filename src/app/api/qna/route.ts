@@ -31,6 +31,12 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    // Diagnostic: Check if admin key exists
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error('CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing in production environment');
+        return NextResponse.json({ error: 'Server configuration error: Missing API Key' }, { status: 500 });
+    }
+
     try {
         const body = await req.json();
         // body should contain: title, content, is_secret, user_id (opt), guest_name (opt), guest_password (opt)
