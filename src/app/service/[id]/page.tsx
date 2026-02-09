@@ -296,8 +296,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 )}
 
                 <button
-                    className={`${styles.submitBtn} w-full mt-8 bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl`}
-                    disabled={loading}
+                    className={`${styles.submitBtn} w-full mt-8 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl`}
+                    disabled={loading || (!user && (!agreements.privacy || !agreements.terms))}
                     onClick={handleSubscribe}
                 >
                     {loading ? '처리 중...' : '구독하기'}
