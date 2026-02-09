@@ -43,12 +43,13 @@
 │   └─ [SCR_MY_003] 프로필 수정
 │
 ├─ 🛡️ 관리자 (Admin)
-│   ├─ [SCR_ADM_001] 주문 관리 대시보드
-│   ├─ [SCR_ADM_002] 계정 배정
-│   ├─ [SCR_ADM_003] 상품/가격 관리
-│   ├─ [SCR_ADM_004] 계정 풀 관리
+│   ├─ [ SCR_ADM_001] 주문 관리 (Multi-Select 필터, 전화번호 검색, Excel Export)
+│   ├─ [SCR_ADM_002] Tidal 계정 관리 (마스터/슬롯, Excel Export)
+│   ├─ [SCR_ADM_003] 서비스 관리
+│   ├─ [SCR_ADM_004] 회원 관리
 │   ├─ [SCR_ADM_005] 공지/FAQ 관리
-│   └─ [SCR_ADM_006] 매출 통계
+│   ├─ [SCR_ADM_006] 운영 설정 (계좌/알림)
+│   └─ [SCR_ADM_007] Q&A 관리
 │
 └─ ⚠️ 에러
     └─ [SCR_ERR_403] 접근 제한

@@ -22,7 +22,6 @@ export default function ProductsPage() {
     return (
         <div className="container py-12">
             <div className="flex flex-col items-center mb-12 text-center">
-                <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl mb-4">서비스 목록</h1>
                 <p className="max-w-[700px] text-muted-foreground md:text-xl">
                     달버스에서 제공하는 프리미엄 구독 서비스를 놀라운 가격에 만나보세요.
                 </p>

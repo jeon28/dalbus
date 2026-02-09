@@ -16,9 +16,12 @@ Dalbus는 Tidal과 같은 프리미엄 OTT 및 스트리밍 서비스의 구독�
 ### 🛡️ 관리자 (Admin)
 - **대시보드**: 실시간 주문 현황, 매출 요약 및 배정 대기 건 관리
 - **회원 관리**: 가입 회원 목록 조회 및 관리
+- **주문 관리**: Multi-Select Status 필터, 전화번호 검색, Excel 내보내기 (회원/비회원 시트 분리)
+- **Tidal 계정 관리**: 마스터 계정 및 슬롯 관리, Excel 내보내기 (마스터 정보 + 6개 고정 슬롯)
 - **서비스/상품 관리**: 공유 서비스 항목 및 기간별 요금제(1/3개월 등) 동적 관리
 - **공지/FAQ 관리**: **동적 카테고리 시스템**이 적용된 공지사항 및 FAQ 관리
 - **운영 설정**: 무통장 입금 계좌(은행, 계좌번호, 예금주) 실시간 설정 및 반영
+- **알림 시스템**: Resend API를 통한 주문 접수 시 관리자 이메일 자동 발송
 
 ---
 
@@ -41,6 +44,7 @@ npm install
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+RESEND_API_KEY=re_your_resend_api_key
 ```
 
 ---
@@ -49,17 +53,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ```text
 dalbus/
-├── docs/               # PRD, 설계 문서 (v2.2 기준 현행화 완료)
+├── docs/               # PRD, 설계 문서 (v2.3 기준 현행화 완료)
 ├── src/
 │   ├── app/
-│   │   ├── (protected)/# 인증이 필요한 페이지 (RBAC 적용)
-│   │   │   ├── admin/  # 관리자 대시보드, 회원/주문/상품/게시판 관리
-│   │   │   ├── mypage/ # 사용자 프로필 및 구독 현황
-│   │   ├── api/        # Next.js Route Handlers (Supabase 연동)
-│   │   ├── public/     # 비로그인 접근 가능 페이지 (공지/FAQ/Q&A/상품)
-│   │   ├── service/    # 상품 상세 및 구매 flow
+│   │   ├── (auth)/     # 인증 페이지 (로그인, 회원가입)
+│   │   ├── (protected)/# 인증 필요 페이지 (RBAC 적용)
+│   │   │   ├── admin/  # 관리자 (주문/회원/서비스/Tidal 계정/공지/FAQ/QnA)
+│   │   │   └── mypage/ # 사용자 프로필 및 구독 현황
+│   │   ├── api/        # Next.js API Routes (주문/관리자/알림)
+│   │   ├── public/     # 공개 페이지 (랜딩, 공지, FAQ, Q&A, 상품 목록)
+│   │   └── service/    # 상품 상세 및 구매 flow
 │   ├── components/     # UI 공통 컴포넌트 (Shadcn/UI 기반)
-│   ├── lib/            # 전역 Context, Supabase Client, 유틸리티
+│   ├── lib/            # Supabase Client, Context, 유틸리티 (email.ts)
+│   └── types/          # TypeScript 타입 정의
 ├── supabase/           # DB Schema 및 Migration SQL 파일
 └── public/             # 정적 자산 (이미지, 로고)
 ```
@@ -77,6 +83,7 @@ dalbus/
 ---
 
 ## 📄 업데이트 이력 (Changelog)
+- **v2.3 (2026-02-09)**: 주문 알림 시스템(Resend), 관리자 필터/검색 고도화, Excel 내보내기 (주문/Tidal 계정)
 - **v2.2 (2026-02-09)**: 주문 성공 결과 페이지 도입, 공지/FAQ 동적 카테고리 시스템, 관리자 운영 설정(계좌 관리) 추가, 모바일 헤더 최적화
 - **v2.1 (2025-02-08)**: 회원 관리 및 Q&A 게시판(비회원 지원) 고도화
 - **v2.0 (2025-02-07)**: PRD 기반 핵심 기능 및 UI 전면 개편 (Tidal 연동)

@@ -22,12 +22,41 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
+import { CheckCircle2, Circle, HelpCircle, Timer, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import * as XLSX from 'xlsx';
 
 
 export default function OrderHistoryPage() {
     const { isAdmin } = useServices();
     const [orders, setOrders] = useState<Record<string, any>[]>([]);
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+    const [phoneSearch, setPhoneSearch] = useState<string>('');
     const router = useRouter();
+
+    const statuses = [
+        {
+            value: "주문신청",
+            label: "주문신청",
+            icon: Circle,
+        },
+        {
+            value: "입금확인",
+            label: "입금확인",
+            icon: Timer,
+        },
+        {
+            value: "배정완료",
+            label: "배정완료",
+            icon: CheckCircle2,
+        },
+        {
+            value: "작업완료",
+            label: "작업완료",
+            icon: HelpCircle,
+        },
+    ]
 
     // Matching Modal State
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
@@ -61,6 +90,49 @@ export default function OrderHistoryPage() {
         if (order.assignment_status === 'assigned') return '배정완료'; // Linked
         if (order.payment_status === 'paid') return '입금확인';
         return '주문신청'; // Pending payment
+    };
+
+    const exportToExcel = () => {
+        // Prepare data for member orders
+        const memberData = memberOrders.map(order => ({
+            '날짜': new Date(order.created_at).toLocaleDateString(),
+            '주문번호': order.order_number,
+            '고객명': order.profiles?.name || order.buyer_name || 'Unknown',
+            '이메일': order.profiles?.email || order.buyer_email || '-',
+            '연락처': order.profiles?.phone || order.buyer_phone || '-',
+            '서비스': order.products?.name || 'Product',
+            '이용기간': order.product_plans?.duration_months ? `${order.product_plans.duration_months}개월` : '-',
+            '금액': order.amount?.toLocaleString() + '원',
+            '상태': getOrderStatus(order)
+        }));
+
+        // Prepare data for guest orders
+        const guestData = guestOrders.map(order => ({
+            '날짜': new Date(order.created_at).toLocaleDateString(),
+            '주문번호': order.order_number,
+            '고객명': order.profiles?.name || order.buyer_name || 'Unknown',
+            '이메일': order.profiles?.email || order.buyer_email || '-',
+            '연락처': order.profiles?.phone || order.buyer_phone || '-',
+            '서비스': order.products?.name || 'Product',
+            '이용기간': order.product_plans?.duration_months ? `${order.product_plans.duration_months}개월` : '-',
+            '금액': order.amount?.toLocaleString() + '원',
+            '상태': getOrderStatus(order)
+        }));
+
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+
+        // Create worksheets
+        const wsMember = XLSX.utils.json_to_sheet(memberData);
+        const wsGuest = XLSX.utils.json_to_sheet(guestData);
+
+        // Add worksheets to workbook
+        XLSX.utils.book_append_sheet(wb, wsMember, '회원 주문');
+        XLSX.utils.book_append_sheet(wb, wsGuest, '비회원 주문');
+
+        // Generate file
+        const fileName = `주문내역_${new Date().toLocaleDateString()}.xlsx`;
+        XLSX.writeFile(wb, fileName);
     };
 
     const handleOpenMatchModal = async (order: any) => {
@@ -220,8 +292,24 @@ export default function OrderHistoryPage() {
         </div>
     );
 
-    const memberOrders = orders.filter(o => !o.is_guest);
-    const guestOrders = orders.filter(o => o.is_guest);
+    const filteredOrders = orders.filter(order => {
+        // Status filter
+        if (selectedStatuses.length > 0) {
+            const status = getOrderStatus(order);
+            if (!selectedStatuses.includes(status)) return false;
+        }
+
+        // Phone number filter
+        if (phoneSearch) {
+            const phone = order.profiles?.phone || order.buyer_phone || '';
+            if (!phone.includes(phoneSearch)) return false;
+        }
+
+        return true;
+    });
+
+    const memberOrders = filteredOrders.filter(o => !o.is_guest);
+    const guestOrders = filteredOrders.filter(o => o.is_guest);
 
     return (
         <main className={styles.main}>
@@ -233,6 +321,24 @@ export default function OrderHistoryPage() {
 
             <div className={`${styles.content} container`}>
                 <section className={styles.orderSection}>
+                    <div className="flex items-center gap-4 mb-4 justify-end">
+                        <Button onClick={exportToExcel} variant="outline" size="sm">
+                            <Download className="mr-2 h-4 w-4" />
+                            엑셀 다운로드
+                        </Button>
+                        <Input
+                            placeholder="전화번호 검색..."
+                            value={phoneSearch}
+                            onChange={(e) => setPhoneSearch(e.target.value)}
+                            className="max-w-xs"
+                        />
+                        <DataTableFacetedFilter
+                            title="Status"
+                            options={statuses}
+                            selectedValues={selectedStatuses}
+                            setFilter={setSelectedStatuses}
+                        />
+                    </div>
                     <Tabs defaultValue="member" className="w-full">
                         <TabsList className="mb-4">
                             <TabsTrigger value="member">회원 주문 ({memberOrders.length})</TabsTrigger>

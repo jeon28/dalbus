@@ -20,13 +20,15 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
     try {
         const body = await req.json();
-        const { admin_login_id, admin_login_pw } = body;
+        const { admin_login_id, admin_login_pw, admin_email, admin_phone } = body;
 
         const { data, error } = await supabaseAdmin
             .from('site_settings')
             .update({
                 admin_login_id,
                 admin_login_pw,
+                admin_email,
+                admin_phone,
                 updated_at: new Date().toISOString()
             })
             .eq('id', 'main')

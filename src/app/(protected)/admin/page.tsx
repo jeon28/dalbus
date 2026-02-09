@@ -32,7 +32,12 @@ export default function AdminPage() {
     const [orders, setOrders] = useState<Order[]>([]);
 
     // Settings State
-    const [settings, setSettings] = useState({ admin_login_id: '', admin_login_pw: '' });
+    const [settings, setSettings] = useState({
+        admin_login_id: '',
+        admin_login_pw: '',
+        admin_email: '',
+        admin_phone: ''
+    });
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [newBank, setNewBank] = useState({ bank_name: '', account_number: '', account_holder: '' });
 
@@ -212,6 +217,23 @@ export default function AdminPage() {
                                     type="password"
                                     value={settings.admin_login_pw}
                                     onChange={e => setSettings({ ...settings, admin_login_pw: e.target.value })}
+                                />
+                            </div>
+                            <div className={styles.settingsItem}>
+                                <Label>알림용 이메일</Label>
+                                <Input
+                                    type="email"
+                                    placeholder="admin@example.com"
+                                    value={settings.admin_email || ''}
+                                    onChange={e => setSettings({ ...settings, admin_email: e.target.value })}
+                                />
+                            </div>
+                            <div className={styles.settingsItem}>
+                                <Label>알림용 휴대폰번호</Label>
+                                <Input
+                                    placeholder="010-1234-5678"
+                                    value={settings.admin_phone || ''}
+                                    onChange={e => setSettings({ ...settings, admin_phone: e.target.value })}
                                 />
                             </div>
                             <Button onClick={handleSaveSettings} className="w-full bg-black text-white hover:bg-gray-800">

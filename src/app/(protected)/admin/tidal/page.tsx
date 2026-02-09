@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -347,6 +348,59 @@ export default function TidalAccountsPage() {
         }
     };
 
+    const exportToExcel = () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const excelData: any[] = [];
+
+        accounts.forEach((acc, accIdx) => {
+            // Master account row
+            excelData.push({
+                'No.': accIdx + 1,
+                '마스터 ID': acc.login_id,
+                '결제 계정': acc.payment_email,
+                '결제일': `${acc.payment_day}일`,
+                '메모': acc.memo,
+                'Slot': '',
+                '고객명': '',
+                '주문번호': '',
+                '소속 ID': '',
+                '소속 PW': '',
+                '시작일': '',
+                '종료일': '',
+            });
+
+            // 6 fixed slot rows
+            for (let slotIdx = 0; slotIdx < 6; slotIdx++) {
+                const assignment = acc.order_accounts?.find(oa => oa.slot_number === slotIdx);
+                const order = assignment?.orders;
+
+                excelData.push({
+                    'No.': '',
+                    '마스터 ID': '',
+                    '결제 계정': '',
+                    '결제일': '',
+                    '메모': '',
+                    'Slot': `Slot ${slotIdx + 1}`,
+                    '고객명': order?.buyer_name || order?.profiles?.name || '',
+                    '주문번호': order?.order_number || '',
+                    '소속 ID': assignment?.tidal_id || '',
+                    '소속 PW': assignment?.slot_password || '',
+                    '시작일': order?.start_date ? new Date(order.start_date).toLocaleDateString() : '',
+                    '종료일': order?.end_date ? new Date(order.end_date).toLocaleDateString() : '',
+                });
+            }
+        });
+
+        // Create workbook
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(excelData);
+        XLSX.utils.book_append_sheet(wb, ws, 'Tidal 계정');
+
+        // Generate file
+        const fileName = `Tidal계정_${new Date().toLocaleDateString()}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    };
+
     // --- Modals --- (Assign/Move)
 
     const openAssignModal = (account: Account, slotIndex: number) => {
@@ -447,9 +501,14 @@ export default function TidalAccountsPage() {
             <header className={`${styles.header} glass`}>
                 <div className="container flex justify-between items-center">
                     <h1 className={styles.title}>Tidal 계정 관리 (V2.2)</h1>
-                    <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
-                        <Plus size={16} /> 계정 추가
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={exportToExcel} variant="outline" className="gap-2">
+                            <Download size={16} /> 엑셀 다운로드
+                        </Button>
+                        <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
+                            <Plus size={16} /> 계정 추가
+                        </Button>
+                    </div>
                 </div>
             </header>
 

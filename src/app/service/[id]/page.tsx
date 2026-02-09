@@ -139,26 +139,43 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             orderData.user_id = user.id;
         }
 
-        const { error } = await supabase.from('orders').insert([orderData]);
-
-        if (error) {
-            console.error('Error creating order:', error);
-            alert('주문 생성 실패: ' + error.message);
-            setLoading(false);
-        } else {
-            // Redirect to dedicated success page
-            const selectedBank = bankAccounts.find(b => b.id === selectedBankId);
-            const bankStr = selectedBank ? `${selectedBank.bank_name} ${selectedBank.account_number} (${selectedBank.account_holder})` : '';
-
-            const params = new URLSearchParams({
-                service: product.name,
-                price: amount.toString(),
-                period: selectedPeriod.toString(),
-                depositor: user ? user.name : guestInfo.depositor,
-                bank: bankStr
+        try {
+            const response = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderData,
+                    product_name: product.name,
+                    plan_name: selectedPlan.duration_months + '개월'
+                })
             });
 
-            router.push(`/public/checkout/success?${params.toString()}`);
+            const result = await response.json();
+
+            if (!response.ok || result.error) {
+                const errorMsg = result.error || 'Failed to create order';
+                console.error('Error creating order:', errorMsg);
+                alert('주문 생성 실패: ' + errorMsg);
+                setLoading(false);
+            } else {
+                // Redirect to dedicated success page
+                const selectedBank = bankAccounts.find(b => b.id === selectedBankId);
+                const bankStr = selectedBank ? `${selectedBank.bank_name} ${selectedBank.account_number} (${selectedBank.account_holder})` : '';
+
+                const params = new URLSearchParams({
+                    service: product.name,
+                    price: amount.toString(),
+                    period: selectedPeriod.toString(),
+                    depositor: user ? user.name : guestInfo.depositor,
+                    bank: bankStr
+                });
+
+                router.push(`/public/checkout/success?${params.toString()}`);
+            }
+        } catch (err) {
+            console.error('Order creation process failed:', err);
+            alert('주문 처리 중 오류가 발생했습니다.');
+            setLoading(false);
         }
     };
 

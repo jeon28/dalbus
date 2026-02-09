@@ -72,9 +72,6 @@ export default function Header() {
                                         로그인
                                     </Button>
                                 </Link>
-                                <Link href="/signup">
-                                    <Button size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">회원가입</Button>
-                                </Link>
                             </>
                         )}
                     </nav>
