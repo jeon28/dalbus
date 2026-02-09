@@ -56,14 +56,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
 
         if (productsData) {
             const mappedServices: Service[] = productsData.map(p => {
-                // Find active plans and get the lowest price
-                const activePlans = (p.product_plans || []).filter((plan: any) => plan.is_active);
-                let displayPrice = p.original_price;
-
-                if (activePlans.length > 0) {
-                    const lowestPlan = [...activePlans].sort((a, b) => a.price - b.price)[0];
-                    displayPrice = lowestPlan.price;
-                }
+                const displayPrice = p.original_price;
 
                 return {
                     id: p.id,

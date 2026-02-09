@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from 'next/link';
 import { ArrowLeft, Trash2, Plus } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
 
 export default function EditServicePage() {
     const { isAdmin } = useServices();
@@ -54,8 +55,9 @@ export default function EditServicePage() {
         }
     }, [isAdmin, id, router, fetchProduct]);
 
-    const handleProductChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, type, checked } = e.target;
+    const handleProductChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        const checked = (e.target as HTMLInputElement).checked;
         setProduct((prev: any) => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
@@ -196,7 +198,14 @@ export default function EditServicePage() {
 
                         <div className="space-y-2">
                             <Label htmlFor="description">설명</Label>
-                            <Input id="description" name="description" value={product.description || ''} onChange={handleProductChange} />
+                            <Textarea
+                                id="description"
+                                name="description"
+                                value={product.description || ''}
+                                onChange={handleProductChange}
+                                placeholder="상세 설명을 입력하세요."
+                                className="min-h-[150px]"
+                            />
                         </div>
 
                         <div className="space-y-2">
@@ -245,8 +254,8 @@ export default function EditServicePage() {
                                         <button
                                             onClick={() => handleTogglePlan(plan)}
                                             className={`text-xs px-2 py-1 rounded cursor-pointer transition-colors ${plan.is_active
-                                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                    : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                                : 'bg-red-100 text-red-800 hover:bg-red-200'
                                                 }`}
                                             title="상태 변경 (Active/Inactive)"
                                         >
