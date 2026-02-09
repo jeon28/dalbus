@@ -38,6 +38,9 @@ export default function Header() {
                                 <Link href="/admin/services" className="transition-colors hover:text-primary font-bold text-foreground/80">
                                     서비스 관리
                                 </Link>
+                                <Link href="/admin/faqs" className="transition-colors hover:text-primary font-bold text-foreground/80">
+                                    FAQ 관리
+                                </Link>
                                 <Link href="/admin/qna" className="transition-colors hover:text-primary font-bold text-foreground/80">
                                     Q&A 관리
                                 </Link>

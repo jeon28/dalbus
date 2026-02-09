@@ -12,43 +12,41 @@ interface FAQ {
     sort_order: number;
 }
 
-const categoryMap: Record<string, string> = {
-    general: '일반',
-    payment: '결제/요금',
-    account: '계정/이용',
-    refund: '환불/해지'
-};
-
 export default function FAQPage() {
     const [faqs, setFaqs] = useState<FAQ[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [openId, setOpenId] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string>('all');
 
     useEffect(() => {
-        const fetchFaqs = async () => {
-            const { data, error } = await supabase
+        const fetchData = async () => {
+            // Fetch FAQs
+            const faqRes = await supabase
                 .from('faqs')
                 .select('*')
                 .eq('is_published', true)
                 .order('sort_order', { ascending: true });
 
-            if (error) {
-                console.error('Error fetching FAQs:', JSON.stringify(error, null, 2));
-            } else {
-                setFaqs(data || []);
-            }
+            // Fetch Categories
+            const catRes = await supabase
+                .from('faq_categories')
+                .select('*')
+                .order('sort_order', { ascending: true });
+
+            if (faqRes.data) setFaqs(faqRes.data);
+            if (catRes.data) setCategories(catRes.data);
             setLoading(false);
         };
 
-        fetchFaqs();
+        fetchData();
     }, []);
 
     const filteredFaqs = activeCategory === 'all'
         ? faqs
         : faqs.filter(f => f.category === activeCategory);
 
-    const categories = ['all', ...Object.keys(categoryMap)];
+    const categoryTabs = ['all', ...categories.map(c => c.name)];
 
     if (loading) {
         return (
@@ -67,7 +65,7 @@ export default function FAQPage() {
 
             {/* Category Tabs */}
             <div className="flex flex-wrap justify-center gap-2 mb-10">
-                {categories.map((cat) => (
+                {categoryTabs.map((cat) => (
                     <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
@@ -76,7 +74,7 @@ export default function FAQPage() {
                             : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                             }`}
                     >
-                        {cat === 'all' ? '전체' : categoryMap[cat]}
+                        {cat === 'all' ? '전체' : cat}
                     </button>
                 ))}
             </div>
@@ -92,7 +90,7 @@ export default function FAQPage() {
                             >
                                 <div className="flex items-center gap-3">
                                     <Badge variant="outline" className="text-[10px] font-normal border-muted-foreground/30">
-                                        {categoryMap[faq.category]}
+                                        {faq.category}
                                     </Badge>
                                     <span className="font-semibold text-foreground/90">{faq.question}</span>
                                 </div>
