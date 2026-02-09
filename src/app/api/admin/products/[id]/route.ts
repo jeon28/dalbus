@@ -27,7 +27,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const body = await req.json();
         // Exclude plans from product update, they are handled separately or via different logic if needed
         // But here we might receive them. For now, let's just update product fields.
-        const { slug, name, original_price, description, benefits, image_url, sort_order, is_active } = body;
+        const { slug, name, original_price, description, detail_content, benefits, image_url, sort_order, is_active } = body;
 
         const { data, error } = await supabaseAdmin
             .from('products')
@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 name,
                 original_price,
                 description,
+                detail_content,
                 benefits,
                 image_url,
                 sort_order,
