@@ -197,14 +197,19 @@ export default function EditServicePage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="description">설명</Label>
+                            <Label htmlFor="description">설명 (서비스 카드 노출)</Label>
+                            <Input id="description" name="description" value={product.description || ''} onChange={handleProductChange} placeholder="서비스 카드에 요약 표시될 내용" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="detail_content">상세 설명 (상세 화면 노출)</Label>
                             <Textarea
-                                id="description"
-                                name="description"
-                                value={product.description || ''}
+                                id="detail_content"
+                                name="detail_content"
+                                value={product.detail_content || ''}
                                 onChange={handleProductChange}
-                                placeholder="상세 설명을 입력하세요."
-                                className="min-h-[150px]"
+                                placeholder="상세 화면에서 보여줄 특징 및 정보를 입력하세요."
+                                className="min-h-[200px]"
                             />
                         </div>
 

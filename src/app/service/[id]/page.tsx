@@ -158,14 +158,12 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             </header>
 
             <div className={`${styles.content} container max-w-2xl mx-auto py-8`}>
-                {/* Product Description / Detail Content */}
-                {(product.description || product.detail_content) && (
+                {/* Product Detailed Content */}
+                {(product.detail_content || product.description) && (
                     <div
                         className="glass p-6 rounded-xl mb-8 animate-fade-in text-sm leading-relaxed whitespace-pre-line"
                     >
-                        {product.description || (product.detail_content && (
-                            <div dangerouslySetInnerHTML={{ __html: product.detail_content }} />
-                        ))}
+                        {product.detail_content || product.description}
                     </div>
                 )}
 
