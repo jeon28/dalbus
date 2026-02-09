@@ -74,8 +74,9 @@
 }
 
 .active {
-    border: 2px solid var(--primary) !important;
-    background: rgba(0, 0, 0, 0.02);
+    border: 3px solid var(--primary) !important;
+    background: rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .submitBtn {
@@ -84,13 +85,15 @@
     padding: 20px;
     border-radius: 8px;
     font-size: 1.1rem;
-    font-weight: 900;
+    font-weight: 950;
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-top: 10px;
 }
 
 .submitBtn:disabled {
-    background: #f0f0f0;
-    color: #cccccc;
+    background: #d1d5db !important;
+    color: #9ca3af !important;
+    cursor: not-allowed;
+    box-shadow: none !important;
 }
