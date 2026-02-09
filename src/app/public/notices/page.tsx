@@ -14,19 +14,12 @@ interface Notice {
     created_at: string;
 }
 
-const categoryMap: Record<string, { label: string, color: string }> = {
-    service: { label: '서비스', color: 'bg-blue-100 text-blue-800' },
-    update: { label: '업데이트', color: 'bg-green-100 text-green-800' },
-    event: { label: '이벤트', color: 'bg-purple-100 text-purple-800' },
-    maintenance: { label: '점검', color: 'bg-red-100 text-red-800' }
-};
-
 export default function NoticesPage() {
     const [notices, setNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchNotices = async () => {
+        const fetchData = async () => {
             const { data, error } = await supabase
                 .from('notices')
                 .select('*')
@@ -42,7 +35,7 @@ export default function NoticesPage() {
             setLoading(false);
         };
 
-        fetchNotices();
+        fetchData();
     }, []);
 
     if (loading) {
@@ -69,8 +62,8 @@ export default function NoticesPage() {
                                     {notice.is_pinned && (
                                         <Badge variant="default" className="bg-primary hover:bg-primary">중요</Badge>
                                     )}
-                                    <Badge variant="secondary" className={categoryMap[notice.category]?.color}>
-                                        {categoryMap[notice.category]?.label || notice.category}
+                                    <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+                                        {notice.category}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground ml-auto">
                                         {new Date(notice.created_at).toLocaleDateString('ko-KR')}
