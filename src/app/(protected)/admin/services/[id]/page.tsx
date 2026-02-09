@@ -119,8 +119,24 @@ export default function EditServicePage() {
         }
     };
 
+    const handleTogglePlan = async (plan: any) => {
+        try {
+            const response = await fetch(`/api/admin/plans/${plan.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    is_active: !plan.is_active
+                })
+            });
+            if (!response.ok) throw new Error('Failed to update plan status');
+            fetchProduct();
+        } catch (error: any) {
+            alert(`오류 발생: ${error.message}`);
+        }
+    };
+
     const handleDeletePlan = async (planId: string) => {
-        if (!confirm('정말 삭제하시겠습니까?')) return;
+        if (!confirm('정말 삭제하시겠습니까?\n이 기간권으로 결제된 내역이 있을 경우 삭제가 실패할 수 있습니다. (이 경우 \'비활성화\'를 권장합니다)')) return;
         try {
             const response = await fetch(`/api/admin/plans/${planId}`, {
                 method: 'DELETE',
@@ -128,10 +144,12 @@ export default function EditServicePage() {
             if (response.ok) {
                 fetchProduct();
             } else {
-                alert('삭제 실패');
+                const errorData = await response.json();
+                alert(`삭제 실패: ${errorData.error || '알 수 없는 오류'}`);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error deleting plan:', error);
+            alert(`삭제 실패: ${error.message}`);
         }
     };
 
@@ -224,9 +242,16 @@ export default function EditServicePage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className={`text-xs px-2 py-0.5 rounded ${plan.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        <button
+                                            onClick={() => handleTogglePlan(plan)}
+                                            className={`text-xs px-2 py-1 rounded cursor-pointer transition-colors ${plan.is_active
+                                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                                    : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                                }`}
+                                            title="상태 변경 (Active/Inactive)"
+                                        >
                                             {plan.is_active ? 'Active' : 'Inactive'}
-                                        </span>
+                                        </button>
                                         <Button variant="ghost" size="icon" onClick={() => handleDeletePlan(plan.id)}>
                                             <Trash2 className="h-4 w-4 text-red-500" />
                                         </Button>
