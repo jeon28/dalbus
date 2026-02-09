@@ -10,10 +10,26 @@ import { Badge } from "@/components/ui/badge";
 import { useServices } from '@/lib/ServiceContext';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 
+interface FAQ {
+    id: string;
+    question: string;
+    answer: string;
+    category: string;
+    sort_order: number;
+    is_published: boolean;
+    created_at?: string;
+}
+
+interface FAQCategory {
+    id: string;
+    name: string;
+    sort_order: number;
+}
+
 export default function FAQAdminPage() {
     const { isAdmin } = useServices();
-    const [faqs, setFaqs] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [faqs, setFaqs] = useState<FAQ[]>([]);
+    const [categories, setCategories] = useState<FAQCategory[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Form states
@@ -27,13 +43,7 @@ export default function FAQAdminPage() {
     });
     const [newCategory, setNewCategory] = useState('');
 
-    useEffect(() => {
-        if (isAdmin) {
-            fetchData();
-        }
-    }, [isAdmin]);
-
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         setLoading(true);
         const [faqRes, catRes] = await Promise.all([
             fetch('/api/admin/faqs'),
@@ -48,7 +58,13 @@ export default function FAQAdminPage() {
             }
         }
         setLoading(false);
-    };
+    }, [formData.category]);
+
+    useEffect(() => {
+        if (isAdmin) {
+            fetchData();
+        }
+    }, [isAdmin, fetchData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,7 +85,7 @@ export default function FAQAdminPage() {
         }
     };
 
-    const handleEdit = (faq: any) => {
+    const handleEdit = (faq: FAQ) => {
         setIsEditing(faq.id);
         setFormData({
             question: faq.question,

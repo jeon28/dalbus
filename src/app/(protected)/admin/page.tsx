@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -9,17 +8,32 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+interface Order {
+    id: string;
+    created_at: string;
+    amount: number;
+    payment_status: string;
+    assignment_status: string;
+}
+
+interface BankAccount {
+    id: string;
+    bank_name: string;
+    account_number: string;
+    account_holder: string;
+}
+
 export default function AdminPage() {
-    const { isAdmin, loginAdmin, logoutAdmin } = useServices();
+    const { isAdmin, loginAdmin } = useServices();
 
     // Auth Form State
     const [loginId, setLoginId] = useState('');
     const [loginPw, setLoginPw] = useState('');
-    const [orders, setOrders] = useState<any[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
 
     // Settings State
     const [settings, setSettings] = useState({ admin_login_id: '', admin_login_pw: '' });
-    const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [newBank, setNewBank] = useState({ bank_name: '', account_number: '', account_holder: '' });
 
     const fetchStats = async () => {

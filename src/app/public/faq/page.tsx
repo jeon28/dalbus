@@ -12,9 +12,15 @@ interface FAQ {
     sort_order: number;
 }
 
+interface FAQCategory {
+    id: string;
+    name: string;
+    sort_order: number;
+}
+
 export default function FAQPage() {
     const [faqs, setFaqs] = useState<FAQ[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [categories, setCategories] = useState<FAQCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [openId, setOpenId] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string>('all');

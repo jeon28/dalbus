@@ -10,10 +10,26 @@ import { Badge } from "@/components/ui/badge";
 import { useServices } from '@/lib/ServiceContext';
 import { Pencil, Trash2, Plus, Pin, PinOff } from 'lucide-react';
 
+interface Notice {
+    id: string;
+    title: string;
+    content: string;
+    category: string;
+    is_published: boolean;
+    is_pinned: boolean;
+    created_at: string;
+}
+
+interface NoticeCategory {
+    id: string;
+    name: string;
+    sort_order: number;
+}
+
 export default function NoticeAdminPage() {
     const { isAdmin } = useServices();
-    const [notices, setNotices] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [notices, setNotices] = useState<Notice[]>([]);
+    const [categories, setCategories] = useState<NoticeCategory[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Form states
@@ -27,13 +43,7 @@ export default function NoticeAdminPage() {
     });
     const [newCategory, setNewCategory] = useState('');
 
-    useEffect(() => {
-        if (isAdmin) {
-            fetchData();
-        }
-    }, [isAdmin]);
-
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         setLoading(true);
         const [noticeRes, catRes] = await Promise.all([
             fetch('/api/admin/notices'),
@@ -48,7 +58,13 @@ export default function NoticeAdminPage() {
             }
         }
         setLoading(false);
-    };
+    }, [formData.category]);
+
+    useEffect(() => {
+        if (isAdmin) {
+            fetchData();
+        }
+    }, [isAdmin, fetchData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,7 +85,7 @@ export default function NoticeAdminPage() {
         }
     };
 
-    const handleEdit = (notice: any) => {
+    const handleEdit = (notice: Notice) => {
         setIsEditing(notice.id);
         setFormData({
             title: notice.title,
@@ -87,7 +103,7 @@ export default function NoticeAdminPage() {
         if (res.ok) fetchData();
     };
 
-    const handleTogglePin = async (notice: any) => {
+    const handleTogglePin = async (notice: Notice) => {
         const res = await fetch(`/api/admin/notices/${notice.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
