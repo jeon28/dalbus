@@ -118,13 +118,6 @@ export default function FAQPage() {
                 )}
             </div>
 
-            <div className="mt-16 p-8 rounded-2xl bg-primary/5 text-center">
-                <h3 className="text-lg font-bold mb-2">원하시는 답변을 찾지 못하셨나요?</h3>
-                <p className="text-sm text-muted-foreground mb-6">달버스 고객센터로 문의해 주시면 친절하게 답변해 드리겠습니다.</p>
-                <button className="bg-primary text-primary-foreground px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-opacity">
-                    1:1 문의하기
-                </button>
-            </div>
         </div>
     );
 }
