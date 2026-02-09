@@ -153,6 +153,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             const params = new URLSearchParams({
                 service: product.name,
                 price: amount.toString(),
+                period: selectedPeriod.toString(),
                 depositor: user ? user.name : guestInfo.depositor,
                 bank: bankStr
             });

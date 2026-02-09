@@ -16,7 +16,8 @@ export async function GET() {
         .select(`
             *,
             profiles(name, email, phone),
-            products(name)
+            products(name),
+            product_plans(duration_months)
         `)
         .order('created_at', { ascending: false });
 

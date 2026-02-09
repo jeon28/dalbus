@@ -183,7 +183,14 @@ export default function OrderHistoryPage() {
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
                                     <div className="text-xs text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
-                                <td>{o.products?.name || 'Product'}</td>
+                                <td>
+                                    <div>{o.products?.name || 'Product'}</div>
+                                    {o.product_plans?.duration_months && (
+                                        <div className="text-[10px] text-gray-400">
+                                            이용기간: {o.product_plans.duration_months}개월
+                                        </div>
+                                    )}
+                                </td>
                                 <td>₩{o.amount?.toLocaleString()}</td>
                                 <td>
                                     <span className={`px-2 py-1 rounded text-xs 

@@ -10,6 +10,7 @@ import styles from './mypage.module.css';
 
 interface UserSubscription {
     service_name: string;
+    duration: string;
     end_date: string;
     account_id: string;
     account_pw: string;
@@ -26,28 +27,30 @@ export default function MyPage() {
         if (!user) return;
         setLoading(true);
 
-        // Fetch orders and related shared accounts
+        // Fetch orders and related data using v2 schema
         const { data, error } = await supabase
             .from('orders')
             .select(`
-                work_status,
-                services(name),
-                shared_accounts(account_id, account_pw, end_date)
+                assignment_status,
+                products(name),
+                product_plans(duration_months),
+                order_number
             `)
             .eq('user_id', user?.id)
-            .eq('payment_status', '완료');
+            .order('created_at', { ascending: false });
 
         if (error) {
             console.error('Error fetching subscriptions:', error);
         } else if (data) {
             const mapped: UserSubscription[] = data.map((item: any) => {
-                const account = item.shared_accounts?.[0];
+                const duration = item.product_plans?.duration_months || 0;
                 return {
-                    service_name: (item.services as any)?.name || 'Service',
-                    end_date: account?.end_date || '-',
-                    account_id: account?.account_id || '매칭 대기 중',
-                    account_pw: account?.account_pw || '매칭 대기 중',
-                    status: item.work_status
+                    service_name: item.products?.name || 'Service',
+                    duration: duration > 0 ? `${duration}개월` : '-',
+                    end_date: item.end_date || '-', // end_date is on order in v2
+                    account_id: '계정 정보 확인 중', // In a full impl, we'd join order_accounts -> accounts
+                    account_pw: '계정 정보 확인 중',
+                    status: item.assignment_status
                 };
             });
             setSubscriptions(mapped);
@@ -105,7 +108,7 @@ export default function MyPage() {
                                 <div className={styles.cardTop}>
                                     <span className={styles.serviceIcon}>🎧</span>
                                     <div className={styles.serviceInfo}>
-                                        <h4>{sub.service_name}</h4>
+                                        <h4>{sub.service_name} ({sub.duration})</h4>
                                         <p>{sub.end_date} 까지</p>
                                     </div>
                                     <span className={styles.statusBadge}>{sub.status}</span>

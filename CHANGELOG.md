@@ -1,31 +1,38 @@
-# Changelog
+# Changelog - 2026-02-09
 
-All notable changes to this project will be documented in this file.
+## 📢 공지사항 및 FAQ 관리 시스템 고도화
+- **공지사항 관리 기능**:
+    - 관리자 전용 공지사항 CRUD(생성, 조회, 수정, 삭제) 기능 구현.
+    - 공지사항 상단 고정(Pin) 및 게시 상태 설정 기능 추가.
+    - 동적 카테고리 시스템 도입 (`notice_categories` 테이블 생성 및 연동).
+- **FAQ 개선**:
+    - 사용자 페이지에서 '1:1 문의하기' 섹션 제거 요청 반영.
+    - 관리자 FAQ 카테고리 관리 기능 안정화.
 
-## [Unreleased] - 2026-02-08
+## 📱 모바일 UI/UX 최적화
+- **헤더 리팩토링**:
+    - 모바일 화면에서 브랜드 로고 상시 노출.
+    - 모바일에서 숨겨져 있던 주 메뉴(서비스, 공지사항, FAQ, Q&A)를 가로 스크롤 형태로 상시 노출 처리.
+    - 메뉴명 간소화: '서비스 목록' → **'서비스'**.
+- **반응형 디자인**:
+    - 모바일 기기에서의 버튼 크기, 텍스트 가독성 및 터치 편의성 조정.
 
-### Added
-- **Admin Dashboard**:
-  - Implemented secure Order History view bypassing RLS safely.
-  - Added Member List view (`/admin/members`) to see all registered users.
-  - Added Service Management (`/admin/services`) for CRUD operations on Products and Plans.
-  - Added Q&A Management (`/admin/qna`) for answering user inquiries.
-- **Q&A Feature**:
-  - Public Q&A Board (`/public/qna`) accessible to both Members and Guests.
-  - Guest support with Name/Password authentication for post management.
-  - Secret post functionality (visible only to author and admin).
-  - Admin answer capability.
-- **Database**:
-  - Added `qna` table for storing inquiries and answers.
-  - Added RLS policies for `qna` table.
-  - Added `supabaseAdmin` client for secure server-side operations.
+## 🛒 주문 및 결제 프로세스 개선
+- **주문 완료 전용 페이지 신설**:
+    - 기존 브라우저 `alert()` 알림을 전용 결과 페이지(`/public/checkout/success`)로 대체.
+    - 주문 내역 요약(서비스명, 이용 기간, 결제 금액, 입금자명, 입금 계좌) 시각화.
+- **결제 UI 디테일**:
+    - '전체동의' 시 '구독하기' 버튼 색상을 **검정색 배경/흰색 글자**로 명확하게 변경.
+    - 이용 기간(개월 수) 정보가 누락되지 않도록 체크아웃 및 결과 페이지 로직 보완.
 
-### Changed
-- **Navigation**:
-  - Updated Header to include links for Q&A and Admin features.
-  - Admin links are conditionally rendered based on admin status.
-- **Security**:
-  - Removed `localStorage` persistence for Admin login to enhance security (session-based).
-- **Fixes**:
-  - Fixed CSS regression on landing page.
-  - Fixed various build errors and port conflicts.
+## 📊 주문 내역 관리 강화
+- **이용 기간 표시 추가**:
+    - **관리자**: 주문 내역 목록에서 각 주문의 구독 기간(개월)을 바로 확인할 수 있도록 수정.
+    - **사용자**: 마이페이지 '내 구독 정보' 카드에 이용 기간 정보 추가.
+- **마이페이지 최적화**:
+    - DB v2.0 스키마 변경 사항에 맞춰 마이페이지 데이터 로드 로직 전면 수정 및 최적화.
+
+## 🛠️ 기술적 수정 사항
+- **API 안정화**: 관리자용 주문, 공지사항, 카테고리 관련 API 엔드포인트 구현 및 예외 처리.
+- **린트 오류 해결**: 사용하지 않는 컴포넌트(`Switch`) 제거 및 타입 정의 보완.
+- **데이터베이스 migration**: 공지사항 및 FAQ 관리를 위한 신규 마이그레이션 파일(`015`, `016`) 적용.
