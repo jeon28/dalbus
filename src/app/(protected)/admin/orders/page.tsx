@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+
 
 export default function OrderHistoryPage() {
     const { isAdmin } = useServices();
@@ -199,7 +199,7 @@ export default function OrderHistoryPage() {
                                         <Button size="sm" variant="secondary" onClick={() => confirmPayment(o.id)}>입금확인</Button>
                                     )}
                                     {status === '입금확인' && (
-                                        <Button size="sm" onClick={() => handleOpenMatchModal(o)}>매칭</Button>
+                                        <Button size="sm" onClick={() => handleOpenMatchModal(o)}>계정배정</Button>
                                     )}
                                     {status === '배정완료' && (
                                         <Button size="sm" variant="outline" onClick={() => markAsCompleted(o.id)}>작업완료</Button>
@@ -243,9 +243,9 @@ export default function OrderHistoryPage() {
                     <DialogHeader><DialogTitle>주문 매칭 (Tidal 배정)</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">계정 선택</Label>
+                            <Label className="text-right">마스터 계정 선택</Label>
                             <Select onValueChange={setSelectedAccount} value={selectedAccount}>
-                                <SelectTrigger className="col-span-3"><SelectValue placeholder="계정 선택" /></SelectTrigger>
+                                <SelectTrigger className="col-span-3"><SelectValue placeholder="마스터 계정 선택" /></SelectTrigger>
                                 <SelectContent>
                                     {availableAccounts.map(acc => (
                                         <SelectItem key={acc.id} value={acc.id}>
@@ -268,10 +268,6 @@ export default function OrderHistoryPage() {
                                 </Select>
                             </div>
                         )}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Slot PW</Label>
-                            <Input value={slotPasswordModal} onChange={(e) => setSlotPasswordModal(e.target.value)} placeholder="설정할 비밀번호 (선택)" className="col-span-3" />
-                        </div>
                     </div>
                     <DialogFooter>
                         <Button onClick={confirmMatch} disabled={!selectedAccount || selectedSlot === null}>배정 확인</Button>

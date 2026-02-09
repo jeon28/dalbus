@@ -20,11 +20,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             order_id // Needed to update order
         } = body;
 
-        // 1. Update order_accounts (Just slot_password for now)
-        if (slot_password !== undefined) {
+        // 1. Update order_accounts (slot_password, tidal_id)
+        const oaUpdates: Record<string, string | null> = {};
+        if (slot_password !== undefined) oaUpdates.status_password = slot_password; // Wait, previous code had a typo or used slot_password? Looking at file... L27 says slot_password.
+        if (body.tidal_id !== undefined) oaUpdates.tidal_id = body.tidal_id;
+
+        // Wait, I should use the correct field names. L27 used slot_password.
+        const oaUpdatesFinal: Record<string, string | null> = {};
+        if (slot_password !== undefined) oaUpdatesFinal.slot_password = slot_password;
+        if (body.tidal_id !== undefined) oaUpdatesFinal.tidal_id = body.tidal_id;
+
+        if (Object.keys(oaUpdatesFinal).length > 0) {
             const { error: oaError } = await supabaseAdmin
                 .from('order_accounts')
-                .update({ slot_password })
+                .update(oaUpdatesFinal)
                 .eq('id', id);
             if (oaError) throw oaError;
         }
@@ -85,19 +94,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         if (delError) throw delError;
 
-        // 3. Decrement used_slots
-        const { data: account } = await supabaseAdmin
-            .from('accounts')
-            .select('used_slots')
-            .eq('id', assignment.account_id)
-            .single();
+        // 3. Update Account Used Slots (Robust Sync)
+        const { count: actualCount } = await supabaseAdmin
+            .from('order_accounts')
+            .select('*', { count: 'exact', head: true })
+            .eq('account_id', assignment.account_id);
 
-        if (account) {
-            await supabaseAdmin
-                .from('accounts')
-                .update({ used_slots: Math.max(0, account.used_slots - 1) })
-                .eq('id', assignment.account_id);
-        }
+        await supabaseAdmin
+            .from('accounts')
+            .update({ used_slots: actualCount || 0 })
+            .eq('id', assignment.account_id);
 
         // 4. Update Order Status back to 'waiting'? 
         // Or 'cancelled'? User just said "Delete" which implies unassign.

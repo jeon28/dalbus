@@ -11,6 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             order_id,
             slot_number,
             slot_password,
+            tidal_id,
             // Manual creation fields
             buyer_name, buyer_phone, buyer_email, start_date, end_date
         } = body;
@@ -96,16 +97,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 order_id: targetOrderId,
                 account_id: account_id,
                 slot_number: slot_number,
-                slot_password: slot_password
+                slot_password: slot_password,
+                tidal_id: tidal_id
             });
 
         if (insertError) throw insertError;
 
-        // 4. Update Account Used Slots
-        const { data: account } = await supabaseAdmin.from('accounts').select('used_slots').eq('id', account_id).single();
-        if (account) {
-            await supabaseAdmin.from('accounts').update({ used_slots: account.used_slots + 1 }).eq('id', account_id);
-        }
+        // 4. Update Account Used Slots (Robust Sync)
+        const { count: actualCount } = await supabaseAdmin
+            .from('order_accounts')
+            .select('*', { count: 'exact', head: true })
+            .eq('account_id', account_id);
+
+        await supabaseAdmin.from('accounts').update({ used_slots: actualCount || 0 }).eq('id', account_id);
 
         // 5. Update Order Status
         await supabaseAdmin

@@ -20,6 +20,7 @@ export interface Database {
           product_id: string
           status: 'available' | 'assigned' | 'disabled'
           used_slots: number
+          payment_day: number
         }
         Insert: {
           created_at?: string
@@ -31,6 +32,7 @@ export interface Database {
           product_id: string
           status?: 'available' | 'assigned' | 'disabled'
           used_slots?: number
+          payment_day?: number
         }
         Update: {
           created_at?: string
@@ -42,6 +44,7 @@ export interface Database {
           product_id?: string
           status?: 'available' | 'assigned' | 'disabled'
           used_slots?: number
+          payment_day?: number
         }
         Relationships: [
           {
@@ -160,22 +163,29 @@ export interface Database {
       }
       order_accounts: {
         Row: {
-          account_id: string
-          assigned_at: string
           id: string
           order_id: string
+          slot_number: number
+          slot_password: string | null
+          tidal_id: string | null
         }
         Insert: {
           account_id: string
           assigned_at?: string
           id?: string
           order_id: string
+          slot_number?: number
+          slot_password?: string | null
+          tidal_id?: string | null
         }
         Update: {
           account_id?: string
           assigned_at?: string
           id?: string
           order_id?: string
+          slot_number?: number
+          slot_password?: string | null
+          tidal_id?: string | null
         }
         Relationships: [
           {

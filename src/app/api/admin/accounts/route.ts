@@ -16,6 +16,7 @@ export async function GET() {
                     assigned_at,
                     slot_number,
                     slot_password,
+                    tidal_id,
                     orders (
                         id,
                         order_number,
@@ -24,7 +25,13 @@ export async function GET() {
                         buyer_email,
                         start_date, 
                         end_date,
-                        profiles ( name, phone, email )
+                        created_at,
+                        amount,
+                        payment_status,
+                        assignment_status,
+                        user_id,
+                        profiles ( name, phone, email ),
+                        products ( name )
                     )
                 )
             `)
@@ -53,7 +60,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        // body: product_id, login_id, login_pw, payment_email, max_slots, memo
+        // body: product_id, login_id, login_pw, payment_email, payment_day, max_slots, memo
 
         const { data, error } = await supabaseAdmin
             .from('accounts')
