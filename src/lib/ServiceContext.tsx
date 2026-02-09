@@ -8,6 +8,7 @@ export interface Service {
     name: string;
     icon: string;
     price: string;
+    description?: string;
     tag: string;
     color: string;
 }
@@ -41,26 +42,39 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
 
     // Fetch services (products) from Supabase
     const fetchServices = async () => {
-        const { data, error } = await supabase
+        // Fetch products and their active plans
+        const { data: productsData, error: productsError } = await supabase
             .from('products')
-            .select('*')
+            .select('*, product_plans(*)')
             .eq('is_active', true)
             .order('sort_order', { ascending: true });
 
-        if (error) {
-            console.error('Error fetching products:', JSON.stringify(error, null, 2));
+        if (productsError) {
+            console.error('Error fetching products:', JSON.stringify(productsError, null, 2));
             return;
         }
 
-        if (data) {
-            const mappedServices: Service[] = data.map(p => ({
-                id: p.id,
-                name: p.name,
-                icon: p.image_url || 'default',
-                price: p.original_price.toLocaleString(),
-                tag: (p.tags && p.tags.length > 0) ? p.tags[0] : '',
-                color: 'default' // Default color if not in schema
-            }));
+        if (productsData) {
+            const mappedServices: Service[] = productsData.map(p => {
+                // Find active plans and get the lowest price
+                const activePlans = (p.product_plans || []).filter((plan: any) => plan.is_active);
+                let displayPrice = p.original_price;
+
+                if (activePlans.length > 0) {
+                    const lowestPlan = [...activePlans].sort((a, b) => a.price - b.price)[0];
+                    displayPrice = lowestPlan.price;
+                }
+
+                return {
+                    id: p.id,
+                    name: p.name,
+                    icon: p.image_url || 'default',
+                    price: displayPrice.toLocaleString(),
+                    description: p.description || '',
+                    tag: (p.tags && p.tags.length > 0) ? p.tags[0] : '',
+                    color: 'default'
+                };
+            });
             setServices(mappedServices);
         }
     };

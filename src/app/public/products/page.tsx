@@ -53,7 +53,7 @@ export default function ProductsPage() {
                             </CardHeader>
                             <CardContent className="flex-1 pb-6">
                                 <p className="text-sm text-muted-foreground mb-4">
-                                    가장 저렴하고 안전한 공유 계정 이용.
+                                    {product.description || '가장 저렴하고 안전한 공유 계정 이용.'}
                                 </p>
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-2xl font-bold">₩{product.price}</span>

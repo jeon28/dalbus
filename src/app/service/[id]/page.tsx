@@ -36,9 +36,16 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             const { data: plansData } = await supabase
                 .from('product_plans')
                 .select('*')
-                .eq('product_id', serviceId);
+                .eq('product_id', serviceId)
+                .eq('is_active', true)
+                .order('duration_months', { ascending: true });
 
-            if (plansData) setPlans(plansData);
+            if (plansData) {
+                setPlans(plansData);
+                if (plansData.length > 0) {
+                    setSelectedPeriod(plansData[0].duration_months);
+                }
+            }
         };
         fetchDetail();
     }, [serviceId]);
@@ -48,7 +55,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const product = serviceDetail || (basicService ? { ...basicService, detail_content: null, original_price: parseInt(basicService.price.replace(/,/g, '')) } : null);
 
     const [loading, setLoading] = useState(false);
-    const [selectedPeriod, setSelectedPeriod] = useState<1 | 3>(1);
+    const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
 
     // Guest Form State
     const [guestInfo, setGuestInfo] = useState({
@@ -126,16 +133,11 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
     if (!product) return <div className="container py-20 text-center">Loading...</div>;
 
-    // Use plan prices for display if available, fallback to calculation
-    const plan1 = plans.find(p => p.duration_months === 1);
-    const plan3 = plans.find(p => p.duration_months === 3);
-
-    const price1Month = plan1 ? plan1.price : product.original_price;
-    const price3Month = plan3 ? plan3.price : Math.floor(product.original_price * 3 * 0.95);
-
-    const calculatedPrice = selectedPeriod === 3
-        ? price3Month.toLocaleString()
-        : price1Month.toLocaleString();
+    // Use selected plan price for display
+    const currentPlan = plans.find(p => p.duration_months === selectedPeriod);
+    const calculatedPrice = currentPlan
+        ? currentPlan.price.toLocaleString()
+        : product.original_price.toLocaleString();
 
     return (
         <main className={styles.main}>
@@ -174,24 +176,33 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     </ul>
                 </div>
 
-                {/* Period Selection */}
+                {/* Period Selection - Dynamic */}
                 <section className={styles.options}>
                     <h3 className="text-lg font-bold mb-3">이용 기간 선택</h3>
                     <div className={styles.optionList}>
-                        <div
-                            className={`${styles.optionItem} ${selectedPeriod === 1 ? styles.active : ''} glass`}
-                            onClick={() => setSelectedPeriod(1)}
-                        >
-                            <span>1개월</span>
-                            <span>{product.original_price.toLocaleString()}원</span>
-                        </div>
-                        <div
-                            className={`${styles.optionItem} ${selectedPeriod === 3 ? styles.active : ''} glass`}
-                            onClick={() => setSelectedPeriod(3)}
-                        >
-                            <span>3개월 (5% 할인)</span>
-                            <span>{Math.floor(product.original_price * 3 * 0.95).toLocaleString()}원</span>
-                        </div>
+                        {plans.length > 0 ? (
+                            plans.map((plan) => (
+                                <div
+                                    key={plan.id}
+                                    className={`${styles.optionItem} ${selectedPeriod === plan.duration_months ? styles.active : ''} glass`}
+                                    onClick={() => setSelectedPeriod(plan.duration_months)}
+                                >
+                                    <span>
+                                        {plan.duration_months}개월
+                                        {plan.discount_rate > 0 && (
+                                            <span className="ml-1 text-[10px] text-green-600 font-normal">
+                                                ({plan.discount_rate}% 할인)
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span>{plan.price.toLocaleString()}원</span>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-4 text-center text-sm text-muted-foreground glass rounded-xl">
+                                사용 가능한 요금제가 없습니다.
+                            </div>
+                        )}
                     </div>
                 </section>
 
