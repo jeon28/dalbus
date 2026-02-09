@@ -57,6 +57,27 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [loading, setLoading] = useState(false);
     const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
 
+    // Bank Accounts State
+    const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+    const [selectedBankId, setSelectedBankId] = useState<string>('');
+
+    useEffect(() => {
+        const fetchBanks = async () => {
+            try {
+                const res = await fetch('/api/admin/bank-accounts');
+                if (res.ok) {
+                    const data = await res.json();
+                    const activeBanks = data.filter((b: any) => b.is_active);
+                    setBankAccounts(activeBanks);
+                    if (activeBanks.length > 0) setSelectedBankId(activeBanks[0].id);
+                }
+            } catch (err) {
+                console.error('Failed to fetch bank accounts:', err);
+            }
+        };
+        fetchBanks();
+    }, []);
+
     // Guest Form State
     const [guestInfo, setGuestInfo] = useState({
         name: '',
@@ -243,8 +264,19 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                 </div>
                             </RadioGroup>
 
-                            <select className="w-full p-3 rounded-md border border-input bg-background mb-3 text-sm">
-                                <option>하나은행 39091001317704 예금주: 유한회사 소프트데이</option>
+                            <select
+                                className="w-full p-3 rounded-md border border-input bg-background mb-3 text-sm focus:ring-2 focus:ring-primary outline-none"
+                                value={selectedBankId}
+                                onChange={(e) => setSelectedBankId(e.target.value)}
+                            >
+                                {bankAccounts.map(bank => (
+                                    <option key={bank.id} value={bank.id}>
+                                        {bank.bank_name} {bank.account_number} 예금주: {bank.account_holder}
+                                    </option>
+                                ))}
+                                {bankAccounts.length === 0 && (
+                                    <option disabled>등록된 결제 계좌가 없습니다.</option>
+                                )}
                             </select>
 
                             <Input
