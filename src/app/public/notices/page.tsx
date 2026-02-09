@@ -9,7 +9,7 @@ interface Notice {
     id: string;
     title: string;
     content: string;
-    category: 'service' | 'update' | 'event' | 'maintenance';
+    category: string;
     is_pinned: boolean;
     created_at: string;
 }

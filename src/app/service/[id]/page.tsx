@@ -146,9 +146,18 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             alert('주문 생성 실패: ' + error.message);
             setLoading(false);
         } else {
-            alert(user ? '구독 신청이 완료되었습니다.' : '주문이 접수되었습니다. 입금 확인 후 알림톡이 발송됩니다.');
-            if (user) router.push('/mypage');
-            else router.push('/'); // Redirect to home or a guest order status page
+            // Redirect to dedicated success page
+            const selectedBank = bankAccounts.find(b => b.id === selectedBankId);
+            const bankStr = selectedBank ? `${selectedBank.bank_name} ${selectedBank.account_number} (${selectedBank.account_holder})` : '';
+
+            const params = new URLSearchParams({
+                service: product.name,
+                price: amount.toString(),
+                depositor: user ? user.name : guestInfo.depositor,
+                bank: bankStr
+            });
+
+            router.push(`/public/checkout/success?${params.toString()}`);
         }
     };
 

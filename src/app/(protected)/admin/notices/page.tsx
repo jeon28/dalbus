@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { useServices } from '@/lib/ServiceContext';
 import { Pencil, Trash2, Plus, Pin, PinOff } from 'lucide-react';
 
@@ -146,18 +145,22 @@ export default function NoticeAdminPage() {
                                     </div>
                                     <div className="flex items-center gap-6 pt-8">
                                         <div className="flex items-center space-x-2">
-                                            <Switch
+                                            <input
+                                                type="checkbox"
                                                 id="pin"
+                                                className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
                                                 checked={formData.is_pinned}
-                                                onCheckedChange={val => setFormData({ ...formData, is_pinned: val })}
+                                                onChange={e => setFormData({ ...formData, is_pinned: e.target.checked })}
                                             />
                                             <Label htmlFor="pin" className="cursor-pointer">상단 고정</Label>
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                            <Switch
+                                            <input
+                                                type="checkbox"
                                                 id="publish"
+                                                className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
                                                 checked={formData.is_published}
-                                                onCheckedChange={val => setFormData({ ...formData, is_published: val })}
+                                                onChange={e => setFormData({ ...formData, is_published: e.target.checked })}
                                             />
                                             <Label htmlFor="publish" className="cursor-pointer">게시 여부</Label>
                                         </div>

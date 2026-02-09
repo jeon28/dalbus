@@ -80,8 +80,8 @@
 }
 
 .submitBtn {
-    background: var(--primary);
-    color: #fff;
+    background: #000 !important;
+    color: #fff !important;
     padding: 20px;
     border-radius: 8px;
     font-size: 1.1rem;

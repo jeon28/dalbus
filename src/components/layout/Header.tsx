@@ -9,14 +9,14 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex h-14 items-center">
-                <div className="mr-4 hidden md:flex">
-                    <Link href="/" className="mr-6 flex items-center space-x-2">
-                        <span className="hidden font-bold sm:inline-block">Dalbus</span>
+            <div className="container flex h-14 items-center justify-between gap-4">
+                <div className="flex items-center gap-4 md:gap-8 flex-1 overflow-hidden">
+                    <Link href="/" className="flex items-center space-x-2 shrink-0">
+                        <span className="font-bold">Dalbus</span>
                     </Link>
-                    <nav className="flex items-center space-x-6 text-sm font-medium">
+                    <nav className="flex items-center space-x-4 md:space-x-6 text-[13px] md:text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-hide">
                         <Link href="/public/products" className="transition-colors hover:text-foreground/80 text-foreground/60">
-                            서비스 목록
+                            서비스
                         </Link>
                         <Link href="/public/notices" className="transition-colors hover:text-foreground/80 text-foreground/60">
                             공지사항
@@ -54,29 +54,26 @@ export default function Header() {
                         )}
                     </nav>
                 </div>
-                <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-                    <div className="w-full flex-1 md:w-auto md:flex-none">
-                        {/* Search or other items */}
-                    </div>
-                    <nav className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
+                    <nav className="flex items-center gap-1 md:gap-2">
                         {isAdmin ? (
-                            <Button variant="outline" size="sm" onClick={logoutAdmin} className="border-red-200 text-red-600 hover:bg-red-50">로그아웃</Button>
+                            <Button variant="outline" size="sm" onClick={logoutAdmin} className="border-red-200 text-red-600 hover:bg-red-50 h-8 md:h-9 text-xs md:text-sm">로그아웃</Button>
                         ) : user ? (
                             <>
                                 <Link href="/mypage">
-                                    <Button variant="ghost" size="sm">마이페이지</Button>
+                                    <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">마이페이지</Button>
                                 </Link>
-                                <Button variant="outline" size="sm" onClick={logout}>로그아웃</Button>
+                                <Button variant="outline" size="sm" onClick={logout} className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">로그아웃</Button>
                             </>
                         ) : (
                             <>
                                 <Link href="/login">
-                                    <Button variant="ghost" size="sm">
+                                    <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">
                                         로그인
                                     </Button>
                                 </Link>
                                 <Link href="/signup">
-                                    <Button size="sm">회원가입</Button>
+                                    <Button size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">회원가입</Button>
                                 </Link>
                             </>
                         )}
