@@ -150,7 +150,6 @@ export default function AdminPage() {
             <header className={`${styles.header} glass`}>
                 <div className="container flex justify-between items-center px-4">
                     <h1 className={styles.title}>관리자 대시보드</h1>
-                    <Button variant="outline" size="sm" onClick={logoutAdmin} className="border-red-200 text-red-600 hover:bg-red-50">로그아웃</Button>
                 </div>
             </header>
 

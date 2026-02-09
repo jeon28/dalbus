@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useServices } from '@/lib/ServiceContext';
 
 export default function Header() {
-    const { user, isAdmin, logout } = useServices();
+    const { user, isAdmin, logout, logoutAdmin } = useServices();
 
     return (
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -53,7 +53,9 @@ export default function Header() {
                         {/* Search or other items */}
                     </div>
                     <nav className="flex items-center gap-2">
-                        {user ? (
+                        {isAdmin ? (
+                            <Button variant="outline" size="sm" onClick={logoutAdmin} className="border-red-200 text-red-600 hover:bg-red-50">로그아웃</Button>
+                        ) : user ? (
                             <>
                                 <Link href="/mypage">
                                     <Button variant="ghost" size="sm">마이페이지</Button>
@@ -71,11 +73,6 @@ export default function Header() {
                                     <Button size="sm">회원가입</Button>
                                 </Link>
                             </>
-                        )}
-                        {isAdmin && (
-                            <Link href="/admin">
-                                <Button variant="destructive" size="sm">관리자</Button>
-                            </Link>
                         )}
                     </nav>
                 </div>
