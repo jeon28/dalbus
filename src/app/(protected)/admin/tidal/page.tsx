@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -106,8 +106,14 @@ export default function TidalAccountsPage() {
 
     // Modals
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+    const [isImportResultModalOpen, setIsImportResultModalOpen] = useState(false);
+    const [importResults, setImportResults] = useState<{
+        success: { masters: number, slots: number },
+        failed: { id: string, reason: string }[]
+    } | null>(null);
 
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
@@ -133,6 +139,8 @@ export default function TidalAccountsPage() {
         product_id: '',
         max_slots: 6
     });
+
+    const [editingAccount, setEditingAccount] = useState<Account | null>(null);
 
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
 
@@ -348,6 +356,62 @@ export default function TidalAccountsPage() {
         }
     };
 
+    const handleEditMasterAccount = (account: Account) => {
+        setEditingAccount(account);
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateMasterAccount = async () => {
+        if (!editingAccount) return;
+        try {
+            const res = await fetch(`/api/admin/accounts/${editingAccount.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    login_id: editingAccount.login_id,
+                    payment_email: editingAccount.payment_email,
+                    payment_day: editingAccount.payment_day,
+                    memo: editingAccount.memo
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to update account');
+
+            setIsEditModalOpen(false);
+            fetchAccounts();
+            alert('수정되었습니다.');
+        } catch (error) {
+            console.error(error);
+            alert('수정 실패');
+        }
+    };
+
+    const handleDeleteMasterAccount = async (account: Account) => {
+        if ((account.order_accounts?.length || 0) > 0) {
+            alert('슬롯이 배정되어 있는 계정은 삭제할 수 없습니다. 먼저 배정을 해제해 주세요.');
+            return;
+        }
+
+        if (!confirm(`'${account.login_id}' 계정을 삭제하시겠습니까?`)) return;
+
+        try {
+            const res = await fetch(`/api/admin/accounts/${account.id}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || '삭제 실패');
+            }
+
+            fetchAccounts();
+            alert('삭제되었습니다.');
+        } catch (error) {
+            const e = error as Error;
+            alert(e.message);
+        }
+    };
+
     const exportToExcel = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const excelData: any[] = [];
@@ -362,6 +426,7 @@ export default function TidalAccountsPage() {
                 '메모': acc.memo,
                 'Slot': '',
                 '고객명': '',
+                '전화번호': '',
                 '주문번호': '',
                 '소속 ID': '',
                 '소속 PW': '',
@@ -382,6 +447,7 @@ export default function TidalAccountsPage() {
                     '메모': '',
                     'Slot': `Slot ${slotIdx + 1}`,
                     '고객명': order?.buyer_name || order?.profiles?.name || '',
+                    '전화번호': order?.buyer_phone || order?.profiles?.phone || '',
                     '주문번호': order?.order_number || '',
                     '소속 ID': assignment?.tidal_id || '',
                     '소속 PW': assignment?.slot_password || '',
@@ -399,6 +465,50 @@ export default function TidalAccountsPage() {
         // Generate file
         const fileName = `Tidal계정_${new Date().toLocaleDateString()}.xlsx`;
         XLSX.writeFile(wb, fileName);
+    };
+
+    const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const data = new Uint8Array(event.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+            // Validation: Check headers
+            const requiredHeaders = ['마스터 ID', '결제 계정', '결제일', '메모'];
+            const firstRow = jsonData[0];
+            if (!firstRow || !requiredHeaders.every(h => h in firstRow)) {
+                alert('엑셀 양식이 올바르지 않습니다. 다운로드 양식을 확인해 주세요.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/accounts/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accounts: jsonData })
+                });
+
+                if (!res.ok) throw new Error('Import failed');
+
+                const summary = await res.json();
+                setImportResults(summary);
+                setIsImportResultModalOpen(true);
+                fetchAccounts();
+            } catch (error) {
+                console.error(error);
+                alert('임포트 처리 중 오류가 발생했습니다.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        // Reset input
+        e.target.value = '';
     };
 
     // --- Modals --- (Assign/Move)
@@ -502,6 +612,18 @@ export default function TidalAccountsPage() {
                 <div className="container flex justify-between items-center">
                     <h1 className={styles.title}>Tidal 계정 관리 (V2.2)</h1>
                     <div className="flex gap-2">
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                onChange={handleImportExcel}
+                            />
+                            <Button variant="outline" className="flex items-center gap-2">
+                                <Upload className="w-4 h-4" />
+                                엑셀 임포트
+                            </Button>
+                        </div>
                         <Button onClick={exportToExcel} variant="outline" className="gap-2">
                             <Download size={16} /> 엑셀 다운로드
                         </Button>
@@ -519,8 +641,9 @@ export default function TidalAccountsPage() {
                         <div className="col-span-2">마스터 ID</div>
                         <div className="col-span-2">결제 ID</div>
                         <div className="col-span-1 text-center">결제일</div>
-                        <div className="col-span-4 text-left">메모</div>
+                        <div className="col-span-3 text-left">메모</div>
                         <div className="col-span-1 text-center">슬롯</div>
+                        <div className="col-span-1 text-center">관리</div>
                         <div className="col-span-1 text-center">상세</div>
                     </div>
 
@@ -530,28 +653,36 @@ export default function TidalAccountsPage() {
 
                         return (
                             <div key={acc.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                                <div className="grid grid-cols-12 gap-4 p-4 items-center text-sm cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                    <div className="col-span-1 text-gray-500 font-mono">
+                                <div className="grid grid-cols-12 gap-4 p-4 items-center text-sm">
+                                    <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         {String(idx + 1).padStart(3, '0')}
                                     </div>
-                                    <div className="col-span-2 truncate" title={acc.login_id}>
-                                        <div className="font-medium">{acc.login_id}</div>
+                                    <div className="col-span-2 truncate cursor-pointer" title={acc.login_id} onClick={() => toggleRow(acc.id)}>
+                                        <div className="font-medium text-xs">{acc.login_id}</div>
                                     </div>
-                                    <div className="col-span-2 truncate" title={acc.payment_email}>
+                                    <div className="col-span-2 truncate cursor-pointer" title={acc.payment_email} onClick={() => toggleRow(acc.id)}>
                                         <div className="text-xs text-blue-600">{acc.payment_email}</div>
                                     </div>
-                                    <div className="col-span-1 text-center text-gray-400 font-mono">
+                                    <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         {acc.payment_day}일
                                     </div>
-                                    <div className="col-span-4 text-gray-500 text-xs text-left truncate" title={acc.memo}>
-                                        {acc.memo}
+                                    <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
+                                        {acc.memo?.length > 20 ? acc.memo.substring(0, 20) + '...' : acc.memo}
                                     </div>
-                                    <div className="col-span-1 text-center">
+                                    <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                             {acc.order_accounts?.length || 0}/6
                                         </span>
                                     </div>
-                                    <div className="col-span-1 text-center">
+                                    <div className="col-span-1 text-center flex justify-center gap-1">
+                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="계정 수정" onClick={(e) => { e.stopPropagation(); handleEditMasterAccount(acc); }}>
+                                            <Pencil size={14} />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="계정 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
+                                            <Trash2 size={14} />
+                                        </Button>
+                                    </div>
+                                    <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                     </div>
                                 </div>
@@ -737,6 +868,33 @@ export default function TidalAccountsPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>마스터 계정 수정</DialogTitle></DialogHeader>
+                    {editingAccount && (
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit_login_id" className="text-right">마스터 계정</Label>
+                                <Input id="edit_login_id" value={editingAccount.login_id} onChange={(e) => setEditingAccount({ ...editingAccount, login_id: e.target.value })} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit_payment_email" className="text-right">결제 계정</Label>
+                                <Input id="edit_payment_email" value={editingAccount.payment_email} onChange={(e) => setEditingAccount({ ...editingAccount, payment_email: e.target.value })} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit_payment_day" className="text-right">결제일</Label>
+                                <Input id="edit_payment_day" type="number" min="1" max="31" value={editingAccount.payment_day} onChange={(e) => setEditingAccount({ ...editingAccount, payment_day: parseInt(e.target.value) || 1 })} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit_memo" className="text-right">메모</Label>
+                                <Input id="edit_memo" value={editingAccount.memo} onChange={(e) => setEditingAccount({ ...editingAccount, memo: e.target.value })} className="col-span-3" />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter><Button onClick={handleUpdateMasterAccount}>수정 완료</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>주문 배정 (기존 주문)</DialogTitle></DialogHeader>
@@ -863,6 +1021,46 @@ export default function TidalAccountsPage() {
                     )}
                     <DialogFooter>
                         <Button onClick={() => setIsOrderDetailOpen(false)}>닫기</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Import Result Modal */}
+            <Dialog open={isImportResultModalOpen} onOpenChange={setIsImportResultModalOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>임포트 결과 요약</DialogTitle>
+                    </DialogHeader>
+                    {importResults && (
+                        <div className="space-y-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-green-50 p-4 rounded-lg text-center">
+                                    <div className="text-sm text-green-600">성공 마스터</div>
+                                    <div className="text-2xl font-bold text-green-700">{importResults.success.masters}</div>
+                                </div>
+                                <div className="bg-blue-50 p-4 rounded-lg text-center">
+                                    <div className="text-sm text-blue-600">성공 슬롯</div>
+                                    <div className="text-2xl font-bold text-blue-700">{importResults.success.slots}</div>
+                                </div>
+                            </div>
+
+                            {importResults.failed.length > 0 && (
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-bold text-red-600">실패 목록 ({importResults.failed.length})</h4>
+                                    <div className="max-h-40 overflow-y-auto border rounded divide-y text-xs">
+                                        {importResults.failed.map((f, i) => (
+                                            <div key={i} className="p-2 flex justify-between">
+                                                <span className="font-medium">{f.id}</span>
+                                                <span className="text-red-500">{f.reason}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setIsImportResultModalOpen(false)}>확인</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

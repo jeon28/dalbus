@@ -20,9 +20,6 @@ export async function GET() {
                     orders (
                         id,
                         order_number,
-                        buyer_name,
-                        buyer_phone,
-                        buyer_email,
                         start_date, 
                         end_date,
                         created_at,
