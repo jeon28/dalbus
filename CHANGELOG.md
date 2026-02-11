@@ -1,4 +1,72 @@
-# Changelog - 2026-02-09
+# Changelog
+
+## v2.7 - 2026-02-11
+
+### 🔧 Excel Import 로직 개선 및 안정화
+
+#### 문제 해결
+- **오류 수정**: `there is no unique or exclusion constraint matching the ON CONFLICT specification` 해결
+- **오류 수정**: `null value in column "order_id" violates not-null constraint` 해결
+- **오류 수정**: 중복 `tidal_id` 데이터로 인한 constraint 생성 실패 해결
+
+#### 핵심 개선사항
+- **조건부 Upsert 전략 도입**:
+  - `tidal_id`가 있을 때: `tidal_id`로 upsert
+  - `tidal_id`가 없을 때: `(account_id, slot_number)`로 기존 레코드 확인 후 UPDATE/INSERT
+  - 빈 슬롯 처리 개선: `tidal_id`와 `slot_password` 모두 없을 때만 건너뛰기
+
+- **에러 메시지 한글화**:
+  - `unique constraint` → "중복된 Tidal ID 또는 슬롯 번호입니다."
+  - `ON CONFLICT` → "DB 제약조건이 설정되지 않았습니다. Migration 020을 실행해주세요."
+  - 사용자 친화적인 오류 메시지로 문제 해결 용이
+
+- **데이터 검증 강화**:
+  - 마스터 계정: `login_id`, `payment_email` 필수 체크
+  - 슬롯 번호: 0~5 범위 검증
+  - 빈 값 자동 trim 처리
+
+- **used_slots 자동 동기화**:
+  - 슬롯 임포트 완료 후 실제 배정 개수로 자동 업데이트
+  - 데이터 정합성 향상
+
+- **상세 로깅 추가**:
+  - 마스터별 처리 상태 추적
+  - 최종 요약 (성공/실패 개수)
+  - Vercel Function Logs에서 디버깅 용이
+
+- **주문번호 필드 지원**:
+  - 엑셀 "주문번호" 컬럼 파싱
+  - 기존 주문과 자동 연결
+
+#### 데이터베이스 마이그레이션
+- **Migration 018**: `accounts.login_pw` nullable 처리
+  - Excel 임포트 시 초기 비밀번호 없이도 마스터 계정 생성 가능
+
+- **Migration 019**: `order_accounts.order_id` nullable 처리
+  - 레거시 슬롯 데이터 임포트 지원
+  - 주문 없이 슬롯만 먼저 생성 가능
+
+- **Migration 020**: UNIQUE constraints 추가
+  - `tidal_id` UNIQUE: 1 Tidal ID = 1 Slot (중복 배정 방지)
+  - `(account_id, slot_number)` UNIQUE: 1 슬롯 = 1 배정 (중복 방지)
+
+#### 문서화
+- **TROUBLESHOOT_EXCEL_IMPORT.md**: SQL 실행 가이드 및 오류 해결 방법
+- **IMPORT_LOGIC_IMPROVEMENT.md**: 개선 상세 설명 및 구현 전략
+- **CHANGELOG_IMPORT_FIX.md**: 변경 이력 및 테스트 시나리오
+- **FIX_DUPLICATE_TIDAL_ID.sql**: 중복 데이터 정리 스크립트
+- **COMPLETE_MIGRATION_SCRIPT.sql**: 통합 마이그레이션 스크립트
+- **supabase/migrations/020_add_unique_tidal_id.sql**: Production용 마이그레이션 파일
+
+#### 영향
+- ✅ Migration 미실행 환경에서도 부분적으로 임포트 가능
+- ✅ 중복 데이터 사전 감지 및 명확한 오류 메시지
+- ✅ 부분 실패 시에도 성공 항목은 정상 저장
+- ✅ 운영 중 데이터 정합성 향상
+
+---
+
+## v0.91 - 2026-02-09
 
 ## 📧 주문 알림 시스템 구현
 - **관리자 이메일 알림**:
