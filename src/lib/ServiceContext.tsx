@@ -42,33 +42,46 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
 
     // Fetch services (products) from Supabase
     const fetchServices = async () => {
-        // Fetch products and their active plans
-        const { data: productsData, error: productsError } = await supabase
-            .from('products')
-            .select('*, product_plans(*)')
-            .eq('is_active', true)
-            .order('sort_order', { ascending: true });
+        try {
+            // Fetch products and their active plans
+            const { data: productsData, error: productsError } = await supabase
+                .from('products')
+                .select('*, product_plans(*)')
+                .eq('is_active', true)
+                .order('sort_order', { ascending: true });
 
-        if (productsError) {
-            console.error('Error fetching products:', JSON.stringify(productsError, null, 2));
-            return;
-        }
+            if (productsError) {
+                // Ignore AbortError (normal cleanup behavior)
+                if (productsError.message?.includes('AbortError') || productsError.code === 'PGRST301') {
+                    return;
+                }
+                console.error('Error fetching products:', JSON.stringify(productsError, null, 2));
+                return;
+            }
 
-        if (productsData) {
-            const mappedServices: Service[] = productsData.map(p => {
-                const displayPrice = p.original_price;
+            if (productsData) {
+                const mappedServices: Service[] = productsData.map(p => {
+                    const displayPrice = p.original_price;
 
-                return {
-                    id: p.id,
-                    name: p.name,
-                    icon: p.image_url || 'default',
-                    price: displayPrice.toLocaleString(),
-                    description: p.description || '',
-                    tag: (p.tags && p.tags.length > 0) ? p.tags[0] : '',
-                    color: 'default'
-                };
-            });
-            setServices(mappedServices);
+                    return {
+                        id: p.id,
+                        name: p.name,
+                        icon: p.image_url || 'default',
+                        price: displayPrice.toLocaleString(),
+                        description: p.description || '',
+                        tag: (p.tags && p.tags.length > 0) ? p.tags[0] : '',
+                        color: 'default'
+                    };
+                });
+                setServices(mappedServices);
+            }
+        } catch (error) {
+            // Ignore AbortError (occurs during component unmount or cleanup)
+            const err = error as Error;
+            if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                return;
+            }
+            console.error('Unexpected error in fetchServices:', error);
         }
     };
 
@@ -76,30 +89,51 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         fetchServices();
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.user) {
-                // For simplicity in this demo, we'll use the user metadata or email
+                // Fetch user profile to check admin role
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('name, email, role')
+                    .eq('id', session.user.id)
+                    .single();
+
                 const userObj: User = {
                     id: session.user.id,
-                    name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                    email: session.user.email || ''
+                    name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+                    email: profile?.email || session.user.email || ''
                 };
                 setUser(userObj);
                 localStorage.setItem('dalbus-user', JSON.stringify(userObj));
+
+                // Check if user is admin
+                if (profile?.role === 'admin') {
+                    setIsAdmin(true);
+                    localStorage.setItem('dalbus-isAdmin', 'true');
+                } else {
+                    setIsAdmin(false);
+                    localStorage.removeItem('dalbus-isAdmin');
+                }
             } else {
                 setUser(null);
+                setIsAdmin(false);
                 localStorage.removeItem('dalbus-user');
+                localStorage.removeItem('dalbus-isAdmin');
             }
         });
 
         // Initial check from localStorage for immediate UI feedback
         const savedUser = localStorage.getItem('dalbus-user');
+        const savedIsAdmin = localStorage.getItem('dalbus-isAdmin');
         if (savedUser) {
             try {
                 setUser(JSON.parse(savedUser));
             } catch (e) {
                 console.error('Failed to parse saved user', e);
             }
+        }
+        if (savedIsAdmin === 'true') {
+            setIsAdmin(true);
         }
 
         setIsHydrated(true);
@@ -137,7 +171,11 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     const logout = async () => {
         await supabase.auth.signOut();
         setUser(null);
+        setIsAdmin(false);
         localStorage.removeItem('dalbus-user');
+        localStorage.removeItem('dalbus-isAdmin');
+        // Redirect to login page
+        window.location.href = '/login';
     };
 
     const loginAdmin = () => {
@@ -146,6 +184,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
 
     const logoutAdmin = () => {
         setIsAdmin(false);
+        localStorage.removeItem('dalbus-isAdmin');
     };
 
     return (

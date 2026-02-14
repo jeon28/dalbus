@@ -23,28 +23,55 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         const fetchDetail = async () => {
             if (!serviceId) return;
 
-            // Fetch product
-            const { data: productData } = await supabase
-                .from('products')
-                .select('*')
-                .eq('id', serviceId)
-                .single();
+            try {
+                // Fetch product
+                const { data: productData, error: productError } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('id', serviceId)
+                    .single();
 
-            if (productData) setServiceDetail(productData);
-
-            // Fetch plans
-            const { data: plansData } = await supabase
-                .from('product_plans')
-                .select('*')
-                .eq('product_id', serviceId)
-                .eq('is_active', true)
-                .order('duration_months', { ascending: true });
-
-            if (plansData) {
-                setPlans(plansData);
-                if (plansData.length > 0) {
-                    setSelectedPeriod(plansData[0].duration_months);
+                // Ignore AbortError (normal cleanup behavior)
+                if (productError) {
+                    if (productError.message?.includes('AbortError') || productError.code === 'PGRST301') {
+                        return;
+                    }
+                    console.error('Error fetching product:', productError);
+                    return;
                 }
+
+                if (productData) setServiceDetail(productData);
+
+                // Fetch plans
+                const { data: plansData, error: plansError } = await supabase
+                    .from('product_plans')
+                    .select('*')
+                    .eq('product_id', serviceId)
+                    .eq('is_active', true)
+                    .order('duration_months', { ascending: true });
+
+                // Ignore AbortError
+                if (plansError) {
+                    if (plansError.message?.includes('AbortError') || plansError.code === 'PGRST301') {
+                        return;
+                    }
+                    console.error('Error fetching plans:', plansError);
+                    return;
+                }
+
+                if (plansData) {
+                    setPlans(plansData);
+                    if (plansData.length > 0) {
+                        setSelectedPeriod(plansData[0].duration_months);
+                    }
+                }
+            } catch (error) {
+                // Ignore AbortError (occurs during component unmount or cleanup)
+                const err = error as Error;
+                if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                    return;
+                }
+                console.error('Unexpected error in fetchDetail:', error);
             }
         };
         fetchDetail();
