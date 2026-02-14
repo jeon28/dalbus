@@ -26,6 +26,7 @@ import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filte
 import { CheckCircle2, Circle, HelpCircle, Timer, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
+import { differenceInMonths, parseISO } from 'date-fns';
 
 
 export default function OrderHistoryPage() {
@@ -156,6 +157,30 @@ export default function OrderHistoryPage() {
         }
     };
 
+    const getMasterInfo = (acc: any) => {
+        const masterSlot = acc.order_accounts?.find((oa: any) => oa.type === 'master');
+        if (!masterSlot || !masterSlot.orders) {
+            return 'master 계정없음';
+        }
+
+        const tidalId = masterSlot.tidal_id || '';
+        const endDate = masterSlot.orders.end_date || '';
+        let duration = '';
+
+        if (masterSlot.orders.start_date) {
+            try {
+                const startDate = parseISO(masterSlot.orders.start_date);
+                const now = new Date();
+                const months = differenceInMonths(now, startDate);
+                duration = `${months}개월`;
+            } catch {
+                duration = '-';
+            }
+        }
+
+        return `${tidalId}/${endDate}/${duration}`;
+    };
+
     const getAvailableSlots = (accountId: string) => {
         const acc = availableAccounts.find(a => a.id === accountId);
         if (!acc) return [];
@@ -179,7 +204,7 @@ export default function OrderHistoryPage() {
                 body: JSON.stringify({
                     order_id: selectedOrder.id,
                     slot_number: selectedSlot,
-                    slot_password: slotPasswordModal
+                    tidal_password: slotPasswordModal
                 })
             });
             if (!res.ok) throw new Error('Match failed');
@@ -353,16 +378,18 @@ export default function OrderHistoryPage() {
 
             <Dialog open={isMatchModalOpen} onOpenChange={setIsMatchModalOpen}>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>주문 매칭 (Tidal 배정)</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>계정 배정</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">마스터 계정 선택</Label>
+                            <Label className="text-right">마스터 계정</Label>
                             <Select onValueChange={setSelectedAccount} value={selectedAccount}>
                                 <SelectTrigger className="col-span-3"><SelectValue placeholder="마스터 계정 선택" /></SelectTrigger>
                                 <SelectContent>
                                     {availableAccounts.map(acc => (
                                         <SelectItem key={acc.id} value={acc.id}>
-                                            {acc.login_id} (잔여: {acc.max_slots - acc.used_slots})
+                                            <div className="text-xs">
+                                                {acc.login_id}/{getMasterInfo(acc)}/잔여 {acc.max_slots - acc.used_slots}
+                                            </div>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
