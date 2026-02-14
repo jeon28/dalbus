@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,7 @@ interface GridValue {
 export default function TidalAccountsPage() {
     const { isAdmin } = useServices();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -177,6 +178,32 @@ export default function TidalAccountsPage() {
             fetchPendingOrders();
         }
     }, [isAdmin, router]);
+
+    // URL에서 accountId 읽어서 해당 계정 자동 expand
+    useEffect(() => {
+        const accountId = searchParams.get('accountId');
+        if (accountId && accounts.length > 0) {
+            // 해당 계정을 expandedRows에 추가
+            setExpandedRows(prev => {
+                const newSet = new Set(prev);
+                newSet.add(accountId);
+                return newSet;
+            });
+
+            // 해당 계정으로 스크롤
+            setTimeout(() => {
+                const element = document.getElementById(`account-${accountId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // 하이라이트 효과
+                    element.classList.add('bg-blue-50');
+                    setTimeout(() => {
+                        element.classList.remove('bg-blue-50');
+                    }, 2000);
+                }
+            }, 300);
+        }
+    }, [searchParams, accounts]);
 
     const fetchAccounts = async () => {
 
@@ -738,7 +765,7 @@ export default function TidalAccountsPage() {
                         const slots = Array.from({ length: 6 });
 
                         return (
-                            <div key={acc.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
+                            <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
                                 <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
                                     <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         {String(idx + 1).padStart(3, '0')}

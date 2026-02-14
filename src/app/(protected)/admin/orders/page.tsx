@@ -196,14 +196,23 @@ export default function OrderHistoryPage() {
     };
 
     const confirmMatch = async () => {
-        if (!selectedOrder || !selectedAccount || selectedSlot === null) return;
+        if (!selectedOrder || !selectedAccount) return;
+
+        // 자동으로 가장 낮은 번호의 빈 슬롯 선택
+        const availableSlots = getAvailableSlots(selectedAccount);
+        if (availableSlots.length === 0) {
+            alert('사용 가능한 슬롯이 없습니다.');
+            return;
+        }
+        const autoSelectedSlot = availableSlots[0]; // 가장 낮은 번호 선택
+
         try {
             const res = await fetch(`/api/admin/accounts/${selectedAccount}/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     order_id: selectedOrder.id,
-                    slot_number: selectedSlot,
+                    slot_number: autoSelectedSlot,
                     tidal_password: slotPasswordModal
                 })
             });
@@ -211,7 +220,9 @@ export default function OrderHistoryPage() {
 
             alert('배정되었습니다.');
             setIsMatchModalOpen(false);
-            fetchOrders();
+
+            // Tidal 계정 관리 페이지로 이동 (배정된 계정 자동 expand)
+            router.push(`/admin/tidal?accountId=${selectedAccount}`);
         } catch {
             alert('배정 실패');
         }
@@ -396,21 +407,13 @@ export default function OrderHistoryPage() {
                             </Select>
                         </div>
                         {selectedAccount && (
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Slot 선택</Label>
-                                <Select onValueChange={(val) => setSelectedSlot(Number(val))} value={selectedSlot?.toString()}>
-                                    <SelectTrigger className="col-span-3"><SelectValue placeholder="슬롯 선택" /></SelectTrigger>
-                                    <SelectContent>
-                                        {getAvailableSlots(selectedAccount).map(slotNum => (
-                                            <SelectItem key={slotNum} value={slotNum.toString()}>Slot #{slotNum + 1}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
+                                💡 슬롯은 가장 낮은 번호의 빈 슬롯으로 자동 배정됩니다.
                             </div>
                         )}
                     </div>
                     <DialogFooter>
-                        <Button onClick={confirmMatch} disabled={!selectedAccount || selectedSlot === null}>배정 확인</Button>
+                        <Button onClick={confirmMatch} disabled={!selectedAccount}>배정 확인</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
