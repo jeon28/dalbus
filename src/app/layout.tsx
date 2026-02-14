@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { ServiceProvider } from "@/lib/ServiceContext";
+import ErrorHandler from "@/components/ErrorHandler";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,6 +22,7 @@ export default function RootLayout({
         <html lang="ko">
             <body className={inter.className}>
                 <ServiceProvider>
+                    <ErrorHandler />
                     <Header />
                     {children}
                     <Footer />
