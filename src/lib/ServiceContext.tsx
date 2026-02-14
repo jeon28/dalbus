@@ -43,8 +43,6 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     // Fetch services (products) from Supabase
     const fetchServices = async () => {
         try {
-            console.log('[fetchServices] Starting fetch...');
-
             // Fetch products and their active plans
             const { data: productsData, error: productsError } = await supabase
                 .from('products')
@@ -52,20 +50,16 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 .eq('is_active', true)
                 .order('sort_order', { ascending: true });
 
-            console.log('[fetchServices] Response:', { productsData, productsError });
-
             if (productsError) {
                 // Ignore AbortError (normal cleanup behavior)
                 if (productsError.message?.includes('AbortError') || productsError.code === 'PGRST301') {
-                    console.log('[fetchServices] AbortError ignored');
                     return;
                 }
-                console.error('[fetchServices] Error:', JSON.stringify(productsError, null, 2));
+                console.error('Error fetching products:', JSON.stringify(productsError, null, 2));
                 return;
             }
 
             if (productsData) {
-                console.log('[fetchServices] Products count:', productsData.length);
                 const mappedServices: Service[] = productsData.map(p => {
                     const displayPrice = p.original_price;
 
@@ -79,19 +73,15 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                         color: 'default'
                     };
                 });
-                console.log('[fetchServices] Setting services:', mappedServices);
                 setServices(mappedServices);
-            } else {
-                console.log('[fetchServices] No data returned');
             }
         } catch (error) {
             // Ignore AbortError (occurs during component unmount or cleanup)
             const err = error as Error;
             if (err.name === 'AbortError' || err.message?.includes('aborted')) {
-                console.log('[fetchServices] Caught AbortError');
                 return;
             }
-            console.error('[fetchServices] Unexpected error:', error);
+            console.error('Unexpected error in fetchServices:', error);
         }
     };
 
@@ -134,7 +124,11 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     localStorage.removeItem('dalbus-isAdmin');
                 }
             } catch (error) {
-                console.error('Failed to initialize auth:', error);
+                const err = error as Error;
+                // AbortError는 조용히 무시 (React Strict Mode cleanup)
+                if (err.name !== 'AbortError' && !err.message?.includes('aborted')) {
+                    console.error('Failed to initialize auth:', error);
+                }
                 // 에러 발생 시에도 기본 상태로 설정
                 setUser(null);
                 setIsAdmin(false);
