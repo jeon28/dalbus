@@ -46,11 +46,21 @@ export default function QnAPage() {
             const { data, error } = await query;
 
             if (error) {
+                // Ignore AbortError
+                if (error.message?.includes('AbortError') || error.code === 'PGRST301') {
+                    setLoading(false);
+                    return;
+                }
                 console.error('Error fetching Q&A:', error);
             } else {
                 setQnas(data || []);
             }
         } catch (e) {
+            const err = e as Error;
+            if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                setLoading(false);
+                return;
+            }
             console.error(e);
         }
         setLoading(false);

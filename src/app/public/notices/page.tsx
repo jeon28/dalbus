@@ -19,23 +19,48 @@ export default function NoticesPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchData = async () => {
-            const { data, error } = await supabase
-                .from('notices')
-                .select('*')
-                .eq('is_published', true)
-                .order('is_pinned', { ascending: false })
-                .order('created_at', { ascending: false });
+        let isMounted = true;
 
-            if (error) {
-                console.error('Error fetching notices:', JSON.stringify(error, null, 2));
-            } else {
-                setNotices(data || []);
+        const fetchData = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('notices')
+                    .select('*')
+                    .eq('is_published', true)
+                    .order('is_pinned', { ascending: false })
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    // Ignore AbortError
+                    if (error.message?.includes('AbortError') || error.code === 'PGRST301') {
+                        return;
+                    }
+                    if (isMounted) {
+                        console.error('Error fetching notices:', JSON.stringify(error, null, 2));
+                    }
+                } else if (isMounted) {
+                    setNotices(data || []);
+                }
+            } catch (error) {
+                const err = error as Error;
+                if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                    return;
+                }
+                if (isMounted) {
+                    console.error('Unexpected error:', error);
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
-            setLoading(false);
         };
 
         fetchData();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     if (loading) {

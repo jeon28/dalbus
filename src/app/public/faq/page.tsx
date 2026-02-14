@@ -26,26 +26,57 @@ export default function FAQPage() {
     const [activeCategory, setActiveCategory] = useState<string>('all');
 
     useEffect(() => {
+        let isMounted = true;
+
         const fetchData = async () => {
-            // Fetch FAQs
-            const faqRes = await supabase
-                .from('faqs')
-                .select('*')
-                .eq('is_published', true)
-                .order('sort_order', { ascending: true });
+            try {
+                // Fetch FAQs
+                const faqRes = await supabase
+                    .from('faqs')
+                    .select('*')
+                    .eq('is_published', true)
+                    .order('sort_order', { ascending: true });
 
-            // Fetch Categories
-            const catRes = await supabase
-                .from('faq_categories')
-                .select('*')
-                .order('sort_order', { ascending: true });
+                // Fetch Categories
+                const catRes = await supabase
+                    .from('faq_categories')
+                    .select('*')
+                    .order('sort_order', { ascending: true });
 
-            if (faqRes.data) setFaqs(faqRes.data);
-            if (catRes.data) setCategories(catRes.data);
-            setLoading(false);
+                // Ignore AbortError
+                if (faqRes.error) {
+                    if (faqRes.error.message?.includes('AbortError') || faqRes.error.code === 'PGRST301') {
+                        return;
+                    }
+                }
+                if (catRes.error) {
+                    if (catRes.error.message?.includes('AbortError') || catRes.error.code === 'PGRST301') {
+                        return;
+                    }
+                }
+
+                if (isMounted) {
+                    if (faqRes.data) setFaqs(faqRes.data);
+                    if (catRes.data) setCategories(catRes.data);
+                    setLoading(false);
+                }
+            } catch (error) {
+                const err = error as Error;
+                if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                    return;
+                }
+                if (isMounted) {
+                    console.error('Unexpected error:', error);
+                    setLoading(false);
+                }
+            }
         };
 
         fetchData();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const filteredFaqs = activeCategory === 'all'
