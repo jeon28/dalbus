@@ -88,10 +88,12 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         fetchServices();
 
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // 초기 session 확인 및 설정
+        const initializeAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+
             if (session?.user) {
-                // Fetch user profile to check admin role
+                // 실제 session이 있으면 profile 가져오기
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('name, email, role')
@@ -106,7 +108,6 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 setUser(userObj);
                 localStorage.setItem('dalbus-user', JSON.stringify(userObj));
 
-                // Check if user is admin
                 if (profile?.role === 'admin') {
                     setIsAdmin(true);
                     localStorage.setItem('dalbus-isAdmin', 'true');
@@ -115,28 +116,57 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     localStorage.removeItem('dalbus-isAdmin');
                 }
             } else {
+                // session이 없으면 localStorage 정리
+                setUser(null);
+                setIsAdmin(false);
+                localStorage.removeItem('dalbus-user');
+                localStorage.removeItem('dalbus-isAdmin');
+            }
+
+            setIsHydrated(true);
+        };
+
+        initializeAuth();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_OUT') {
+                // 로그아웃 이벤트 명시적 처리
+                setUser(null);
+                setIsAdmin(false);
+                localStorage.removeItem('dalbus-user');
+                localStorage.removeItem('dalbus-isAdmin');
+            } else if (session?.user) {
+                // 로그인 이벤트
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('name, email, role')
+                    .eq('id', session.user.id)
+                    .single();
+
+                const userObj: User = {
+                    id: session.user.id,
+                    name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+                    email: profile?.email || session.user.email || ''
+                };
+                setUser(userObj);
+                localStorage.setItem('dalbus-user', JSON.stringify(userObj));
+
+                if (profile?.role === 'admin') {
+                    setIsAdmin(true);
+                    localStorage.setItem('dalbus-isAdmin', 'true');
+                } else {
+                    setIsAdmin(false);
+                    localStorage.removeItem('dalbus-isAdmin');
+                }
+            } else {
+                // session이 없는 경우
                 setUser(null);
                 setIsAdmin(false);
                 localStorage.removeItem('dalbus-user');
                 localStorage.removeItem('dalbus-isAdmin');
             }
         });
-
-        // Initial check from localStorage for immediate UI feedback
-        const savedUser = localStorage.getItem('dalbus-user');
-        const savedIsAdmin = localStorage.getItem('dalbus-isAdmin');
-        if (savedUser) {
-            try {
-                setUser(JSON.parse(savedUser));
-            } catch (e) {
-                console.error('Failed to parse saved user', e);
-            }
-        }
-        if (savedIsAdmin === 'true') {
-            setIsAdmin(true);
-        }
-
-        setIsHydrated(true);
 
         return () => {
             subscription.unsubscribe();
@@ -169,13 +199,21 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = async () => {
-        await supabase.auth.signOut();
-        setUser(null);
-        setIsAdmin(false);
-        localStorage.removeItem('dalbus-user');
-        localStorage.removeItem('dalbus-isAdmin');
-        // Redirect to login page
-        window.location.href = '/login';
+        try {
+            // Supabase 로그아웃
+            await supabase.auth.signOut();
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            // 상태 초기화
+            setUser(null);
+            setIsAdmin(false);
+            localStorage.removeItem('dalbus-user');
+            localStorage.removeItem('dalbus-isAdmin');
+
+            // 로그인 페이지로 리다이렉트
+            window.location.href = '/login';
+        }
     };
 
     const loginAdmin = () => {
