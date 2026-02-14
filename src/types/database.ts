@@ -166,8 +166,12 @@ export interface Database {
           id: string
           order_id: string
           slot_number: number
-          slot_password: string | null
+          tidal_password: string | null
           tidal_id: string | null
+          type: 'master' | 'user'
+          buyer_name: string | null
+          buyer_phone: string | null
+          buyer_email: string | null
         }
         Insert: {
           account_id: string
@@ -175,8 +179,12 @@ export interface Database {
           id?: string
           order_id: string
           slot_number?: number
-          slot_password?: string | null
+          tidal_password?: string | null
           tidal_id?: string | null
+          type?: 'master' | 'user'
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
         }
         Update: {
           account_id?: string
@@ -184,8 +192,12 @@ export interface Database {
           id?: string
           order_id?: string
           slot_number?: number
-          slot_password?: string | null
+          tidal_password?: string | null
           tidal_id?: string | null
+          type?: 'master' | 'user'
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
         }
         Relationships: [
           {

@@ -1,5 +1,64 @@
 # Changelog
 
+## v2.8 - 2026-02-14
+
+### 🎯 Tidal 계정 관리 UI/UX 개선 및 슬롯 편집 기능 수정
+
+#### 주요 개선사항
+
+**슬롯 편집 저장 기능 수정**:
+- **문제**: 슬롯 편집 시 구매자 정보(이름, 전화번호, 이메일)가 저장되지 않던 문제 해결
+- **원인**: `order_accounts` 테이블에 buyer 정보 필드가 없어 `orders` 테이블 데이터만 참조
+- **해결**:
+  - `order_accounts` 테이블에 `buyer_name`, `buyer_phone`, `buyer_email` 컬럼 추가
+  - API 엔드포인트 수정하여 슬롯별로 독립적인 구매자 정보 저장 가능
+  - 데이터 표시 시 `order_accounts` 우선, `orders` 폴백 전략 적용
+
+**마스터 정보 컬럼 추가**:
+- Tidal 계정 관리 메인 테이블에 "마스터정보" 컬럼 신설
+- 표시 정보: `tidal_id/종료일/이용기간` (예: chchun@hifitidal.com/2027-1-22/15개월)
+- 마스터 슬롯이 없는 경우 "master 계정없음" 표시
+- 가입일로부터 현재까지 경과 개월 수 자동 계산 (date-fns 활용)
+
+**그리드 레이아웃 최적화**:
+- "그룹 ID"와 "결제 ID" 컬럼을 "결제계좌" 하나로 통합
+- 표시 형식: `GRP1-chchun@naver.com` (그룹ID-결제ID)
+- 마스터정보 컬럼 너비 확대 (col-span-2 → col-span-3)
+- 날짜가 잘려서 보이던 문제 해결
+
+#### 데이터베이스 변경
+- **Migration**: `order_accounts` 테이블에 buyer 필드 추가
+  ```sql
+  ALTER TABLE order_accounts
+  ADD COLUMN buyer_name TEXT,
+  ADD COLUMN buyer_phone TEXT,
+  ADD COLUMN buyer_email TEXT;
+  ```
+
+#### API 수정
+- `GET /api/admin/accounts`: `order_accounts`에서 buyer 필드 fetch 추가
+- `POST /api/admin/accounts/[id]/assign`: 슬롯 배정 시 buyer 정보 저장
+- `PUT /api/admin/assignments/[id]`: 슬롯 편집 시 buyer 정보 `order_accounts`에 저장
+  - 기존: buyer 정보를 `orders` 테이블에만 저장
+  - 변경: buyer 정보를 `order_accounts`에 저장 (슬롯별 독립 관리)
+
+#### TypeScript 타입 업데이트
+- `src/types/database.ts`: `order_accounts` 타입에 buyer 필드 추가
+- `src/app/(protected)/admin/tidal/page.tsx`:
+  - `Assignment` 인터페이스에 buyer 필드 추가
+  - `getMasterInfo()` 헬퍼 함수 추가
+
+#### Tailwind CSS 설정
+- `tailwind.config.js`: `grid-cols-13` 지원 추가
+
+#### 영향
+- ✅ 슬롯별로 구매자 정보를 독립적으로 편집 가능
+- ✅ 마스터 계정 정보를 메인 화면에서 한눈에 확인 가능
+- ✅ UI 공간 효율성 개선으로 더 많은 정보 표시
+- ✅ 데이터 정규화 개선 (슬롯 정보 = order_accounts, 주문 정보 = orders)
+
+---
+
 ## v2.7 - 2026-02-11
 
 ### 🔧 Excel Import 로직 개선 및 안정화

@@ -9,38 +9,37 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const { id } = await params; // order_accounts.id
         const body = await req.json();
 
-        // body contains: slot_password, buyer_name, buyer_phone, buyer_email, start_date, end_date
+        // body contains: tidal_password, buyer_name, buyer_phone, buyer_email, start_date, end_date, type
         const {
-            slot_password,
+            tidal_password,
             buyer_name,
             buyer_phone,
             buyer_email,
             start_date,
             end_date,
-            order_id // Needed to update order
+            type,
+            order_id // Needed to update order dates if present
         } = body;
 
-        // 1. Update order_accounts (slot_password, tidal_id)
+        // 1. Update order_accounts (all editable fields including buyer info)
         const oaUpdates: Record<string, string | null> = {};
-        if (slot_password !== undefined) oaUpdates.status_password = slot_password; // Wait, previous code had a typo or used slot_password? Looking at file... L27 says slot_password.
+        if (tidal_password !== undefined) oaUpdates.tidal_password = tidal_password;
         if (body.tidal_id !== undefined) oaUpdates.tidal_id = body.tidal_id;
+        if (type !== undefined) oaUpdates.type = type;
+        if (buyer_name !== undefined) oaUpdates.buyer_name = buyer_name;
+        if (buyer_phone !== undefined) oaUpdates.buyer_phone = buyer_phone;
+        if (buyer_email !== undefined) oaUpdates.buyer_email = buyer_email;
 
-        // Wait, I should use the correct field names. L27 used slot_password.
-        const oaUpdatesFinal: Record<string, string | null> = {};
-        if (slot_password !== undefined) oaUpdatesFinal.slot_password = slot_password;
-        if (body.tidal_id !== undefined) oaUpdatesFinal.tidal_id = body.tidal_id;
-
-        if (Object.keys(oaUpdatesFinal).length > 0) {
+        if (Object.keys(oaUpdates).length > 0) {
             const { error: oaError } = await supabaseAdmin
                 .from('order_accounts')
-                .update(oaUpdatesFinal)
+                .update(oaUpdates)
                 .eq('id', id);
             if (oaError) throw oaError;
         }
 
-        // 2. Update orders table (User info and dates)
-        // We need order_id. If not passed in body, fetch it first? 
-        // Let's assume frontend passes it or we fetch it.
+        // 2. Update orders table (only dates if provided)
+        // Buyer info is now stored in order_accounts, not orders
         let targetOrderId = order_id;
 
         if (!targetOrderId) {
@@ -50,9 +49,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         if (targetOrderId) {
             const orderUpdates: Record<string, string | number | null> = {};
-            if (buyer_name !== undefined) orderUpdates.buyer_name = buyer_name;
-            if (buyer_phone !== undefined) orderUpdates.buyer_phone = buyer_phone;
-            if (buyer_email !== undefined) orderUpdates.buyer_email = buyer_email;
             if (start_date !== undefined) orderUpdates.start_date = start_date;
             if (end_date !== undefined) orderUpdates.end_date = end_date;
 

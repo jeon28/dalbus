@@ -10,8 +10,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const {
             order_id,
             slot_number,
-            slot_password,
+            tidal_password,
             tidal_id,
+            type,
             // Manual creation fields
             buyer_name, buyer_phone, buyer_email, start_date, end_date
         } = body;
@@ -97,8 +98,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 order_id: targetOrderId,
                 account_id: account_id,
                 slot_number: slot_number,
-                slot_password: slot_password,
-                tidal_id: tidal_id
+                tidal_password: tidal_password,
+                tidal_id: tidal_id,
+                type: type || (slot_number === 0 ? 'master' : 'user'),
+                buyer_name: buyer_name || null,
+                buyer_phone: buyer_phone || null,
+                buyer_email: buyer_email || null
             });
 
         if (insertError) throw insertError;

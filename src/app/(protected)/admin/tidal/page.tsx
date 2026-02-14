@@ -28,10 +28,14 @@ import { differenceInMonths, parseISO } from 'date-fns';
 interface Assignment {
     id: string;
     slot_number: number;
-    slot_password?: string;
+    tidal_password?: string;
     tidal_id?: string;
     order_id?: string;
     orders?: Order;
+    type?: 'master' | 'user';
+    buyer_name?: string;
+    buyer_phone?: string;
+    buyer_email?: string;
 }
 
 interface Account {
@@ -188,7 +192,7 @@ export default function TidalAccountsPage() {
                 for (let i = 0; i < acc.max_slots; i++) {
                     const assignment = acc.order_accounts?.find((oa: Assignment) => oa.slot_number === i);
                     // For Slot 1 (i===0), default to Master Password if no specific slot password exists
-                    let defaultPw = assignment?.slot_password || '';
+                    let defaultPw = assignment?.tidal_password || '';
                     if (i === 0 && !defaultPw) {
                         defaultPw = acc.login_pw;
                     }
@@ -196,13 +200,15 @@ export default function TidalAccountsPage() {
                     initialGrid[`${acc.id}_${i}`] = {
                         assignment_id: assignment?.id,
                         tidal_id: assignment?.tidal_id || '',
-                        buyer_email: assignment?.orders?.buyer_email || '',
-                        slot_password: defaultPw,
-                        buyer_name: assignment?.orders?.buyer_name || assignment?.orders?.profiles?.name || '',
-                        buyer_phone: assignment?.orders?.buyer_phone || assignment?.orders?.profiles?.phone || '',
+                        tidal_password: defaultPw,
+                        // Prefer buyer info from order_accounts, fallback to orders table
+                        buyer_name: assignment?.buyer_name || assignment?.orders?.buyer_name || assignment?.orders?.profiles?.name || '',
+                        buyer_phone: assignment?.buyer_phone || assignment?.orders?.buyer_phone || assignment?.orders?.profiles?.phone || '',
+                        buyer_email: assignment?.buyer_email || assignment?.orders?.buyer_email || '',
                         start_date: assignment?.orders?.start_date || '',
                         end_date: assignment?.orders?.end_date || '',
                         order_number: assignment?.orders?.order_number || '',
+                        type: assignment?.type || (i === 0 ? 'master' : 'user'), // Slot 1 defaults to master, others to user
                     };
                 }
             });
@@ -228,6 +234,30 @@ export default function TidalAccountsPage() {
         } catch (error) {
             console.error(error);
         }
+    };
+
+    const getMasterInfo = (acc: Account) => {
+        const masterSlot = acc.order_accounts?.find(oa => oa.type === 'master');
+        if (!masterSlot || !masterSlot.orders) {
+            return 'master 계정없음';
+        }
+
+        const tidalId = masterSlot.tidal_id || '';
+        const endDate = masterSlot.orders.end_date || '';
+        let duration = '';
+
+        if (masterSlot.orders.start_date) {
+            try {
+                const startDate = parseISO(masterSlot.orders.start_date);
+                const now = new Date();
+                const months = differenceInMonths(now, startDate);
+                duration = `${months}개월`;
+            } catch {
+                duration = '-';
+            }
+        }
+
+        return `${tidalId}/${endDate}/${duration}`;
     };
 
     const toggleRow = (id: string) => {
@@ -292,12 +322,13 @@ export default function TidalAccountsPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         slot_number: slotIdx,
-                        slot_password: data.slot_password,
+                        tidal_password: data.tidal_password,
+                        tidal_id: data.tidal_id,
+                        type: data.type,
                         // Manual fields
                         buyer_name: data.buyer_name,
                         buyer_phone: data.buyer_phone,
                         buyer_email: data.buyer_email,
-                        tidal_id: data.tidal_id,
                         start_date: data.start_date,
                         end_date: data.end_date
                     })
@@ -333,6 +364,32 @@ export default function TidalAccountsPage() {
     };
 
     const handleCreateAccount = async () => {
+        // 1. Validate required fields
+        if (!newAccount.login_id || !newAccount.login_id.trim()) {
+            alert('❌ 그룹 ID는 필수 입력 항목입니다.');
+            return;
+        }
+
+        if (!newAccount.payment_email || !newAccount.payment_email.trim()) {
+            alert('❌ 결제 계정은 필수 입력 항목입니다.');
+            return;
+        }
+
+        if (!newAccount.payment_day || newAccount.payment_day < 1 || newAccount.payment_day > 31) {
+            alert('❌ 결제일은 1~31 사이의 값이어야 합니다.');
+            return;
+        }
+
+        // 2. Check if payment_email already exists in another group
+        const duplicateGroup = accounts.find(acc =>
+            acc.payment_email === newAccount.payment_email.trim()
+        );
+
+        if (duplicateGroup) {
+            alert(`❌ 결제 계정 중복\n\n결제 계정 '${newAccount.payment_email}'은(는) 이미 다른 그룹에서 사용 중입니다.\n\n【사용 중인 그룹】\n그룹 ID: ${duplicateGroup.login_id}\n\n※ 결제 계정은 한 개의 그룹에만 할당할 수 있습니다.`);
+            return;
+        }
+
         try {
             const prodRes = await fetch('/api/admin/products');
             const products = await prodRes.json();
@@ -348,11 +405,12 @@ export default function TidalAccountsPage() {
 
             if (!res.ok) throw new Error('Failed to create account');
 
+            alert('✅ 그룹이 생성되었습니다.');
             setIsAddModalOpen(false);
             fetchAccounts();
             setNewAccount({ login_id: '', login_pw: '', payment_email: '', payment_day: 1, memo: '', product_id: '', max_slots: 6 });
         } catch {
-            alert('계정 생성 실패');
+            alert('❌ 그룹 생성 실패');
         }
     };
 
@@ -363,6 +421,34 @@ export default function TidalAccountsPage() {
 
     const handleUpdateMasterAccount = async () => {
         if (!editingAccount) return;
+
+        // 1. Validate required fields
+        if (!editingAccount.login_id || !editingAccount.login_id.trim()) {
+            alert('❌ 그룹 ID는 필수 입력 항목입니다.');
+            return;
+        }
+
+        if (!editingAccount.payment_email || !editingAccount.payment_email.trim()) {
+            alert('❌ 결제 계정은 필수 입력 항목입니다.');
+            return;
+        }
+
+        if (!editingAccount.payment_day || editingAccount.payment_day < 1 || editingAccount.payment_day > 31) {
+            alert('❌ 결제일은 1~31 사이의 값이어야 합니다.');
+            return;
+        }
+
+        // 2. Check if payment_email already exists in another group (excluding current group)
+        const duplicateGroup = accounts.find(acc =>
+            acc.payment_email === editingAccount.payment_email.trim() &&
+            acc.id !== editingAccount.id // Exclude current group being edited
+        );
+
+        if (duplicateGroup) {
+            alert(`❌ 결제 계정 중복\n\n결제 계정 '${editingAccount.payment_email}'은(는) 이미 다른 그룹에서 사용 중입니다.\n\n【사용 중인 그룹】\n그룹 ID: ${duplicateGroup.login_id}\n\n※ 결제 계정은 한 개의 그룹에만 할당할 수 있습니다.`);
+            return;
+        }
+
         try {
             const res = await fetch(`/api/admin/accounts/${editingAccount.id}`, {
                 method: 'PUT',
@@ -379,20 +465,20 @@ export default function TidalAccountsPage() {
 
             setIsEditModalOpen(false);
             fetchAccounts();
-            alert('수정되었습니다.');
+            alert('✅ 수정되었습니다.');
         } catch (error) {
             console.error(error);
-            alert('수정 실패');
+            alert('❌ 수정 실패');
         }
     };
 
     const handleDeleteMasterAccount = async (account: Account) => {
         if ((account.order_accounts?.length || 0) > 0) {
-            alert('슬롯이 배정되어 있는 계정은 삭제할 수 없습니다. 먼저 배정을 해제해 주세요.');
+            alert('슬롯이 배정되어 있는 그룹은 삭제할 수 없습니다. 먼저 배정을 해제해 주세요.');
             return;
         }
 
-        if (!confirm(`'${account.login_id}' 계정을 삭제하시겠습니까?`)) return;
+        if (!confirm(`'${account.login_id}' 그룹을 삭제하시겠습니까?`)) return;
 
         try {
             const res = await fetch(`/api/admin/accounts/${account.id}`, {
@@ -420,7 +506,7 @@ export default function TidalAccountsPage() {
             // Master account row
             excelData.push({
                 'No.': accIdx + 1,
-                '마스터 ID': acc.login_id,
+                '그룹 ID': acc.login_id,
                 '결제 계정': acc.payment_email,
                 '결제일': `${acc.payment_day}일`,
                 '메모': acc.memo,
@@ -441,7 +527,7 @@ export default function TidalAccountsPage() {
 
                 excelData.push({
                     'No.': '',
-                    '마스터 ID': '',
+                    '그룹 ID': '',
                     '결제 계정': '',
                     '결제일': '',
                     '메모': '',
@@ -450,7 +536,7 @@ export default function TidalAccountsPage() {
                     '전화번호': order?.buyer_phone || order?.profiles?.phone || '',
                     '주문번호': order?.order_number || '',
                     '소속 ID': assignment?.tidal_id || '',
-                    '소속 PW': assignment?.slot_password || '',
+                    '소속 PW': assignment?.tidal_password || '',
                     '시작일': order?.start_date ? new Date(order.start_date).toLocaleDateString() : '',
                     '종료일': order?.end_date ? new Date(order.end_date).toLocaleDateString() : '',
                 });
@@ -481,7 +567,7 @@ export default function TidalAccountsPage() {
             const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
             // Validation: Check headers
-            const requiredHeaders = ['마스터 ID', '결제 계정', '결제일', '메모'];
+            const requiredHeaders = ['그룹 ID', '결제 계정', '결제일', '메모'];
             const firstRow = jsonData[0];
             if (!firstRow || !requiredHeaders.every(h => h in firstRow)) {
                 alert('엑셀 양식이 올바르지 않습니다. 다운로드 양식을 확인해 주세요.');
@@ -544,7 +630,7 @@ export default function TidalAccountsPage() {
                 end_date: order.end_date || '',
                 order_number: order.order_number || '',
                 tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : '',
-                slot_password: slotPasswordModal || '',
+                tidal_password: slotPasswordModal || '',
                 full_order: order // Store full order for detail view
             }
         }));
@@ -558,7 +644,7 @@ export default function TidalAccountsPage() {
         setMoveTargets(accounts.filter(a => a.used_slots < a.max_slots));
         setSelectedTargetAccount('');
         setSelectedTargetSlot(null);
-        setSlotPasswordModal(currentAssignment.slot_password || '');
+        setSlotPasswordModal(currentAssignment.tidal_password || '');
         setIsMoveModalOpen(true);
     };
 
@@ -576,7 +662,7 @@ export default function TidalAccountsPage() {
                     order_id: selectedAssignment.orders.id,
                     target_account_id: selectedTargetAccount,
                     target_slot_number: selectedTargetSlot,
-                    target_slot_password: selectedAssignment?.slot_password // Use existing Pw
+                    target_tidal_password: selectedAssignment?.tidal_password // Use existing Pw
                 })
             });
             if (!res.ok) throw new Error('Failed');
@@ -628,7 +714,7 @@ export default function TidalAccountsPage() {
                             <Download size={16} /> 엑셀 다운로드
                         </Button>
                         <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
-                            <Plus size={16} /> 계정 추가
+                            <Plus size={16} /> 그룹 추가
                         </Button>
                     </div>
                 </div>
@@ -636,12 +722,12 @@ export default function TidalAccountsPage() {
 
             <div className={`${styles.content} container`}>
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 font-bold border-b text-sm">
+                    <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-sm">
                         <div className="col-span-1">No.</div>
-                        <div className="col-span-2">마스터 ID</div>
-                        <div className="col-span-2">결제 ID</div>
+                        <div className="col-span-3">결제계좌</div>
                         <div className="col-span-1 text-center">결제일</div>
-                        <div className="col-span-3 text-left">메모</div>
+                        <div className="col-span-2 text-left">메모</div>
+                        <div className="col-span-3 text-left">마스터정보</div>
                         <div className="col-span-1 text-center">슬롯</div>
                         <div className="col-span-1 text-center">관리</div>
                         <div className="col-span-1 text-center">상세</div>
@@ -653,21 +739,25 @@ export default function TidalAccountsPage() {
 
                         return (
                             <div key={acc.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                                <div className="grid grid-cols-12 gap-4 p-4 items-center text-sm">
+                                <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
                                     <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         {String(idx + 1).padStart(3, '0')}
                                     </div>
-                                    <div className="col-span-2 truncate cursor-pointer" title={acc.login_id} onClick={() => toggleRow(acc.id)}>
-                                        <div className="font-medium text-xs">{acc.login_id}</div>
-                                    </div>
-                                    <div className="col-span-2 truncate cursor-pointer" title={acc.payment_email} onClick={() => toggleRow(acc.id)}>
-                                        <div className="text-xs text-blue-600">{acc.payment_email}</div>
+                                    <div className="col-span-3 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
+                                        <div className="font-medium text-xs">
+                                            <span className="text-gray-700">{acc.login_id}</span>
+                                            <span className="text-gray-400 mx-1">-</span>
+                                            <span className="text-blue-600">{acc.payment_email}</span>
+                                        </div>
                                     </div>
                                     <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         {acc.payment_day}일
                                     </div>
-                                    <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
-                                        {acc.memo?.length > 20 ? acc.memo.substring(0, 20) + '...' : acc.memo}
+                                    <div className="col-span-2 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
+                                        {acc.memo?.length > 15 ? acc.memo.substring(0, 15) + '...' : acc.memo}
+                                    </div>
+                                    <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={getMasterInfo(acc)} onClick={() => toggleRow(acc.id)}>
+                                        {getMasterInfo(acc)}
                                     </div>
                                     <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
@@ -675,10 +765,10 @@ export default function TidalAccountsPage() {
                                         </span>
                                     </div>
                                     <div className="col-span-1 text-center flex justify-center gap-1">
-                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="계정 수정" onClick={(e) => { e.stopPropagation(); handleEditMasterAccount(acc); }}>
+                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="그룹 수정" onClick={(e) => { e.stopPropagation(); handleEditMasterAccount(acc); }}>
                                             <Pencil size={14} />
                                         </Button>
-                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="계정 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
+                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="그룹 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
                                             <Trash2 size={14} />
                                         </Button>
                                     </div>
@@ -693,6 +783,7 @@ export default function TidalAccountsPage() {
                                             <thead>
                                                 <tr className="text-gray-400 border-b">
                                                     <th className="py-2 text-center w-12">Slot</th>
+                                                    <th className="py-2 text-center w-20">Type</th>
                                                     <th className="py-2 text-left w-32">Tidal ID</th>
                                                     <th className="py-2 text-left w-24">비밀번호</th>
                                                     <th className="py-2 text-left w-20">이름</th>
@@ -730,10 +821,21 @@ export default function TidalAccountsPage() {
                                                             {isEditing ? (
                                                                 <>
                                                                     <td className="px-1">
+                                                                        <Select value={val.type || 'user'} onValueChange={(value) => updateGridValue(acc.id, sIdx, 'type', value)}>
+                                                                            <SelectTrigger className="h-8 text-xs bg-white">
+                                                                                <SelectValue />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                <SelectItem value="master">Master</SelectItem>
+                                                                                <SelectItem value="user">User</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </td>
+                                                                    <td className="px-1">
                                                                         <Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
                                                                     </td>
                                                                     <td className="px-1">
-                                                                        <Input className="h-8 text-xs bg-white" placeholder="PW" value={val.slot_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'slot_password', e.target.value)} />
+                                                                        <Input className="h-8 text-xs bg-white" placeholder="PW" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
                                                                     </td>
                                                                     <td className="px-1">
                                                                         <Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
@@ -753,8 +855,13 @@ export default function TidalAccountsPage() {
                                                                 </>
                                                             ) : (
                                                                 <>
+                                                                    <td className="px-2 text-center">
+                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                            {val.type === 'master' ? 'Master' : 'User'}
+                                                                        </span>
+                                                                    </td>
                                                                     <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id}>{val.tidal_id || '-'}</td>
-                                                                    <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.slot_password}>{val.slot_password || '-'}</td>
+                                                                    <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password}>{val.tidal_password || '-'}</td>
                                                                     <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name}>{val.buyer_name || '-'}</td>
                                                                     <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email}>{val.buyer_email || '-'}</td>
                                                                     <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone}>{val.buyer_phone || '-'}</td>
@@ -845,19 +952,25 @@ export default function TidalAccountsPage() {
             {/* Copying previous modal code for completeness */}
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>마스터 계정 추가</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>그룹 추가</DialogTitle></DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="login_id" className="text-right">마스터 계정</Label>
-                            <Input id="login_id" value={newAccount.login_id} onChange={(e) => setNewAccount({ ...newAccount, login_id: e.target.value })} className="col-span-3" placeholder="master@hifitidal.com" />
+                            <Label htmlFor="login_id" className="text-right">
+                                그룹 ID <span className="text-red-500">*</span>
+                            </Label>
+                            <Input id="login_id" type="text" value={newAccount.login_id} onChange={(e) => setNewAccount({ ...newAccount, login_id: e.target.value })} className="col-span-3" placeholder="GROUP-001" required />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="payment_email" className="text-right">결제 계정</Label>
-                            <Input id="payment_email" value={newAccount.payment_email} onChange={(e) => setNewAccount({ ...newAccount, payment_email: e.target.value })} className="col-span-3" placeholder="payment@email.com" />
+                            <Label htmlFor="payment_email" className="text-right">
+                                결제 계정 <span className="text-red-500">*</span>
+                            </Label>
+                            <Input id="payment_email" value={newAccount.payment_email} onChange={(e) => setNewAccount({ ...newAccount, payment_email: e.target.value })} className="col-span-3" placeholder="payment@email.com" required />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="payment_day" className="text-right">결제일</Label>
-                            <Input id="payment_day" type="number" min="1" max="31" value={newAccount.payment_day} onChange={(e) => setNewAccount({ ...newAccount, payment_day: parseInt(e.target.value) || 1 })} className="col-span-3" placeholder="1~31" />
+                            <Label htmlFor="payment_day" className="text-right">
+                                결제일 <span className="text-red-500">*</span>
+                            </Label>
+                            <Input id="payment_day" type="number" min="1" max="31" value={newAccount.payment_day} onChange={(e) => setNewAccount({ ...newAccount, payment_day: parseInt(e.target.value) || 1 })} className="col-span-3" placeholder="1~31" required />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="memo" className="text-right">메모</Label>
@@ -870,24 +983,30 @@ export default function TidalAccountsPage() {
 
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>마스터 계정 수정</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>그룹 수정</DialogTitle></DialogHeader>
                     {editingAccount && (
                         <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit_login_id" className="text-right">마스터 계정</Label>
-                                <Input id="edit_login_id" value={editingAccount.login_id} onChange={(e) => setEditingAccount({ ...editingAccount, login_id: e.target.value })} className="col-span-3" />
+                                <Label htmlFor="edit_login_id" className="text-right">
+                                    그룹 ID <span className="text-red-500">*</span>
+                                </Label>
+                                <Input id="edit_login_id" value={editingAccount.login_id || ''} onChange={(e) => setEditingAccount({ ...editingAccount, login_id: e.target.value })} className="col-span-3" required />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit_payment_email" className="text-right">결제 계정</Label>
-                                <Input id="edit_payment_email" value={editingAccount.payment_email} onChange={(e) => setEditingAccount({ ...editingAccount, payment_email: e.target.value })} className="col-span-3" />
+                                <Label htmlFor="edit_payment_email" className="text-right">
+                                    결제 계정 <span className="text-red-500">*</span>
+                                </Label>
+                                <Input id="edit_payment_email" value={editingAccount.payment_email || ''} onChange={(e) => setEditingAccount({ ...editingAccount, payment_email: e.target.value })} className="col-span-3" required />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit_payment_day" className="text-right">결제일</Label>
-                                <Input id="edit_payment_day" type="number" min="1" max="31" value={editingAccount.payment_day} onChange={(e) => setEditingAccount({ ...editingAccount, payment_day: parseInt(e.target.value) || 1 })} className="col-span-3" />
+                                <Label htmlFor="edit_payment_day" className="text-right">
+                                    결제일 <span className="text-red-500">*</span>
+                                </Label>
+                                <Input id="edit_payment_day" type="number" min="1" max="31" value={editingAccount.payment_day || 1} onChange={(e) => setEditingAccount({ ...editingAccount, payment_day: parseInt(e.target.value) || 1 })} className="col-span-3" required />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit_memo" className="text-right">메모</Label>
-                                <Input id="edit_memo" value={editingAccount.memo} onChange={(e) => setEditingAccount({ ...editingAccount, memo: e.target.value })} className="col-span-3" />
+                                <Input id="edit_memo" value={editingAccount.memo || ''} onChange={(e) => setEditingAccount({ ...editingAccount, memo: e.target.value })} className="col-span-3" />
                             </div>
                         </div>
                     )}
