@@ -20,6 +20,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [plans, setPlans] = useState<Record<string, any>[]>([]);
 
     useEffect(() => {
+        let isMounted = true;
+
         const fetchDetail = async () => {
             if (!serviceId) return;
 
@@ -36,11 +38,13 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     if (productError.message?.includes('AbortError') || productError.code === 'PGRST301') {
                         return;
                     }
-                    console.error('Error fetching product:', productError);
+                    if (isMounted) {
+                        console.error('Error fetching product:', productError);
+                    }
                     return;
                 }
 
-                if (productData) setServiceDetail(productData);
+                if (productData && isMounted) setServiceDetail(productData);
 
                 // Fetch plans
                 const { data: plansData, error: plansError } = await supabase
@@ -55,11 +59,13 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     if (plansError.message?.includes('AbortError') || plansError.code === 'PGRST301') {
                         return;
                     }
-                    console.error('Error fetching plans:', plansError);
+                    if (isMounted) {
+                        console.error('Error fetching plans:', plansError);
+                    }
                     return;
                 }
 
-                if (plansData) {
+                if (plansData && isMounted) {
                     setPlans(plansData);
                     if (plansData.length > 0) {
                         setSelectedPeriod(plansData[0].duration_months);
@@ -71,10 +77,17 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 if (err.name === 'AbortError' || err.message?.includes('aborted')) {
                     return;
                 }
-                console.error('Unexpected error in fetchDetail:', error);
+                if (isMounted) {
+                    console.error('Unexpected error in fetchDetail:', error);
+                }
             }
         };
+
         fetchDetail();
+
+        return () => {
+            isMounted = false;
+        };
     }, [serviceId]);
 
     // Fallback to context if detail fetch is pending or failed (though detail has more fields)
