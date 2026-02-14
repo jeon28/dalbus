@@ -90,40 +90,50 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
 
         // 초기 session 확인 및 설정
         const initializeAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
 
-            if (session?.user) {
-                // 실제 session이 있으면 profile 가져오기
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('name, email, role')
-                    .eq('id', session.user.id)
-                    .single();
+                if (session?.user) {
+                    // 실제 session이 있으면 profile 가져오기
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('name, email, role')
+                        .eq('id', session.user.id)
+                        .single();
 
-                const userObj: User = {
-                    id: session.user.id,
-                    name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                    email: profile?.email || session.user.email || ''
-                };
-                setUser(userObj);
-                localStorage.setItem('dalbus-user', JSON.stringify(userObj));
+                    const userObj: User = {
+                        id: session.user.id,
+                        name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+                        email: profile?.email || session.user.email || ''
+                    };
+                    setUser(userObj);
+                    localStorage.setItem('dalbus-user', JSON.stringify(userObj));
 
-                if (profile?.role === 'admin') {
-                    setIsAdmin(true);
-                    localStorage.setItem('dalbus-isAdmin', 'true');
+                    if (profile?.role === 'admin') {
+                        setIsAdmin(true);
+                        localStorage.setItem('dalbus-isAdmin', 'true');
+                    } else {
+                        setIsAdmin(false);
+                        localStorage.removeItem('dalbus-isAdmin');
+                    }
                 } else {
+                    // session이 없으면 localStorage 정리
+                    setUser(null);
                     setIsAdmin(false);
+                    localStorage.removeItem('dalbus-user');
                     localStorage.removeItem('dalbus-isAdmin');
                 }
-            } else {
-                // session이 없으면 localStorage 정리
+            } catch (error) {
+                console.error('Failed to initialize auth:', error);
+                // 에러 발생 시에도 기본 상태로 설정
                 setUser(null);
                 setIsAdmin(false);
                 localStorage.removeItem('dalbus-user');
                 localStorage.removeItem('dalbus-isAdmin');
+            } finally {
+                // 에러 발생 여부와 관계없이 hydration 완료
+                setIsHydrated(true);
             }
-
-            setIsHydrated(true);
         };
 
         initializeAuth();
