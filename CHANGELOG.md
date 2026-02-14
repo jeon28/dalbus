@@ -1,5 +1,44 @@
 # Changelog
 
+## v2.9 - 2026-02-15
+
+### 🚀 Grid View 도입 및 데이터 구조/UX 개선
+
+#### 새로운 기능 (New Features)
+1. **Grid View (격자 보기) 모드 추가**:
+    - **목적**: 계정별 그룹화된 기존 List View 외에, 모든 할당 내역을 평면적인 테이블로 관리 기능 필요
+    - **기능**:
+        - List View / Grid View 전환 토글 버튼 추가 (상단 버튼 그룹 좌측 배치)
+        - 전체 할당 내역을 단일 테이블로 조회 (ID, Tidal ID, PW, 구매자 정보, 주문번호, 시작/종료일, 마스터 정보 등)
+        - 각 행에서 직접 수정(Edit), 이동(Move), 삭제(Delete) 가능
+    - **UI/UX**:
+        - 계정(Account) 단위로 행 병합(Row Span)하여 시각적 구조화
+        - 마스터 계정 정보(Master ID)를 모든 연관 슬롯에 표시하여 식별 용이성 확보
+
+2. **주문 번호 포맷 변경**:
+    - **기존**: `ORD-YYYYMMDD-XXXX` 형식
+    - **변경**: **8자리 숫자 난수** (예: `12345678`) 포맷으로 변경 (보안 및 간소화)
+    - **기술적 구현**: DB Trigger/Function (`generate_order_number`) 교체 (Migration 021)
+
+#### 개선 사항 (Improvements)
+1. **Tidal ID 중복 검사 강화**:
+    - **문제**: 중복된 Tidal ID 입력 시 DB 에러가 발생하여 사용자에게 불친절한 메시지 노출
+    - **해결**: 백엔드 API에서 `23505` (Unique Constraint Violation) 에러를 캐치하여 "이미 사용 중인 Tidal ID입니다"라는 명확한 한글 에러 메시지 반환 처리
+
+2. **마스터 슬롯 중복 방지**:
+    - **기능**: 한 계정에 'Master' 슬롯이 이미 존재하는 경우, 추가로 Master 슬롯을 생성하려 할 때 경고 알림(Alert) 표시 및 생성 차단
+    - **효과**: 데이터 무결성 보장
+
+#### 버그 수정 및 리팩토링 (Fixes & Refactoring)
+1. **TypeScript 타입 안정성 강화**:
+    - API Routes (`assign`, `assignments`) 및 프론트엔드 페이지에서 `any` 타입 명시적 제거 및 올바른 타입 정의 적용
+    - 빌드 시 발생하던 린트 에러 해결
+
+#### 데이터베이스 변경 (Database Changes)
+- **Migration 021**: `generate_order_number` 함수 수정 (8자리 난수 생성 로직 적용)
+
+---
+
 ## v2.8 - 2026-02-14
 
 ### 🎯 Tidal 계정 관리 UI/UX 개선 및 슬롯 편집 기능 수정

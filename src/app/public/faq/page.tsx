@@ -45,12 +45,12 @@ export default function FAQPage() {
 
                 // Ignore AbortError
                 if (faqRes.error) {
-                    if (faqRes.error.message?.includes('AbortError') || faqRes.error.code === 'PGRST301') {
+                    if (faqRes.error.message?.includes('AbortError') || faqRes.error.message?.includes('aborted') || faqRes.error.message?.includes('signal is aborted') || faqRes.error.code === 'PGRST301') {
                         return;
                     }
                 }
                 if (catRes.error) {
-                    if (catRes.error.message?.includes('AbortError') || catRes.error.code === 'PGRST301') {
+                    if (catRes.error.message?.includes('AbortError') || catRes.error.message?.includes('aborted') || catRes.error.message?.includes('signal is aborted') || catRes.error.code === 'PGRST301') {
                         return;
                     }
                 }
@@ -62,7 +62,7 @@ export default function FAQPage() {
                 }
             } catch (error) {
                 const err = error as Error;
-                if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
                     return;
                 }
                 if (isMounted) {

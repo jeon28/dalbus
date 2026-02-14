@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { differenceInMonths, parseISO } from 'date-fns';
+import { differenceInMonths, parseISO, format } from 'date-fns';
 
 interface Assignment {
     id: string;
@@ -36,6 +36,7 @@ interface Assignment {
     buyer_name?: string;
     buyer_phone?: string;
     buyer_email?: string;
+    order_number?: string;
 }
 
 interface Account {
@@ -84,12 +85,13 @@ interface GridValue {
     [key: string]: any;
 }
 
-export default function TidalAccountsPage() {
+function TidalAccountsContent() {
     const { isAdmin } = useServices();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [isGridView, setIsGridView] = useState(false);
 
     // Grid State: Store edits locally before save
     const [gridValues, setGridValues] = useState<Record<string, GridValue>>({});
@@ -208,7 +210,7 @@ export default function TidalAccountsPage() {
     const fetchAccounts = async () => {
 
         try {
-            const res = await fetch('/api/admin/accounts');
+            const res = await fetch('/api/admin/accounts', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
@@ -226,7 +228,7 @@ export default function TidalAccountsPage() {
 
                     initialGrid[`${acc.id}_${i}`] = {
                         assignment_id: assignment?.id,
-                        tidal_id: assignment?.tidal_id || '',
+                        tidal_id: assignment?.tidal_id ?? null,
                         tidal_password: defaultPw,
                         // Prefer buyer info from order_accounts, fallback to orders table
                         buyer_name: assignment?.buyer_name || assignment?.orders?.buyer_name || assignment?.orders?.profiles?.name || '',
@@ -234,7 +236,7 @@ export default function TidalAccountsPage() {
                         buyer_email: assignment?.buyer_email || assignment?.orders?.buyer_email || '',
                         start_date: assignment?.orders?.start_date || '',
                         end_date: assignment?.orders?.end_date || '',
-                        order_number: assignment?.orders?.order_number || '',
+                        order_number: assignment?.order_number || assignment?.orders?.order_number || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'), // Slot 1 defaults to master, others to user
                     };
                 }
@@ -242,6 +244,10 @@ export default function TidalAccountsPage() {
             setGridValues(initialGrid);
 
         } catch (error) {
+            const err = error as Error;
+            if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
+                return;
+            }
             console.error(error);
         }
 
@@ -249,7 +255,7 @@ export default function TidalAccountsPage() {
 
     const fetchPendingOrders = async () => {
         try {
-            const res = await fetch('/api/admin/orders');
+            const res = await fetch('/api/admin/orders', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 const waiting = data.filter((o: Order) =>
@@ -259,6 +265,10 @@ export default function TidalAccountsPage() {
                 setPendingOrders(waiting);
             }
         } catch (error) {
+            const err = error as Error;
+            if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
+                return;
+            }
             console.error(error);
         }
     };
@@ -308,8 +318,8 @@ export default function TidalAccountsPage() {
                 const emailPrefix = value.split('@')[0];
                 if (emailPrefix) {
                     next.tidal_id = `${emailPrefix}@hifitidal.com`;
-                } else if (!value) {
-                    next.tidal_id = '@hifitidal.com';
+                } else {
+                    next.tidal_id = null;
                 }
             }
 
@@ -336,7 +346,10 @@ export default function TidalAccountsPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                if (!res.ok) throw new Error('Update failed');
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Update failed');
+                }
             } else {
                 // CREATE new assignment (Manual Order)
                 if (!data.buyer_name && !data.buyer_email) {
@@ -348,9 +361,11 @@ export default function TidalAccountsPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        order_id: data.order_id,
+                        order_number: data.order_number,
                         slot_number: slotIdx,
                         tidal_password: data.tidal_password,
-                        tidal_id: data.tidal_id,
+                        tidal_id: data.tidal_id || null,
                         type: data.type,
                         // Manual fields
                         buyer_name: data.buyer_name,
@@ -371,8 +386,11 @@ export default function TidalAccountsPage() {
             setEditingSlots(prev => ({ ...prev, [key]: false })); // Exit edit mode
             fetchAccounts();
         } catch (e) {
-            const error = e as Error;
-            alert('저장 실패: ' + error.message);
+            const errorMsg = (e as { message?: string }).message || String(e);
+            if (!errorMsg.includes('이미 사용 중인 Tidal ID')) {
+                console.error('Save row error:', e);
+            }
+            alert('저장 실패: ' + errorMsg);
         }
     };
 
@@ -547,10 +565,10 @@ export default function TidalAccountsPage() {
                 '종료일': '',
             });
 
-            // 6 fixed slot rows
-            for (let slotIdx = 0; slotIdx < 6; slotIdx++) {
-                const assignment = acc.order_accounts?.find(oa => oa.slot_number === slotIdx);
-                const order = assignment?.orders;
+            // Dynamic slot rows
+            const sortedAssignments = getSortedAssignments(acc);
+            sortedAssignments.forEach((assignment, index) => {
+                const order = assignment.orders;
 
                 excelData.push({
                     'No.': '',
@@ -558,16 +576,16 @@ export default function TidalAccountsPage() {
                     '결제 계정': '',
                     '결제일': '',
                     '메모': '',
-                    'Slot': `Slot ${slotIdx + 1}`,
+                    'Slot': `Slot ${index + 1}`,
                     '고객명': order?.buyer_name || order?.profiles?.name || '',
                     '전화번호': order?.buyer_phone || order?.profiles?.phone || '',
                     '주문번호': order?.order_number || '',
-                    '소속 ID': assignment?.tidal_id || '',
-                    '소속 PW': assignment?.tidal_password || '',
+                    '소속 ID': assignment.tidal_id || '',
+                    '소속 PW': assignment.tidal_password || '',
                     '시작일': order?.start_date ? new Date(order.start_date).toLocaleDateString() : '',
                     '종료일': order?.end_date ? new Date(order.end_date).toLocaleDateString() : '',
                 });
-            }
+            });
         });
 
         // Create workbook
@@ -627,10 +645,16 @@ export default function TidalAccountsPage() {
     // --- Modals --- (Assign/Move)
 
     const openAssignModal = (account: Account, slotIndex: number) => {
-        setSelectedAccount(account);
-        setSelectedSlot(slotIndex);
-        setSlotPasswordModal(generateTidalPassword());
-        setIsAssignModalOpen(true);
+        try {
+            if (!account) throw new Error('계정 정보가 없습니다.');
+            setSelectedAccount(account);
+            setSelectedSlot(slotIndex);
+            setSlotPasswordModal(generateTidalPassword());
+            setIsAssignModalOpen(true);
+        } catch (e) {
+            console.error('Open assign modal error:', e);
+            alert('배정 창을 여는 중 오류가 발생했습니다: ' + String(e));
+        }
     };
 
     const openOrderDetail = (order: Order) => {
@@ -650,16 +674,45 @@ export default function TidalAccountsPage() {
             ...prev,
             [key]: {
                 ...prev[key],
+                order_id: order.id,
                 buyer_name: order.buyer_name || order.profiles?.name || '',
                 buyer_email: order.buyer_email || '',
                 buyer_phone: order.buyer_phone || order.profiles?.phone || '',
                 start_date: order.start_date || '',
                 end_date: order.end_date || '',
                 order_number: order.order_number || '',
-                tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : '',
+                tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : null,
                 tidal_password: slotPasswordModal || '',
                 full_order: order // Store full order for detail view
             }
+        }));
+
+        // Optimistically update accounts state to ensure the new slot renders
+        setAccounts(prev => prev.map(acc => {
+            if (acc.id === selectedAccount.id) {
+                const newAssignment: Assignment = {
+                    id: `temp-${Date.now()}`,
+                    // account_id removed as it's not in Assignment interface
+                    slot_number: selectedSlot,
+                    type: selectedSlot === 0 ? 'master' : 'user',
+                    tidal_id: (emailPrefix ? `${emailPrefix}@hifitidal.com` : null) || undefined,
+                    tidal_password: slotPasswordModal || '',
+                    order_id: order.id,
+                    orders: order
+                };
+
+                const newOrderAccounts = [...(acc.order_accounts || [])];
+                const existingIdx = newOrderAccounts.findIndex(oa => oa.slot_number === selectedSlot);
+
+                if (existingIdx !== -1) {
+                    newOrderAccounts[existingIdx] = { ...newOrderAccounts[existingIdx], ...newAssignment };
+                } else {
+                    newOrderAccounts.push(newAssignment);
+                }
+
+                return { ...acc, used_slots: newOrderAccounts.length, order_accounts: newOrderAccounts };
+            }
+            return acc;
         }));
 
         setEditingSlots(prev => ({ ...prev, [key]: true }));
@@ -705,15 +758,26 @@ export default function TidalAccountsPage() {
     const getAvailableSlots = (accountId: string) => {
         const acc = accounts.find(a => a.id === accountId);
         if (!acc) return [];
-        const takenSlots = new Set<number>();
-        if (acc.order_accounts) {
-            acc.order_accounts.forEach((oa: Assignment) => takenSlots.add(oa.slot_number));
-        }
+        const taken = new Set((acc.order_accounts || [])
+            .filter(oa => oa && typeof oa.slot_number === 'number')
+            .map(oa => oa.slot_number));
         const available = [];
-        for (let i = 0; i < acc.max_slots; i++) {
-            if (!takenSlots.has(i)) available.push(i);
+        for (let i = 0; i < 6; i++) {
+            if (!taken.has(i)) available.push(i);
         }
         return available;
+    };
+
+    const getSortedAssignments = (acc: Account) => {
+        return [...(acc.order_accounts || [])]
+            .filter(oa => oa && typeof oa === 'object')
+            .sort((a, b) => {
+                if (a.type === 'master') return -1;
+                if (b.type === 'master') return 1;
+                const dateA = a.orders?.end_date || '9999-12-31';
+                const dateB = b.orders?.end_date || '9999-12-31';
+                return dateA.localeCompare(dateB);
+            });
     };
 
 
@@ -725,6 +789,10 @@ export default function TidalAccountsPage() {
                 <div className="container flex justify-between items-center">
                     <h1 className={styles.title}>Tidal 계정 관리 (V2.2)</h1>
                     <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)}>
+                            {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
+                            {isGridView ? 'List View' : 'Grid View'}
+                        </Button>
                         <div className="relative">
                             <input
                                 type="file"
@@ -748,231 +816,318 @@ export default function TidalAccountsPage() {
             </header>
 
             <div className={`${styles.content} container`}>
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-sm">
-                        <div className="col-span-1">No.</div>
-                        <div className="col-span-3">결제계좌</div>
-                        <div className="col-span-1 text-center">결제일</div>
-                        <div className="col-span-2 text-left">메모</div>
-                        <div className="col-span-3 text-left">마스터정보</div>
-                        <div className="col-span-1 text-center">슬롯</div>
-                        <div className="col-span-1 text-center">관리</div>
-                        <div className="col-span-1 text-center">상세</div>
+                {isGridView ? (
+                    <div className="bg-white rounded-lg shadow overflow-x-auto">
+                        <table className="w-full text-xs min-w-[1200px]">
+                            <thead>
+                                <tr className="bg-gray-100 border-b">
+                                    <th className="p-2 text-center border-r">ID</th>
+                                    <th className="p-2 text-left border-r">Tidal ID</th>
+                                    <th className="p-2 text-left border-r">PW</th>
+                                    <th className="p-2 text-left border-r">고객명</th>
+                                    <th className="p-2 text-left border-r">전화번호</th>
+                                    <th className="p-2 text-center border-r">주문번호</th>
+                                    <th className="p-2 text-center border-r">시작일</th>
+                                    <th className="p-2 text-center border-r">종료일</th>
+                                    <th className="p-2 text-center border-r">개월수</th>
+                                    <th className="p-2 text-center border-r">계정Type</th>
+                                    <th className="p-2 text-left border-r">Master ID</th>
+                                    <th className="p-2 text-left border-r">결제계정</th>
+                                    <th className="p-2 text-center">결제일</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {accounts.map((acc, accIndex) => {
+                                    const masterAssignment = acc.order_accounts?.find(oa => oa.type === 'master');
+                                    const masterId = masterAssignment?.tidal_id || '';
+                                    const sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => a.slot_number - b.slot_number);
+
+                                    return sortedAssignments.map((assignment, idx) => {
+                                        let period = '-';
+                                        if (assignment.orders?.start_date && assignment.orders?.end_date) {
+                                            try {
+                                                const start = parseISO(assignment.orders.start_date);
+                                                const end = parseISO(assignment.orders.end_date);
+                                                const diff = differenceInMonths(end, start);
+                                                if (diff > 0) period = `${diff}`;
+                                            } catch { }
+                                        }
+
+                                        return (
+                                            <tr key={assignment.id} className="border-b hover:bg-gray-50">
+                                                {idx === 0 ? (
+                                                    <td className="p-2 text-center border-r font-bold" rowSpan={sortedAssignments.length}>
+                                                        {accIndex + 1}
+                                                    </td>
+                                                ) : null}
+                                                <td className="p-2 border-r">{assignment.tidal_id || '-'}</td>
+                                                <td className="p-2 border-r">{assignment.tidal_password || '-'}</td>
+                                                <td className="p-2 border-r">{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</td>
+                                                <td className="p-2 border-r">{assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}</td>
+                                                <td className="p-2 text-center border-r">{assignment.order_number || assignment.orders?.order_number || '-'}</td>
+                                                <td className="p-2 text-center border-r">{assignment.orders?.start_date ? format(parseISO(assignment.orders.start_date), 'yyyy-MM-dd') : '-'}</td>
+                                                <td className="p-2 text-center border-r">{assignment.orders?.end_date ? format(parseISO(assignment.orders.end_date), 'yyyy-MM-dd') : '-'}</td>
+                                                <td className="p-2 text-center border-r">{period}</td>
+                                                <td className="p-2 text-center border-r">
+                                                    <span className={`px-1 rounded ${assignment.type === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>
+                                                        {assignment.type === 'master' ? 'Master' : 'Slave'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-2 border-r">{masterId}</td>
+                                                {idx === 0 ? (
+                                                    <>
+                                                        <td className="p-2 border-r" rowSpan={sortedAssignments.length}>{acc.payment_email}</td>
+                                                        <td className="p-2 text-center" rowSpan={sortedAssignments.length}>{acc.payment_day}일</td>
+                                                    </>
+                                                ) : null}
+                                            </tr>
+                                        );
+                                    });
+                                })}
+                            </tbody>
+                        </table>
                     </div>
+                ) : (
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-sm">
+                            <div className="col-span-1">No.</div>
+                            <div className="col-span-3">결제계좌</div>
+                            <div className="col-span-1 text-center">결제일</div>
+                            <div className="col-span-2 text-left">메모</div>
+                            <div className="col-span-3 text-left">마스터정보</div>
+                            <div className="col-span-1 text-center">슬롯</div>
+                            <div className="col-span-1 text-center">관리</div>
+                            <div className="col-span-1 text-center">상세</div>
+                        </div>
 
-                    {accounts.map((acc, idx) => {
-                        const isExpanded = expandedRows.has(acc.id);
-                        const slots = Array.from({ length: 6 });
+                        {accounts.map((acc, idx) => {
+                            const isExpanded = expandedRows.has(acc.id);
+                            const sortedAssignments = getSortedAssignments(acc);
+                            const availableSlots = getAvailableSlots(acc.id);
+                            const availableSlotNum = availableSlots.length > 0 ? availableSlots[0] : -1;
 
-                        return (
-                            <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                                <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
-                                    <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                        {String(idx + 1).padStart(3, '0')}
-                                    </div>
-                                    <div className="col-span-3 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
-                                        <div className="font-medium text-xs">
-                                            <span className="text-gray-700">{acc.login_id}</span>
-                                            <span className="text-gray-400 mx-1">-</span>
-                                            <span className="text-blue-600">{acc.payment_email}</span>
+                            return (
+                                <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
+                                    <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
+                                        <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                            {String(idx + 1).padStart(3, '0')}
+                                        </div>
+                                        <div className="col-span-3 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
+                                            <div className="font-medium text-xs">
+                                                <span className="text-gray-700">{acc.login_id}</span>
+                                                <span className="text-gray-400 mx-1">-</span>
+                                                <span className="text-blue-600">{acc.payment_email}</span>
+                                            </div>
+                                        </div>
+                                        <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                            {acc.payment_day}일
+                                        </div>
+                                        <div className="col-span-2 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
+                                            {acc.memo?.length > 15 ? acc.memo.substring(0, 15) + '...' : acc.memo}
+                                        </div>
+                                        <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={getMasterInfo(acc)} onClick={() => toggleRow(acc.id)}>
+                                            {getMasterInfo(acc)}
+                                        </div>
+                                        <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                                {acc.order_accounts?.length || 0}/6
+                                            </span>
+                                        </div>
+                                        <div className="col-span-1 text-center flex justify-center gap-1">
+                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="그룹 수정" onClick={(e) => { e.stopPropagation(); handleEditMasterAccount(acc); }}>
+                                                <Pencil size={14} />
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="그룹 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
+                                                <Trash2 size={14} />
+                                            </Button>
+                                        </div>
+                                        <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </div>
                                     </div>
-                                    <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                        {acc.payment_day}일
-                                    </div>
-                                    <div className="col-span-2 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
-                                        {acc.memo?.length > 15 ? acc.memo.substring(0, 15) + '...' : acc.memo}
-                                    </div>
-                                    <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={getMasterInfo(acc)} onClick={() => toggleRow(acc.id)}>
-                                        {getMasterInfo(acc)}
-                                    </div>
-                                    <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                                            {acc.order_accounts?.length || 0}/6
-                                        </span>
-                                    </div>
-                                    <div className="col-span-1 text-center flex justify-center gap-1">
-                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="그룹 수정" onClick={(e) => { e.stopPropagation(); handleEditMasterAccount(acc); }}>
-                                            <Pencil size={14} />
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="그룹 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
-                                            <Trash2 size={14} />
-                                        </Button>
-                                    </div>
-                                    <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                    </div>
-                                </div>
 
-                                {isExpanded && (
-                                    <div className="bg-white border-t p-4 overflow-x-auto">
-                                        <table className="w-full text-xs min-w-[1200px]">
-                                            <thead>
-                                                <tr className="text-gray-400 border-b">
-                                                    <th className="py-2 text-center w-12">Slot</th>
-                                                    <th className="py-2 text-center w-20">Type</th>
-                                                    <th className="py-2 text-left w-32">Tidal ID</th>
-                                                    <th className="py-2 text-left w-24">비밀번호</th>
-                                                    <th className="py-2 text-left w-20">이름</th>
-                                                    <th className="py-2 text-left w-28">이메일</th>
-                                                    <th className="py-2 text-left w-28">전화번호</th>
-                                                    <th className="py-2 text-left w-24">가입일</th>
-                                                    <th className="py-2 text-left w-24">종료일</th>
-                                                    <th className="py-2 text-center w-16">개월</th>
-                                                    <th className="py-2 text-center w-24">주문번호</th>
-                                                    <th className="py-2 text-center w-40">관리</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {slots.map((_, sIdx) => {
-                                                    const assignment = acc.order_accounts?.find((oa: Assignment) => oa.slot_number === sIdx);
-                                                    const key = `${acc.id}_${sIdx}`;
-                                                    const val = gridValues[key] || {}; // Current Input Values
-                                                    const isEditing = editingSlots[key];
+                                    {isExpanded && (
+                                        <div className="bg-white border-t p-4 overflow-x-auto">
+                                            <table className="w-full text-xs min-w-[1200px]">
+                                                <thead>
+                                                    <tr className="text-gray-400 border-b">
+                                                        <th className="py-2 text-center w-12">Slot</th>
+                                                        <th className="py-2 text-center w-20">Type</th>
+                                                        <th className="py-2 text-left w-32">Tidal ID</th>
+                                                        <th className="py-2 text-left w-24">비밀번호</th>
+                                                        <th className="py-2 text-left w-20">이름</th>
+                                                        <th className="py-2 text-left w-28">이메일</th>
+                                                        <th className="py-2 text-left w-28">전화번호</th>
+                                                        <th className="py-2 text-left w-24">가입일</th>
+                                                        <th className="py-2 text-left w-24">종료일</th>
+                                                        <th className="py-2 text-center w-16">개월</th>
+                                                        <th className="py-2 text-center w-24">주문번호</th>
+                                                        <th className="py-2 text-center w-40">관리</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {sortedAssignments.map((assignment, index) => {
+                                                        const sIdx = assignment.slot_number;
+                                                        const key = `${acc.id}_${sIdx}`;
+                                                        const val = gridValues[key] || {}; // Current Input Values
+                                                        const isEditing = editingSlots[key];
 
-                                                    // Period Calc for display
-                                                    let period = '-';
-                                                    if (val.start_date && val.end_date) {
-                                                        try {
-                                                            const start = parseISO(val.start_date);
-                                                            const end = parseISO(val.end_date);
-                                                            const diff = differenceInMonths(end, start);
-                                                            if (diff > 0) period = `${diff}개월`;
-                                                        } catch { }
-                                                    }
+                                                        // Period Calc for display
+                                                        let period = '-';
+                                                        if (val.start_date && val.end_date) {
+                                                            try {
+                                                                const start = parseISO(val.start_date);
+                                                                const end = parseISO(val.end_date);
+                                                                const diff = differenceInMonths(end, start);
+                                                                if (diff > 0) period = `${diff}개월`;
+                                                            } catch { }
+                                                        }
 
-                                                    return (
-                                                        <tr key={sIdx} className="border-b last:border-0 h-10 hover:bg-gray-50">
-                                                            <td className="text-center font-bold text-gray-500">#{sIdx + 1}</td>
+                                                        return (
+                                                            <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
+                                                                <td className="text-center font-bold text-gray-400">#{index + 1}</td>
 
-                                                            {isEditing ? (
-                                                                <>
-                                                                    <td className="px-1">
-                                                                        <Select value={val.type || 'user'} onValueChange={(value) => updateGridValue(acc.id, sIdx, 'type', value)}>
-                                                                            <SelectTrigger className="h-8 text-xs bg-white">
-                                                                                <SelectValue />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent>
-                                                                                <SelectItem value="master">Master</SelectItem>
-                                                                                <SelectItem value="user">User</SelectItem>
-                                                                            </SelectContent>
-                                                                        </Select>
-                                                                    </td>
-                                                                    <td className="px-1">
-                                                                        <Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
-                                                                    </td>
-                                                                    <td className="px-1">
-                                                                        <Input className="h-8 text-xs bg-white" placeholder="PW" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
-                                                                    </td>
-                                                                    <td className="px-1">
-                                                                        <Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
-                                                                    </td>
-                                                                    <td className="px-1">
-                                                                        <Input className="h-8 text-xs bg-white" placeholder="Email" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} />
-                                                                    </td>
-                                                                    <td className="px-1">
-                                                                        <Input className="h-8 text-xs bg-white" placeholder="전화번호" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
-                                                                    </td>
-                                                                    <td className="px-1">
-                                                                        <Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
-                                                                    </td>
-                                                                    <td className="px-1">
-                                                                        <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
-                                                                    </td>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <td className="px-2 text-center">
-                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                                            {val.type === 'master' ? 'Master' : 'User'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id}>{val.tidal_id || '-'}</td>
-                                                                    <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password}>{val.tidal_password || '-'}</td>
-                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name}>{val.buyer_name || '-'}</td>
-                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email}>{val.buyer_email || '-'}</td>
-                                                                    <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone}>{val.buyer_phone || '-'}</td>
-                                                                    <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
-                                                                    <td className="px-2 text-gray-500 font-mono">{val.end_date || '-'}</td>
-                                                                </>
-                                                            )}
-
-                                                            <td className="text-center text-gray-500 font-mono">
-                                                                {period}
-                                                            </td>
-                                                            <td className="text-center text-gray-400 font-mono text-[10px]">
-                                                                {val.order_number ? (
-                                                                    <button
-                                                                        className="text-blue-600 font-bold underline hover:text-blue-800"
-                                                                        onClick={() => {
-                                                                            const orderToView = val.full_order || assignment?.orders;
-                                                                            if (orderToView) openOrderDetail(orderToView);
-                                                                        }}
-                                                                    >
-                                                                        {val.order_number}
-                                                                    </button>
-                                                                ) : isEditing ? (
-                                                                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openAssignModal(acc, sIdx)}>
-                                                                        주문
-                                                                    </Button>
-                                                                ) : (
-                                                                    <span>-</span>
-                                                                )}
-                                                            </td>
-                                                            <td className="text-center">
-                                                                <div className="flex justify-center gap-1 items-center">
-                                                                    {isEditing ? (
-                                                                        <>
-                                                                            <Button size="sm" variant="default" className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700" title="저장" onClick={() => handleSaveRow(acc.id, sIdx)}>
-                                                                                <Save size={14} />
-                                                                            </Button>
-                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, sIdx)}>
-                                                                                X
-                                                                            </Button>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-dashed text-gray-500 hover:text-blue-600 hover:border-blue-300"
-                                                                                onClick={() => {
-                                                                                    if (!assignment) {
-                                                                                        if (confirm('주문 정보를 불러오시겠습니까?')) {
-                                                                                            openAssignModal(acc, sIdx);
-                                                                                        } else {
-                                                                                            startEdit(acc.id, sIdx);
-                                                                                        }
-                                                                                    } else {
-                                                                                        startEdit(acc.id, sIdx);
+                                                                {isEditing ? (
+                                                                    <>
+                                                                        <td className="px-1">
+                                                                            <Select value={val.type || 'user'} onValueChange={(value) => {
+                                                                                if (value === 'master') {
+                                                                                    const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master' && oa.slot_number !== sIdx);
+                                                                                    if (hasMaster) {
+                                                                                        alert('이미 Master가 설정되어 있습니다.');
+                                                                                        return;
                                                                                     }
-                                                                                }}
-                                                                            >
-                                                                                {assignment ? '수정' : '신규'}
-                                                                            </Button>
+                                                                                }
+                                                                                updateGridValue(acc.id, sIdx, 'type', value);
+                                                                            }}>
+                                                                                <SelectTrigger className="h-8 text-xs bg-white">
+                                                                                    <SelectValue />
+                                                                                </SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    <SelectItem value="master">Master</SelectItem>
+                                                                                    <SelectItem value="user">User</SelectItem>
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </td>
+                                                                        <td className="px-1">
+                                                                            <Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
+                                                                        </td>
+                                                                        <td className="px-1">
+                                                                            <Input className="h-8 text-xs bg-white" placeholder="PW" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
+                                                                        </td>
+                                                                        <td className="px-1">
+                                                                            <Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
+                                                                        </td>
+                                                                        <td className="px-1">
+                                                                            <Input className="h-8 text-xs bg-white" placeholder="Email" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} />
+                                                                        </td>
+                                                                        <td className="px-1">
+                                                                            <Input className="h-8 text-xs bg-white" placeholder="전화번호" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
+                                                                        </td>
+                                                                        <td className="px-1">
+                                                                            <Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
+                                                                        </td>
+                                                                        <td className="px-1">
+                                                                            <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
+                                                                        </td>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <td className="px-2 text-center">
+                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                                {val.type === 'master' ? 'Master' : 'User'}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id}>{val.tidal_id || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password}>{val.tidal_password || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name}>{val.buyer_name || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email}>{val.buyer_email || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone}>{val.buyer_phone || '-'}</td>
+                                                                        <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
+                                                                        <td className="px-2 text-gray-500 font-mono">{val.end_date || '-'}</td>
+                                                                    </>
+                                                                )}
 
-                                                                            {assignment && (
-                                                                                <>
-                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600 ml-1" title="이동" onClick={() => openMoveModal(assignment)}>
-                                                                                        <ArrowRightLeft size={14} />
-                                                                                    </Button>
-                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="해제" onClick={() => handleDelete(assignment.id)}>
-                                                                                        <Trash2 size={14} />
-                                                                                    </Button>
-                                                                                </>
-                                                                            )}
-                                                                        </>
+                                                                <td className="text-center text-gray-500 font-mono">
+                                                                    {period}
+                                                                </td>
+                                                                <td className="text-center text-gray-400 font-mono text-[10px]">
+                                                                    {val.order_number ? (
+                                                                        <button
+                                                                            className="text-blue-600 font-bold underline hover:text-blue-800"
+                                                                            onClick={() => {
+                                                                                const orderToView = val.full_order || assignment?.orders;
+                                                                                if (orderToView) openOrderDetail(orderToView);
+                                                                            }}
+                                                                        >
+                                                                            {val.order_number}
+                                                                        </button>
+                                                                    ) : isEditing ? (
+                                                                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openAssignModal(acc, assignment.slot_number)}>
+                                                                            배정
+                                                                        </Button>
+                                                                    ) : (
+                                                                        <span>-</span>
                                                                     )}
+                                                                </td>
+                                                                <td className="text-center">
+                                                                    <div className="flex justify-center gap-1 items-center">
+                                                                        {isEditing ? (
+                                                                            <>
+                                                                                <Button size="sm" variant="default" className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700" title="저장" onClick={() => handleSaveRow(acc.id, assignment.slot_number)}>
+                                                                                    <Save size={14} />
+                                                                                </Button>
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, assignment.slot_number)}>
+                                                                                    X
+                                                                                </Button>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, assignment.slot_number)}>
+                                                                                    <Pencil size={14} />
+                                                                                </Button>
+
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
+                                                                                    <ArrowRightLeft size={14} />
+                                                                                </Button>
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="해제" onClick={() => handleDelete(assignment.id)}>
+                                                                                    <Trash2 size={14} />
+                                                                                </Button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+
+                                                    {sortedAssignments.length < 6 && availableSlotNum !== -1 && (
+                                                        <tr className="border-b last:border-0 h-10 bg-blue-50/30">
+                                                            <td className="text-center font-bold text-gray-300">#{sortedAssignments.length + 1}</td>
+                                                            <td colSpan={10} className="px-4 py-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-gray-400 italic">신규 슬롯을 추가하려면 우측 &apos;배정&apos; 버튼을 클릭하세요.</span>
                                                                 </div>
                                                             </td>
+                                                            <td className="text-center">
+                                                                <Button size="sm" variant="outline" className="h-7 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                                                    onClick={() => openAssignModal(acc, availableSlotNum)}
+                                                                >
+                                                                    <Plus size={14} className="mr-1" /> 배정
+                                                                </Button>
+                                                            </td>
                                                         </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+                                                    )}
+                                                </tbody>
+
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* ... Modal Code (Assign/Add/Move) remains same ... */}
@@ -1098,7 +1253,7 @@ export default function TidalAccountsPage() {
                                 <Select onValueChange={(val) => setSelectedTargetSlot(Number(val))} value={selectedTargetSlot?.toString()}>
                                     <SelectTrigger className="col-span-3"><SelectValue placeholder="슬롯 선택" /></SelectTrigger>
                                     <SelectContent>
-                                        {getAvailableSlots(selectedTargetAccount).map(slotNum => (
+                                        {getAvailableSlots(selectedTargetAccount).map((slotNum: number) => (
                                             <SelectItem key={slotNum} value={slotNum.toString()}>Slot #{slotNum + 1}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1211,5 +1366,13 @@ export default function TidalAccountsPage() {
                 </DialogContent>
             </Dialog>
         </main>
+    );
+}
+
+export default function TidalAccountsPage() {
+    return (
+        <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
+            <TidalAccountsContent />
+        </Suspense>
     );
 }

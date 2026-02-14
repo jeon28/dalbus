@@ -17,6 +17,7 @@ export interface User {
     id: string;
     name: string;
     email: string;
+    phone?: string;
 }
 
 interface ServiceContextType {
@@ -78,7 +79,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             // Ignore AbortError (occurs during component unmount or cleanup)
             const err = error as Error;
-            if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+            if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
                 return;
             }
             console.error('Unexpected error in fetchServices:', error);
@@ -97,14 +98,15 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     // 실제 session이 있으면 profile 가져오기
                     const { data: profile } = await supabase
                         .from('profiles')
-                        .select('name, email, role')
+                        .select('name, email, phone, role')
                         .eq('id', session.user.id)
                         .single();
 
                     const userObj: User = {
                         id: session.user.id,
                         name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                        email: profile?.email || session.user.email || ''
+                        email: profile?.email || session.user.email || '',
+                        phone: profile?.phone || ''
                     };
                     setUser(userObj);
                     localStorage.setItem('dalbus-user', JSON.stringify(userObj));
@@ -126,7 +128,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             } catch (error) {
                 const err = error as Error;
                 // AbortError는 조용히 무시 (React Strict Mode cleanup)
-                if (err.name !== 'AbortError' && !err.message?.includes('aborted')) {
+                if (err.name !== 'AbortError' && !err.message?.includes('aborted') && !err.message?.includes('signal is aborted')) {
                     console.error('Failed to initialize auth:', error);
                 }
                 // 에러 발생 시에도 기본 상태로 설정
@@ -154,14 +156,15 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 // 로그인 이벤트
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('name, email, role')
+                    .select('name, email, phone, role')
                     .eq('id', session.user.id)
                     .single();
 
                 const userObj: User = {
                     id: session.user.id,
                     name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                    email: profile?.email || session.user.email || ''
+                    email: profile?.email || session.user.email || '',
+                    phone: profile?.phone || ''
                 };
                 setUser(userObj);
                 localStorage.setItem('dalbus-user', JSON.stringify(userObj));

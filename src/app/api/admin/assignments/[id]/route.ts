@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { addMonths, format, parseISO } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         // 1. Update order_accounts (all editable fields including buyer info)
         const oaUpdates: Record<string, string | null> = {};
         if (tidal_password !== undefined) oaUpdates.tidal_password = tidal_password;
-        if (body.tidal_id !== undefined) oaUpdates.tidal_id = body.tidal_id;
+        if (body.tidal_id !== undefined) oaUpdates.tidal_id = body.tidal_id || null;
+        if (body.order_number !== undefined) oaUpdates.order_number = body.order_number;
         if (type !== undefined) oaUpdates.type = type;
         if (buyer_name !== undefined) oaUpdates.buyer_name = buyer_name;
         if (buyer_phone !== undefined) oaUpdates.buyer_phone = buyer_phone;
@@ -39,9 +41,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         // 2. Update orders table (only dates if provided)
-        // Buyer info is now stored in order_accounts, not orders
         let targetOrderId = order_id;
-
         if (!targetOrderId) {
             const { data: oa } = await supabaseAdmin.from('order_accounts').select('order_id').eq('id', id).single();
             targetOrderId = oa?.order_id;
@@ -49,8 +49,28 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         if (targetOrderId) {
             const orderUpdates: Record<string, string | number | null> = {};
-            if (start_date !== undefined) orderUpdates.start_date = start_date;
-            if (end_date !== undefined) orderUpdates.end_date = end_date;
+
+            if (start_date !== undefined) {
+                orderUpdates.start_date = start_date;
+
+                // If end_date is not provided, calculate it from start_date + plan duration
+                if (end_date === undefined) {
+                    const { data: ord } = await supabaseAdmin
+                        .from('orders')
+                        .select('plan_id, product_plans(duration_months)')
+                        .eq('id', targetOrderId)
+                        .single();
+
+                    if (ord) {
+                        const durationMonths = (ord.product_plans as unknown as { duration_months: number })?.duration_months || 1;
+                        orderUpdates.end_date = format(addMonths(parseISO(start_date), durationMonths), 'yyyy-MM-dd');
+                    }
+                }
+            }
+
+            if (end_date !== undefined) {
+                orderUpdates.end_date = end_date;
+            }
 
             if (Object.keys(orderUpdates).length > 0) {
                 const { error: ordError } = await supabaseAdmin
@@ -63,7 +83,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        const e = error as Error;
+        const e = error as { code?: string; message: string };
+        if (e.code === '23505') {
+            return NextResponse.json({ error: '이미 사용 중인 Tidal ID입니다. 다른 ID를 입력해주세요.' }, { status: 409 });
+        }
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

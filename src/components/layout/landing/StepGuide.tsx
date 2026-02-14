@@ -2,7 +2,7 @@ import { WalletCards, KeyRound, PlayCircle } from "lucide-react";
 
 export default function StepGuide() {
     return (
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/50" id="how-it-works">
+        <section className="w-full py-12 md:py-16 lg:py-20 bg-muted/50" id="how-it-works">
             <div className="container px-4 md:px-6">
                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
                     <div className="space-y-2">
@@ -17,10 +17,10 @@ export default function StepGuide() {
                         <div className="bg-background p-4 rounded-full shadow-sm">
                             <WalletCards className="h-10 w-10 text-primary" />
                         </div>
-                        <h3 className="text-xl font-bold">1. 간편 결제</h3>
+                        <h3 className="text-xl font-bold">1. 결제</h3>
                         <p className="text-muted-foreground">
                             원하는 서비스와 이용 기간을 선택하고<br />
-                            국내 카드로 간편하게 결제하세요.
+                            간편하게 결제하세요.
                         </p>
                     </div>
                     <div className="grid gap-4 place-items-center text-center">

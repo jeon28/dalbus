@@ -21,6 +21,7 @@ export async function GET() {
                     buyer_name,
                     buyer_phone,
                     buyer_email,
+                    order_number,
                     orders (
                         id,
                         order_number,

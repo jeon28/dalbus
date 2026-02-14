@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
                     lastMaster.slots.push({
                         slot_number: slotNumber,
                         tidal_id: row['소속 ID']?.trim() || '',
-                        slot_password: row['소속 PW']?.trim() || '',
+                        tidal_password: row['소속 PW']?.trim() || '',
                         order_number: row['주문번호']?.trim() || ''
                     });
                 }
@@ -121,8 +121,8 @@ export async function POST(req: NextRequest) {
 
                 // 2. Handle Slot Assignments
                 for (const slot of master.slots) {
-                    // Skip completely empty slots (no tidal_id AND no slot_password)
-                    if (!slot.tidal_id && !slot.slot_password) continue;
+                    // Skip completely empty slots (no tidal_id AND no tidal_password)
+                    if (!slot.tidal_id && !slot.tidal_password) continue;
 
                     try {
                         // Try to find the order if order_number is provided
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
                             account_id: masterAccountId,
                             slot_number: slot.slot_number,
                             tidal_id: slot.tidal_id || null,
-                            slot_password: slot.slot_password || '',
+                            tidal_password: slot.tidal_password || '',
                             order_id: orderId
                         };
 
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
                                 const { error: updateError } = await supabaseAdmin
                                     .from('order_accounts')
                                     .update({
-                                        slot_password: slotData.slot_password,
+                                        tidal_password: slotData.tidal_password,
                                         order_id: slotData.order_id,
                                         tidal_id: slotData.tidal_id
                                     })

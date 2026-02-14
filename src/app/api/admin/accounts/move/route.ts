@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { order_id, target_account_id, target_slot_number, target_slot_password } = body;
+        const { order_id, target_account_id, target_slot_number, target_tidal_password } = body;
 
         if (!order_id || !target_account_id) {
             return NextResponse.json({ error: 'Order ID and Target Account ID are required' }, { status: 400 });
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
             .update({
                 account_id: target_account_id,
                 slot_number: target_slot_number,
-                slot_password: target_slot_password,
+                tidal_password: target_tidal_password,
                 assigned_at: new Date().toISOString()
             })
             .eq('id', currentAssignment.id);

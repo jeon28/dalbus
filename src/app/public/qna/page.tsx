@@ -47,7 +47,7 @@ export default function QnAPage() {
 
             if (error) {
                 // Ignore AbortError
-                if (error.message?.includes('AbortError') || error.code === 'PGRST301') {
+                if (error.message?.includes('AbortError') || error.message?.includes('aborted') || error.message?.includes('signal is aborted') || error.code === 'PGRST301') {
                     setLoading(false);
                     return;
                 }
@@ -57,7 +57,7 @@ export default function QnAPage() {
             }
         } catch (e) {
             const err = e as Error;
-            if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+            if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
                 setLoading(false);
                 return;
             }

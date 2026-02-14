@@ -44,7 +44,7 @@
 │
 ├─ 🛡️ 관리자 (Admin)
 │   ├─ [ SCR_ADM_001] 주문 관리 (Multi-Select 필터, 전화번호 검색, Excel Export)
-│   ├─ [SCR_ADM_002] Tidal 계정 관리 (마스터/슬롯, Excel Export)
+│   ├─ [SCR_ADM_002] Tidal 계정 관리 (List/Grid View, 마스터/슬롯, Excel Export)
 │   ├─ [SCR_ADM_003] 서비스 관리
 │   ├─ [SCR_ADM_004] 회원 관리
 │   ├─ [SCR_ADM_005] 공지/FAQ 관리
@@ -1162,9 +1162,11 @@
 
 ---
 
-## 📱 화면 SCR_ADM_004: 계정 풀 관리
+## 📱 화면 SCR_ADM_002: Tidal 계정 관리 (Grid View)
 
 ### 화면 설명
+* **Grid View/List View** 토글 제공
+* **Grid View**: 모든 슬롯을 평면 테이블로 조회, 평면적인 슬롯 이동/삭제/수정
 * 서비스별 공유 계정 등록/수정/비활성화
 * 계정별 현재 배정 상태 및 이력 확인
 

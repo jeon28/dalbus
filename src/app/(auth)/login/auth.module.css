@@ -71,16 +71,31 @@
     font-weight: 600;
 }
 
-.submitBtn {
+.checkBtn {
     background: var(--primary);
     color: #000000;
+    padding: 15px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.checkBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.submitBtn {
     padding: 15px;
     border-radius: 12px;
     font-size: 1.1rem;
     font-weight: 800;
     margin-top: 10px;
     border: none;
-    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
 .footer {

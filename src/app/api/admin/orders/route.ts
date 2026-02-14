@@ -17,7 +17,8 @@ export async function GET() {
             *,
             profiles(name, email, phone),
             products(name),
-            product_plans(duration_months)
+            product_plans(duration_months),
+            order_accounts(id)
         `)
         .order('created_at', { ascending: false });
 

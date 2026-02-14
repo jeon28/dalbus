@@ -26,6 +26,7 @@ erDiagram
         string phone
         enum role
         timestamp created_at
+        timestamp updated_at
     }
 
     products {
@@ -35,7 +36,12 @@ erDiagram
         text description
         integer original_price
         text detail_content
+        text image_url
+        string[] tags
+        string[] benefits
+        string[] cautions
         boolean is_active
+        integer sort_order
     }
 
     product_plans {
@@ -44,51 +50,69 @@ erDiagram
         integer duration_months
         integer price
         numeric discount_rate
+        boolean is_active
     }
 
     accounts {
         uuid id PK
         uuid product_id FK
         string login_id
-        string login_pw
+        string login_pw "nullable"
         string payment_email
         integer payment_day
         enum status
         integer max_slots
         integer used_slots
+        text memo
     }
 
     orders {
         uuid id PK
-        string order_number UK
-        uuid user_id FK
+        string order_number UK "8-digit random number"
+        uuid user_id FK "nullable (guest)"
         uuid product_id FK
         uuid plan_id FK
         integer amount
         enum payment_status
         enum assignment_status
+        string buyer_name
+        string buyer_email
+        string buyer_phone
+        string depositor_name
+        boolean is_guest
         date start_date
         date end_date
+        timestamp paid_at
+        timestamp assigned_at
     }
 
     order_accounts {
         uuid id PK
-        uuid order_id FK
+        uuid order_id FK "nullable"
         uuid account_id FK
         integer slot_number
-        string slot_password
-        string tidal_id
+        string tidal_id "unique"
+        string tidal_password
+        enum type "master/user"
+        string buyer_name "Added in v2.8"
+        string buyer_phone "Added in v2.8"
+        string buyer_email "Added in v2.8"
+        string order_number
     }
     
     qna {
         uuid id PK
-        uuid user_id FK
+        uuid user_id FK "nullable"
         string guest_name
         string guest_password
         string title
         text content
+        text answer_content
         boolean is_secret
         string status
+        timestamp answered_at
+        timestamp created_at
+        timestamp updated_at
     }
 ```
 
@@ -117,16 +141,15 @@ erDiagram
 ### 2.4 콘텐츠 및 문의 (Content)
 | 테이블명 | 설명 | 비고 |
 | :--- | :--- | :--- |
-| `notices` | 공지사항 게시글 | 상단 고정 필드 지원 |
-| `notice_categories` | 공지사항 카테고리 | 동적 관리 가능 |
+| `notices` | 공지사항 게시글 | Enum 기반 카테고리 관리 |
 | `faqs` | 자주 묻는 질문 | |
-| `faq_categories` | FAQ 카테고리 | |
+| `faq_categories` | FAQ 카테고리 | 동적 관리 가능 |
 | `qna` | 1:1 문의 게시판 | 회원/비회원(비밀번호) 지원 |
 
 ### 2.5 시스템 및 설정 (System)
 | 테이블명 | 설명 | 비고 |
 | :--- | :--- | :--- |
-| `site_settings` | 관리자 계정 및 운영 설정 | 관리자 연락처(알림용) 포함 |
+| `site_settings` | 관리자 계정 및 운영 설정 | 관리자 이메일/비밀번호 포함 |
 | `bank_accounts` | 무통장 입금 계좌 목록 | |
 | `notification_logs` | 알림톡/SMS 발송 이력 | |
 
@@ -136,16 +159,21 @@ erDiagram
 
 ### `orders` (주문)
 - `payment_status`: `pending`, `paid`, `failed`, `cancelled`, `refunded`
-- `assignment_status`: `waiting`, `assigned`, `expired`, `replaced`
+- `assignment_status`: `waiting`, `assigned`, `expired`, `replaced`, `completed`
+- `user_id`: 회원 주문인 경우만 존재 (비회원은 `is_guest = true`)
 
 ### `accounts` (마스터 계정)
+- `login_pw`: 보안상의 이유로 nullable로 관리 가능 (필요 시에만 입력)
 - `payment_day`: 매월 결제되는 날짜
 - `max_slots`: 기본 6개 설정 (Tidal 기준)
 
 ### `order_accounts` (슬롯 배정)
+- `type`: `master` (마스터 계정 정보), `user` (일반 사용자)
 - `slot_number`: 0~5 번호 부여
-- `tidal_id`: 슬롯별 개별 소속 ID (독립 계정 방식)
+- `tidal_id`: 슬롯별 개별 소속 ID (독립 계정 방식), UNIQUE 제약 조건 적용
+- `order_number`: 주문번호 중복 저장 (추적성 강화)
 
 ### `site_settings` (운영 설정)
+- `admin_login_id`: 관리자 로그인 ID
 - `admin_email`: 주문 알림(Resend) 수신용 이메일
 - `admin_phone`: 향후 알림톡 수신용 번호

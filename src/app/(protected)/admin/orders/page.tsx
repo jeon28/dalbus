@@ -64,7 +64,6 @@ export default function OrderHistoryPage() {
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [availableAccounts, setAvailableAccounts] = useState<any[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
-    const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
 
     useEffect(() => {
@@ -139,7 +138,6 @@ export default function OrderHistoryPage() {
     const handleOpenMatchModal = async (order: any) => {
         setSelectedOrder(order);
         setSelectedAccount('');
-        setSelectedSlot(null);
         setSlotPasswordModal('');
 
         // Fetch available accounts
@@ -149,6 +147,16 @@ export default function OrderHistoryPage() {
                 const data = await res.json();
                 // Filter accounts with available slots
                 const available = data.filter((acc: any) => acc.used_slots < acc.max_slots);
+
+                // Sort by master account expiry date (end_date)
+                available.sort((a: any, b: any) => {
+                    const getExpiry = (acc: any) => {
+                        const masterSlot = acc.order_accounts?.find((oa: any) => oa.type === 'master');
+                        return masterSlot?.orders?.end_date || '9999-12-31';
+                    };
+                    return getExpiry(b).localeCompare(getExpiry(a));
+                });
+
                 setAvailableAccounts(available);
                 setIsMatchModalOpen(true);
             }
@@ -243,6 +251,42 @@ export default function OrderHistoryPage() {
         }
     };
 
+    const handleRevertPayment = async (orderId: string) => {
+        if (!confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
+        try {
+            const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payment_status: 'pending' })
+            });
+            if (!res.ok) throw new Error('Revert failed');
+            fetchOrders();
+        } catch {
+            alert('상태 변경 실패');
+        }
+    };
+
+    const handleUnassign = async (order: any) => {
+        const assignmentId = order.order_accounts?.[0]?.id;
+        if (!assignmentId) {
+            alert('배정 정보가 없습니다.');
+            return;
+        }
+
+        if (!confirm('배정을 취소하고 "입금확인" 상태로 되돌리시겠습니까?')) return;
+
+        try {
+            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) throw new Error('Unassign failed');
+            alert('배정이 취소되었습니다.');
+            fetchOrders();
+        } catch {
+            alert('배정 취소 실패');
+        }
+    };
+
     const markAsCompleted = async (orderId: string) => {
         if (!confirm('작업 완료 처리하시겠습니까?')) return;
         try {
@@ -266,7 +310,7 @@ export default function OrderHistoryPage() {
                 <thead>
                     <tr>
                         <th>날짜/주문번호</th>
-                        <th>고객명 (ID)</th>
+                        <th>고객명</th>
                         <th>연락처/이메일</th>
                         <th>서비스</th>
                         <th>금액</th>
@@ -285,7 +329,6 @@ export default function OrderHistoryPage() {
                                 </td>
                                 <td>
                                     <div className="font-medium">{o.profiles?.name || o.buyer_name || 'Unknown'}</div>
-                                    <div className="text-xs text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
                                 <td>
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
@@ -310,15 +353,23 @@ export default function OrderHistoryPage() {
                                     </span>
                                 </td>
                                 <td>
-                                    {status === '주문신청' && (
-                                        <Button size="sm" variant="secondary" onClick={() => confirmPayment(o.id)}>입금확인</Button>
-                                    )}
-                                    {status === '입금확인' && (
-                                        <Button size="sm" onClick={() => handleOpenMatchModal(o)}>계정배정</Button>
-                                    )}
-                                    {status === '배정완료' && (
-                                        <Button size="sm" variant="outline" onClick={() => markAsCompleted(o.id)}>작업완료</Button>
-                                    )}
+                                    <div className="flex flex-col gap-1">
+                                        {status === '주문신청' && (
+                                            <Button size="sm" variant="secondary" onClick={() => confirmPayment(o.id)}>입금확인</Button>
+                                        )}
+                                        {status === '입금확인' && (
+                                            <>
+                                                <Button size="sm" onClick={() => handleOpenMatchModal(o)}>계정배정</Button>
+                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleRevertPayment(o.id)}>입금취소</Button>
+                                            </>
+                                        )}
+                                        {status === '배정완료' && (
+                                            <>
+                                                <Button size="sm" variant="outline" onClick={() => markAsCompleted(o.id)}>작업완료</Button>
+                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)}>배정취소</Button>
+                                            </>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         );

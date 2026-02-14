@@ -35,7 +35,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
                 // Ignore AbortError (normal cleanup behavior)
                 if (productError) {
-                    if (productError.message?.includes('AbortError') || productError.code === 'PGRST301') {
+                    if (productError.message?.includes('AbortError') || productError.message?.includes('aborted') || productError.message?.includes('signal is aborted') || productError.code === 'PGRST301') {
                         return;
                     }
                     if (isMounted) {
@@ -56,7 +56,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
                 // Ignore AbortError
                 if (plansError) {
-                    if (plansError.message?.includes('AbortError') || plansError.code === 'PGRST301') {
+                    if (plansError.message?.includes('AbortError') || plansError.message?.includes('aborted') || plansError.message?.includes('signal is aborted') || plansError.code === 'PGRST301') {
                         return;
                     }
                     if (isMounted) {
@@ -74,7 +74,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             } catch (error) {
                 // Ignore AbortError (occurs during component unmount or cleanup)
                 const err = error as Error;
-                if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
                     return;
                 }
                 if (isMounted) {
@@ -112,7 +112,10 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     if (activeBanks.length > 0) setSelectedBankId(activeBanks[0].id);
                 }
             } catch (err) {
-                console.error('Failed to fetch bank accounts:', err);
+                const e = err as Error;
+                if (e.name !== 'AbortError' && !e.message?.includes('aborted') && !e.message?.includes('signal is aborted')) {
+                    console.error('Failed to fetch bank accounts:', err);
+                }
             }
         };
         fetchBanks();
@@ -131,6 +134,19 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         terms: false
     });
 
+    // Sync User Info to Form State
+    useEffect(() => {
+        if (user) {
+            setGuestInfo(prev => ({
+                ...prev,
+                name: user.name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                depositor: prev.depositor || user.name || '' // Default to user name if empty
+            }));
+        }
+    }, [user]);
+
     const router = useRouter();
 
     const toggleAllAgreements = (checked: boolean) => {
@@ -140,16 +156,14 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const handleSubscribe = async () => {
         if (!product) return;
 
-        // Validation for Guest
-        if (!user) {
-            if (!guestInfo.name || !guestInfo.phone || !guestInfo.email || !guestInfo.depositor) {
-                alert('구매자 정보를 모두 입력해주세요.');
-                return;
-            }
-            if (!agreements.privacy || !agreements.terms) {
-                alert('필수 약관에 동의해주세요.');
-                return;
-            }
+        // Validation
+        if (!guestInfo.name || !guestInfo.phone || !guestInfo.email || !guestInfo.depositor) {
+            alert('주문 정보를 모두 입력해주세요.');
+            return;
+        }
+        if (!user && (!agreements.privacy || !agreements.terms)) {
+            alert('필수 약관에 동의해주세요.');
+            return;
         }
 
         const selectedPlan = plans.find(p => p.duration_months === selectedPeriod);
@@ -160,19 +174,19 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
         setLoading(true);
 
-        const amount = selectedPlan.price; // Use price from plan table
+        const amount = selectedPlan.price;
 
         const orderData: Record<string, any> = {
             product_id: product.id,
             plan_id: selectedPlan.id,
             amount: amount,
-            payment_status: 'pending', // Waiting for deposit
+            payment_status: 'pending',
             assignment_status: 'waiting',
             is_guest: !user,
-            buyer_name: user ? user.name : guestInfo.name,
-            buyer_phone: user ? null : guestInfo.phone,
-            buyer_email: user ? user.email : guestInfo.email,
-            depositor_name: user ? user.name : guestInfo.depositor,
+            buyer_name: guestInfo.name,
+            buyer_phone: guestInfo.phone,
+            buyer_email: guestInfo.email,
+            depositor_name: guestInfo.depositor,
         };
 
         if (user) {
@@ -198,7 +212,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 alert('주문 생성 실패: ' + errorMsg);
                 setLoading(false);
             } else {
-                // Redirect to dedicated success page
                 const selectedBank = bankAccounts.find(b => b.id === selectedBankId);
                 const bankStr = selectedBank ? `${selectedBank.bank_name} ${selectedBank.account_number} (${selectedBank.account_holder})` : '';
 
@@ -206,7 +219,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     service: product.name,
                     price: amount.toString(),
                     period: selectedPeriod.toString(),
-                    depositor: user ? user.name : guestInfo.depositor,
+                    depositor: guestInfo.depositor,
                     bank: bankStr
                 });
 
@@ -297,67 +310,69 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     </div>
                 </section>
 
-                {/* Guest Checkout Form */}
-                {!user && (
-                    <div className="mt-8 space-y-6 animate-fade-in">
-                        <h3 className="text-xl font-bold text-center">구매자 정보</h3>
-                        <div className="space-y-4">
-                            <Input
-                                placeholder="성함을 입력해 주세요."
-                                value={guestInfo.name}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, name: e.target.value })}
-                            />
-                            <Input
-                                type="tel"
-                                placeholder="휴대폰번호를 입력해 주세요."
-                                value={guestInfo.phone}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
-                            />
-                            <Input
-                                type="email"
-                                placeholder="이메일을 입력해 주세요."
-                                value={guestInfo.email}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
-                            />
-                            <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
-                        </div>
+                {/* Checkout Form (Unified for Guest and User) */}
+                <div className="mt-8 space-y-6 animate-fade-in">
+                    <h3 className="text-xl font-bold text-center">
+                        {user ? '회원 정보' : '구매자 정보'}
+                    </h3>
+                    <div className="space-y-4">
+                        <Input
+                            placeholder="성함을 입력해 주세요."
+                            value={guestInfo.name}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, name: e.target.value })}
+                        />
+                        <Input
+                            type="tel"
+                            placeholder="휴대폰번호를 입력해 주세요."
+                            value={guestInfo.phone}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
+                        />
+                        <Input
+                            type="email"
+                            placeholder="이메일을 입력해 주세요."
+                            value={guestInfo.email}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                        />
+                        <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
+                    </div>
 
-                        <h3 className="text-xl font-bold text-center mt-8">결제 수단</h3>
-                        <div className="glass p-4 rounded-xl">
-                            <RadioGroup defaultValue="bank" className="mb-4">
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="bank" id="bank" />
-                                    <Label htmlFor="bank">무통장 입금</Label>
-                                </div>
-                            </RadioGroup>
+                    <h3 className="text-xl font-bold text-center mt-8">결제 수단</h3>
+                    <div className="glass p-4 rounded-xl">
+                        <RadioGroup defaultValue="bank" className="mb-4">
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="bank" id="bank" />
+                                <Label htmlFor="bank">무통장 입금</Label>
+                            </div>
+                        </RadioGroup>
 
-                            <select
-                                className="w-full p-3 rounded-md border border-input bg-background mb-3 text-sm focus:ring-2 focus:ring-primary outline-none"
-                                value={selectedBankId}
-                                onChange={(e) => setSelectedBankId(e.target.value)}
-                            >
-                                {bankAccounts.map(bank => (
-                                    <option key={bank.id} value={bank.id}>
-                                        {bank.bank_name} {bank.account_number} 예금주: {bank.account_holder}
-                                    </option>
-                                ))}
-                                {bankAccounts.length === 0 && (
-                                    <option disabled>등록된 결제 계좌가 없습니다.</option>
-                                )}
-                            </select>
+                        <select
+                            className="w-full p-3 rounded-md border border-input bg-background mb-3 text-sm focus:ring-2 focus:ring-primary outline-none"
+                            value={selectedBankId}
+                            onChange={(e) => setSelectedBankId(e.target.value)}
+                        >
+                            {bankAccounts.map(bank => (
+                                <option key={bank.id} value={bank.id}>
+                                    {bank.bank_name} {bank.account_number} 예금주: {bank.account_holder}
+                                </option>
+                            ))}
+                            {bankAccounts.length === 0 && (
+                                <option disabled>등록된 결제 계좌가 없습니다.</option>
+                            )}
+                        </select>
 
-                            <Input
-                                placeholder="입금자명을 입력해 주세요. (필수)"
-                                value={guestInfo.depositor}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, depositor: e.target.value })}
-                            />
+                        <Input
+                            placeholder="입금자명을 입력해 주세요. (필수)"
+                            value={guestInfo.depositor}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, depositor: e.target.value })}
+                        />
 
-                            <p className="text-xs text-green-600 mt-2">
-                                * 정확한 입금자명을 적어주셔야 자동매칭 되어 즉시 발송됩니다.<br />
-                                * 국내 카드사 정책에 따라, 디지털 상품의 경우 카드결제가 제한되시 않는 점 양해 부탁드립니다. 추후 해외 PG사 연동 예정입니다.
-                            </p>
-                        </div>
+                        <p className="text-xs text-green-600 mt-2">
+                            * 정확한 입금자명을 적어주셔야 자동매칭 되어 즉시 발송됩니다.<br />
+                            * 국내 카드사 정책에 따라, 디지털 상품의 경우 카드결제가 제한되지 않는 점 양해 부탁드립니다.
+                        </p>
+                    </div>
 
+                    {!user && (
                         <div className="space-y-2 mt-4">
                             <div className="flex items-center space-x-2">
                                 <input
@@ -391,8 +406,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                 <label htmlFor="terms" className="text-xs text-muted-foreground cursor-pointer">구매조건 확인 및 이용약관 동의</label>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 <button
                     className={`${styles.submitBtn} w-full mt-8 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl`}

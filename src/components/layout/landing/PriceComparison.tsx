@@ -3,7 +3,7 @@ import { Check, X } from "lucide-react";
 
 export default function PriceComparison() {
     return (
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-background" id="pricing">
+        <section className="w-full py-12 md:py-16 lg:py-20 bg-background" id="pricing">
             <div className="container px-4 md:px-6">
                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
                     <div className="space-y-2">
@@ -13,7 +13,7 @@ export default function PriceComparison() {
                         </p>
                     </div>
                 </div>
-                <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-2 lg:gap-12">
+                <div className="mx-auto grid max-w-5xl items-center gap-6 py-8 lg:grid-cols-2 lg:gap-12">
                     <Card className="relative overflow-hidden border-2 border-muted bg-background">
                         <CardHeader className="flex flex-col items-center justify-center space-y-2 border-b p-6">
                             <div className="grid place-items-center rounded-full bg-muted p-3">
@@ -39,14 +39,14 @@ export default function PriceComparison() {
                                 <Check className="h-6 w-6 text-primary-foreground" />
                             </div>
                             <CardTitle className="text-xl font-bold text-primary">달버스 (Dalbus)</CardTitle>
-                            <div className="text-4xl font-bold text-primary">₩4,967<span className="text-sm font-normal text-muted-foreground">/월~</span></div>
-                            <p className="text-xs text-muted-foreground">3개월권 기준</p>
+                            <div className="text-4xl font-bold text-primary">₩30,000</div>
+                            <p className="text-xs text-muted-foreground">6개월권 기준</p>
                         </CardHeader>
                         <CardContent className="grid gap-4 p-6 place-items-center">
                             <ul className="grid gap-2 text-sm text-center">
-                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 최대 55% 할인</li>
-                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 간편한 기간 연장</li>
-                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 국내 카드 결제 지원</li>
+                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 압도적인 가격 혜택</li>
+                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 6개월 / 12개월 선택 가능</li>
+                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 장기간 안정적 이용</li>
                             </ul>
                         </CardContent>
                     </Card>

@@ -5,6 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css'; // Reusing admin styles
 import { useRouter } from 'next/navigation';
+import { Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function MemberListPage() {
     const { isAdmin } = useServices();
@@ -33,6 +35,30 @@ export default function MemberListPage() {
         setLoading(false);
     };
 
+    const handleDeleteMember = async (member: any) => {
+        if (!confirm(`'${member.name}' (${member.email}) 회원을 삭제하시겠습니까?\n\n주의: 이 작업은 되돌릴 수 없습니다.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/members?id=${member.id}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || '삭제 실패');
+            }
+
+            alert('✅ ' + result.message);
+            fetchMembers(); // Refresh the list
+        } catch (error) {
+            const e = error as Error;
+            alert('❌ ' + e.message);
+        }
+    };
+
     if (!isAdmin) return null;
 
     return (
@@ -53,16 +79,17 @@ export default function MemberListPage() {
                                     <th>이름</th>
                                     <th>이메일</th>
                                     <th>연락처</th>
+                                    <th className="text-center" style={{ width: '80px' }}>관리</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={4} className="text-center py-8">로딩 중...</td>
+                                        <td colSpan={5} className="text-center py-8">로딩 중...</td>
                                     </tr>
                                 ) : members.length === 0 ? (
                                     <tr>
-                                        <td colSpan={4} className="text-center py-8">가입된 회원이 없습니다.</td>
+                                        <td colSpan={5} className="text-center py-8">가입된 회원이 없습니다.</td>
                                     </tr>
                                 ) : (
                                     members.map(member => (
@@ -71,6 +98,17 @@ export default function MemberListPage() {
                                             <td className="font-medium">{member.name}</td>
                                             <td>{member.email}</td>
                                             <td>{member.phone || '-'}</td>
+                                            <td className="text-center">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 p-0 text-gray-400 hover:text-red-600"
+                                                    title="회원 삭제"
+                                                    onClick={() => handleDeleteMember(member)}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </Button>
+                                            </td>
                                         </tr>
                                     ))
                                 )}

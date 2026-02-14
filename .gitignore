@@ -23,3 +23,15 @@ yarn-error.log*
 # vercel
 .vercel/
 .vercel
+
+# logs
+error.log
+output.log
+
+# editor
+.claude/
+
+# migrations
+order_accounts_migration.sql
+
+supabase/.temp/
