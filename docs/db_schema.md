@@ -80,6 +80,8 @@ erDiagram
         string buyer_phone
         string depositor_name
         boolean is_guest
+        enum order_type "NEW/REPURCHASE"
+        uuid related_order_id FK "nullable (for extensions)"
         date start_date
         date end_date
         timestamp paid_at
@@ -160,6 +162,8 @@ erDiagram
 ### `orders` (주문)
 - `payment_status`: `pending`, `paid`, `failed`, `cancelled`, `refunded`
 - `assignment_status`: `waiting`, `assigned`, `expired`, `replaced`, `completed`
+- `order_type`: `NEW` (신규), `REPURCHASE` (재구매/연장)
+- `related_order_id`: 연장 주문인 경우 이전 주문의 UUID를 저장
 - `user_id`: 회원 주문인 경우만 존재 (비회원은 `is_guest = true`)
 
 ### `accounts` (마스터 계정)
