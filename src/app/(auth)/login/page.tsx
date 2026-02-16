@@ -62,7 +62,7 @@ export default function LoginPage() {
                     password: password,
                 }),
                 timeoutPromise
-            ]) as any;
+            ]) as { data: { user: { id: string } | null; session: unknown } | null; error: { message: string } | null };
 
             console.log('signInWithPassword result:', data?.user ? 'Success' : 'Fail', error ? error.message : '');
 
@@ -83,7 +83,7 @@ export default function LoginPage() {
             }
 
             // Success - check if user is admin
-            if (data.user) {
+            if (data?.user) {
                 try {
                     const { data: profile, error: profileErr } = await supabase
                         .from('profiles')

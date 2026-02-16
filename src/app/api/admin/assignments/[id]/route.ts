@@ -22,7 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         } = body;
 
         // 1. Update order_accounts
-        const oaUpdates: Record<string, any> = {};
+        const oaUpdates: Record<string, string | number | boolean | null> = {};
         if (tidal_password !== undefined) oaUpdates.tidal_password = tidal_password;
         if (body.tidal_id !== undefined) oaUpdates.tidal_id = body.tidal_id || null;
         if (body.order_number !== undefined) oaUpdates.order_number = body.order_number;

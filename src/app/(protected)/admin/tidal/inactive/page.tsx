@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trash2, Download } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import styles from '../../admin.module.css';
 import * as XLSX from 'xlsx';
 

@@ -47,7 +47,7 @@ This plan details the step-by-step execution to upgrade Dalbus to v2.0, adhering
 - [ ] **Middleware**: Protect `(protected)` routes. Redirect unauthenticated users to `/login`.
 
 ### 3.4 Feature: Payments (PortOne)
-- [ ] **Payment Page**: Integrate PortOne SDK.
+- [ ] **Pay ent Page**: Int grate PortOne SDK.
 - [ ] **Payment Webhook**: `api/payment/webhook/route.ts` to handle verification and `orders` creation.
 
 ### 3.5 Feature: Admin & My Page
@@ -56,7 +56,7 @@ This plan details the step-by-step execution to upgrade Dalbus to v2.0, adhering
 
 ## Phase 4: Verification & Launch
 - [ ] **Manual Test**: Full user flow (Sign up -> View Product -> Buy -> Check My Page).
-- [ ] **Admin Test**: Assign account to order -> Verify SMS/Notification (mocked).
+- [ ] **Admin Test**: Assign account to order -> Verify SMS/Notificati                                                          
 - [ ] **Security Check**: Verify RLS (User cannot see others' orders).
 
 ## Current Next Step:

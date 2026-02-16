@@ -45,7 +45,7 @@ export async function GET() {
         // Filter out inactive assignments from the response
         const filteredData = data?.map(account => ({
             ...account,
-            order_accounts: account.order_accounts.filter((oa: any) => oa.is_active !== false) // default to true if null/undefined, or strictly check true if nullable
+            order_accounts: account.order_accounts.filter((oa: { is_active?: boolean }) => oa.is_active !== false) // default to true if null/undefined, or strictly check true if nullable
         }));
 
         return NextResponse.json(filteredData);
