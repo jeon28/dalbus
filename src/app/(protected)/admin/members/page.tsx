@@ -4,8 +4,17 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css'; // Reusing admin styles
 import { useRouter } from 'next/navigation';
-import { Trash2 } from 'lucide-react';
+import { Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 export interface Member {
     id: string;
@@ -13,12 +22,16 @@ export interface Member {
     email: string;
     phone: string | null;
     created_at: string;
+    memo?: string | null;
 }
 
 export default function MemberListPage() {
     const { isAdmin } = useServices();
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+    const [memoInput, setMemoInput] = useState("");
+    const [isMemoOpen, setIsMemoOpen] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -66,6 +79,40 @@ export default function MemberListPage() {
         }
     };
 
+    const openMemoModal = (member: Member) => {
+        setSelectedMember(member);
+        setMemoInput(member.memo || "");
+        setIsMemoOpen(true);
+    };
+
+    const handleSaveMemo = async () => {
+        if (!selectedMember) return;
+
+        try {
+            const response = await fetch('/api/admin/members', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: selectedMember.id, memo: memoInput })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || '메모 업데이트 실패');
+            }
+
+            // Update local state
+            setMembers(members.map(m =>
+                m.id === selectedMember.id ? { ...m, memo: memoInput } : m
+            ));
+            setIsMemoOpen(false);
+            // alert('✅ 메모가 저장되었습니다.'); // Optional feedback
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert('❌ ' + message);
+        }
+    };
+
     if (!isAdmin) return null;
 
     return (
@@ -86,17 +133,18 @@ export default function MemberListPage() {
                                     <th>이름</th>
                                     <th>이메일</th>
                                     <th>연락처</th>
-                                    <th className="text-center" style={{ width: '80px' }}>관리</th>
+                                    <th>관리자 메모</th>
+                                    <th className="text-center" style={{ width: '100px' }}>관리</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={5} className="text-center py-8">로딩 중...</td>
+                                        <td colSpan={6} className="text-center py-8">로딩 중...</td>
                                     </tr>
                                 ) : members.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="text-center py-8">가입된 회원이 없습니다.</td>
+                                        <td colSpan={6} className="text-center py-8">가입된 회원이 없습니다.</td>
                                     </tr>
                                 ) : (
                                     members.map(member => (
@@ -105,7 +153,25 @@ export default function MemberListPage() {
                                             <td className="font-medium">{member.name}</td>
                                             <td>{member.email}</td>
                                             <td>{member.phone || '-'}</td>
-                                            <td className="text-center">
+                                            <td>
+                                                <div
+                                                    className="max-w-[200px] truncate cursor-pointer hover:text-blue-600"
+                                                    onClick={() => openMemoModal(member)}
+                                                    title={member.memo || "메모 없음 (클릭하여 추가)"}
+                                                >
+                                                    {member.memo || <span className="text-gray-400 text-sm">Empty</span>}
+                                                </div>
+                                            </td>
+                                            <td className="text-center flex items-center justify-center gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600"
+                                                    title="메모 편집"
+                                                    onClick={() => openMemoModal(member)}
+                                                >
+                                                    <FileText size={16} />
+                                                </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
@@ -124,6 +190,30 @@ export default function MemberListPage() {
                     </div>
                 </section>
             </div>
+
+            <Dialog open={isMemoOpen} onOpenChange={setIsMemoOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>관리자 메모 편집</DialogTitle>
+                        <DialogDescription>
+                            {selectedMember?.name} ({selectedMember?.email}) 회원의 메모를 수정합니다.
+                            이 내용은 관리자에게만 보여집니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <Textarea
+                            placeholder="메모를 입력하세요..."
+                            value={memoInput}
+                            onChange={(e) => setMemoInput(e.target.value)}
+                            rows={5}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsMemoOpen(false)}>취소</Button>
+                        <Button onClick={handleSaveMemo}>저장</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }

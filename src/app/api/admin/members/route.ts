@@ -8,7 +8,7 @@ export async function GET() {
     // Fetching profiles with role 'user'
     const { data, error } = await supabaseAdmin
         .from('profiles')
-        .select('id, name, email, phone, created_at')
+        .select('id, name, email, phone, created_at, memo')
         .eq('role', 'user')
         .order('created_at', { ascending: false });
 
@@ -17,6 +17,31 @@ export async function GET() {
     }
 
     return NextResponse.json(data);
+}
+
+export async function PATCH(request: NextRequest) {
+    try {
+        const body = await request.json();
+        const { id, memo } = body;
+
+        if (!id) {
+            return NextResponse.json({ error: '사용자 ID가 필요합니다.' }, { status: 400 });
+        }
+
+        const { error } = await supabaseAdmin
+            .from('profiles')
+            .update({ memo })
+            .eq('id', id);
+
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, message: '메모가 업데이트되었습니다.' });
+    } catch (error) {
+        console.error('Update member memo error:', error);
+        return NextResponse.json({ error: '메모 업데이트 중 오류가 발생했습니다.' }, { status: 500 });
+    }
 }
 
 export async function DELETE(request: NextRequest) {

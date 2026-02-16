@@ -39,6 +39,7 @@ interface Assignment {
     order_number?: string;
     start_date?: string;
     end_date?: string;
+    period_months?: number;
 }
 
 interface Account {
@@ -89,6 +90,7 @@ interface GridValue {
     type: 'master' | 'user';
     order_id?: string;
     full_order?: Order;
+    period_months?: number;
 }
 
 function TidalAccountsContent() {
@@ -142,8 +144,20 @@ function TidalAccountsContent() {
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
 
-    // Filter State
+    // Filter & Search State
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Sorting State for Grid View
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     // Forms
     const [newAccount, setNewAccount] = useState({
@@ -275,6 +289,7 @@ function TidalAccountsContent() {
                         end_date: assignment?.end_date || '',
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'), // Slot 1 defaults to master, others to user
+                        period_months: assignment?.period_months || 0,
                     };
                 }
             });
@@ -357,6 +372,21 @@ function TidalAccountsContent() {
                     next.tidal_id = `${emailPrefix}@hifitidal.com`;
                 } else {
                     next.tidal_id = null;
+                }
+            }
+
+            // Auto-calculate end_date if start_date and period_months exist
+            if ((field === 'start_date' || field === 'period_months') && (next.start_date && next.period_months)) {
+                try {
+                    const start = parseISO(next.start_date);
+                    const months = parseInt(String(next.period_months)) || 0;
+                    if (months > 0) {
+                        const end = new Date(start);
+                        end.setMonth(end.getMonth() + months);
+                        next.end_date = end.toISOString().split('T')[0];
+                    }
+                } catch (err) {
+                    console.error('Date calculation error:', err);
                 }
             }
 
@@ -619,49 +649,90 @@ function TidalAccountsContent() {
             '소속 PW': string;
             '시작일': string;
             '종료일': string;
+            '개월': string | number;
         }
         const excelData: ExcelRow[] = [];
 
-        accounts.forEach((acc, accIdx) => {
-            // Master account row
-            excelData.push({
-                'No.': accIdx + 1,
-                '그룹 ID': acc.login_id,
-                '결제 계정': acc.payment_email,
-                '결제일': `${acc.payment_day}일`,
-                '메모': acc.memo,
-                'Slot': '',
-                '고객명': '',
-                '전화번호': '',
-                '주문번호': '',
-                '소속 ID': '',
-                '소속 PW': '',
-                '시작일': '',
-                '종료일': '',
-            });
-
-            // Dynamic slot rows
-            const sortedAssignments = getSortedAssignments(acc);
-            sortedAssignments.forEach((assignment, index) => {
-                const order = assignment.orders;
-
+        if (isGridView) {
+            // Export flat data equivalent to Grid View
+            const flatData = getFlatAssignments();
+            flatData.forEach((item, idx) => {
+                const val = gridValues[`${item.accountId}_${item.slotIdx}`] || {};
                 excelData.push({
-                    'No.': '',
-                    '그룹 ID': '',
-                    '결제 계정': '',
-                    '결제일': '',
-                    '메모': '',
-                    'Slot': `Slot ${index + 1}`,
-                    '고객명': order?.buyer_name || order?.profiles?.name || '',
-                    '전화번호': order?.buyer_phone || order?.profiles?.phone || '',
-                    '주문번호': order?.order_number || '',
-                    '소속 ID': assignment.tidal_id || '',
-                    '소속 PW': assignment.tidal_password || '',
-                    '시작일': assignment.start_date ? new Date(assignment.start_date).toLocaleDateString() : '',
-                    '종료일': assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : '',
+                    'No.': idx + 1,
+                    '그룹 ID': item.accountLoginId,
+                    '결제 계정': item.accountPaymentEmail,
+                    '결제일': `${item.accountPaymentDay}일`,
+                    '메모': item.accountMemo ?? '',
+                    'Slot': `Slot ${item.slotIdx + 1}`,
+                    '고객명': val.buyer_name || '',
+                    '전화번호': val.buyer_phone || '',
+                    '주문번호': val.order_number || '',
+                    '소속 ID': val.tidal_id || '',
+                    '소속 PW': val.tidal_password || '',
+                    '시작일': val.start_date || '',
+                    '종료일': val.end_date || '',
+                    '개월': getPeriodMonths(val.start_date, val.end_date)
                 });
             });
-        });
+        } else {
+            // Keep existing grouped format for List View
+            const query = searchQuery.toLowerCase().trim();
+            accounts
+                .filter(acc => {
+                    if (!query) return true;
+                    if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) return true;
+                    return acc.order_accounts?.some(oa => {
+                        const tidalId = (oa.tidal_id || '').toLowerCase();
+                        const buyerName = (oa.buyer_name || oa.orders?.buyer_name || '').toLowerCase();
+                        const phone = (oa.buyer_phone || oa.orders?.buyer_phone || '').toLowerCase();
+                        return tidalId.includes(query) || buyerName.includes(query) || phone.includes(query);
+                    });
+                })
+                .forEach((acc, accIdx) => {
+                    // Master account row
+                    excelData.push({
+                        'No.': accIdx + 1,
+                        '그룹 ID': acc.login_id,
+                        '결제 계정': acc.payment_email,
+                        '결제일': `${acc.payment_day}일`,
+                        '메모': acc.memo ?? '',
+                        'Slot': '',
+                        '고객명': '',
+                        '전화번호': '',
+                        '주문번호': '',
+                        '소속 ID': '',
+                        '소속 PW': '',
+                        '시작일': '',
+                        '종료일': '',
+                        '개월': ''
+                    });
+
+                    // Dynamic slot rows
+                    const sortedAssignments = getSortedAssignments(acc);
+                    sortedAssignments.forEach((assignment) => {
+                        const order = assignment.orders;
+                        const period = getPeriodMonths(assignment.start_date, assignment.end_date);
+
+                        excelData.push({
+                            'No.': '',
+                            '그룹 ID': '',
+                            '결제 계정': '',
+                            '결제일': '',
+                            '메모': '',
+                            'Slot': `Slot ${assignment.slot_number + 1}`,
+                            '고객명': order?.buyer_name || order?.profiles?.name || '',
+                            '전화번호': order?.buyer_phone || order?.profiles?.phone || '',
+                            '주문번호': order?.order_number || '',
+                            '소속 ID': assignment.tidal_id || '',
+                            '소속 PW': assignment.tidal_password || '',
+                            '시작일': assignment.start_date ? new Date(assignment.start_date).toLocaleDateString() : '',
+                            '종료일': assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : '',
+                            '개월': period
+                        });
+                    });
+                });
+        }
 
         // Create workbook
         const wb = XLSX.utils.book_new();
@@ -669,7 +740,7 @@ function TidalAccountsContent() {
         XLSX.utils.book_append_sheet(wb, ws, 'Tidal 계정');
 
         // Generate file
-        const fileName = `Tidal계정_${new Date().toLocaleDateString()}.xlsx`;
+        const fileName = `Tidal계정_${isGridView ? 'Grid' : 'List'}_${new Date().toLocaleDateString()}.xlsx`;
         XLSX.writeFile(wb, fileName);
     };
 
@@ -738,7 +809,15 @@ function TidalAccountsContent() {
         }
     };
 
-    const openOrderDetail = (order: Order) => {
+    const getStatusLabel = (order: Order) => {
+        if (order.assignment_status === 'completed') return '작업완료';
+        if (order.assignment_status === 'assigned') return '배정완료';
+        if (order.payment_status === 'paid') return '입금확인';
+        return '주문신청';
+    };
+
+    const openOrderDetail = (order?: Order) => {
+        if (!order) return;
         setViewOrder(order);
         setIsOrderDetailOpen(true);
     };
@@ -836,19 +915,6 @@ function TidalAccountsContent() {
 
     // ...
 
-    const getAvailableSlots = (accountId: string) => {
-        const acc = accounts.find(a => a.id === accountId);
-        if (!acc) return [];
-        const taken = new Set((acc.order_accounts || [])
-            .filter(oa => oa && typeof oa.slot_number === 'number')
-            .map(oa => oa.slot_number));
-        const available = [];
-        for (let i = 0; i < 6; i++) {
-            if (!taken.has(i)) available.push(i);
-        }
-        return available;
-    };
-
     const getSortedAssignments = (acc: Account) => {
         return [...(acc.order_accounts || [])]
             .filter(oa => oa && typeof oa === 'object')
@@ -861,19 +927,152 @@ function TidalAccountsContent() {
             });
     };
 
+    const getAvailableSlots = (accountId: string) => {
+        const acc = accounts.find(a => a.id === accountId);
+        if (!acc) return [];
+        const taken = new Set((acc.order_accounts || [])
+            .filter(oa => oa && typeof oa.slot_number === 'number')
+            .map(oa => oa.slot_number));
+        const available = [];
+        for (let i = 0; i < 6; i++) {
+            if (!taken.has(i)) available.push(i);
+        }
+        return available;
+    };
+    const getPeriodMonths = (start?: string, end?: string) => {
+        if (!start || !end) return 0;
+        try {
+            return differenceInMonths(parseISO(end), parseISO(start));
+        } catch {
+            return 0;
+        }
+    };
+
+    const getFlatAssignments = () => {
+        interface FlatAssignment extends GridValue {
+            accountId: string;
+            accountLoginId: string;
+            accountPaymentEmail: string;
+            accountPaymentDay: number;
+            accountMemo: string | null;
+            slotIdx: number;
+            assignmentId?: string;
+            [key: string]: string | number | boolean | null | undefined | Order | Assignment;
+        }
+        const flat: FlatAssignment[] = [];
+        const query = searchQuery.toLowerCase().trim();
+
+        accounts.forEach(acc => {
+            for (let i = 0; i < acc.max_slots; i++) {
+                const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
+                const val = gridValues[`${acc.id}_${i}`] || {};
+
+                // Apply Search Filter
+                if (query) {
+                    const buyerName = (val.buyer_name || '').toLowerCase();
+                    const tidalId = (val.tidal_id || '').toLowerCase();
+                    const buyerPhone = (val.buyer_phone || '').toLowerCase();
+
+                    if (!buyerName.includes(query) &&
+                        !tidalId.includes(query) &&
+                        !buyerPhone.includes(query)) {
+                        continue; // Skip if no match
+                    }
+                }
+
+                // Apply Expired Filter
+                if (showExpiredOnly) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (!val.end_date || parseISO(val.end_date) >= today) {
+                        continue;
+                    }
+                }
+
+                flat.push({
+                    accountId: acc.id,
+                    accountLoginId: acc.login_id,
+                    accountPaymentEmail: acc.payment_email,
+                    accountPaymentDay: acc.payment_day,
+                    accountMemo: acc.memo,
+                    slotIdx: i,
+                    assignmentId: assignment?.id,
+                    ...val
+                });
+            }
+        });
+
+        // Sorting
+        if (sortConfig) {
+            flat.sort((a, b) => {
+                let valA: string | number | boolean | null | undefined | Order | Assignment = a[sortConfig.key];
+                let valB: string | number | boolean | null | undefined | Order | Assignment = b[sortConfig.key];
+
+                if (sortConfig.key === 'period') {
+                    valA = getPeriodMonths(a.start_date, a.end_date);
+                    valB = getPeriodMonths(b.start_date, b.end_date);
+                }
+
+                if (valA === undefined || valA === null) valA = '';
+                if (valB === undefined || valB === null) valB = '';
+
+                // Safely compare values
+                const sA = (typeof valA === 'object' ? JSON.stringify(valA) : valA) as string | number | boolean;
+                const sB = (typeof valB === 'object' ? JSON.stringify(valB) : valB) as string | number | boolean;
+
+                if (sA < sB) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (sA > sB) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return flat;
+    };
+
 
     if (!isAdmin) return null;
 
     return (
         <main className={styles.main}>
             <header className={`${styles.header} glass`}>
-                <div className="container flex justify-between items-center">
-                    <h1 className={styles.title}>Tidal 계정 관리 (V2.2)</h1>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)}>
+                <div className="container flex justify-between items-center bg-white/50 py-2 rounded-lg">
+                    <div className="flex items-center gap-4">
+                        <h1 className={styles.title}>Tidal 계정 관리</h1>
+                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
                             {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
                             {isGridView ? 'List View' : 'Grid View'}
                         </Button>
+                    </div>
+
+                    <div className="flex gap-2 items-center">
+                        {/* 1. 검색창 */}
+                        <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
+                            <Filter size={14} className="text-gray-400" />
+                            <Input
+                                type="text"
+                                placeholder="고객명, Tidal ID, 전화번호 검색..."
+                                className="border-0 focus-visible:ring-0 h-8 w-60 text-sm"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+
+                        {/* 2. 만료된 배정만 보기 */}
+                        <Button
+                            variant={showExpiredOnly ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                            className={showExpiredOnly ? "bg-red-600 hover:bg-red-700 text-white h-8" : "text-gray-600 h-8"}
+                        >
+                            만료된 배정만 보기
+                        </Button>
+
+                        {/* 3. 지난 내역 */}
+                        <Button onClick={() => router.push('/admin/tidal/inactive')} variant="outline" className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50 h-8">
+                            <History size={16} /> 지난 내역
+                        </Button>
+
+                        {/* 4. 엑셀 임포트 */}
                         <div className="relative">
                             <input
                                 type="file"
@@ -881,27 +1080,19 @@ function TidalAccountsContent() {
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 onChange={handleImportExcel}
                             />
-                            <Button variant="outline" className="flex items-center gap-2">
+                            <Button variant="outline" className="flex items-center gap-2 h-8">
                                 <Upload className="w-4 h-4" />
                                 엑셀 임포트
                             </Button>
                         </div>
-                        <Button
-                            variant={showExpiredOnly ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setShowExpiredOnly(!showExpiredOnly)}
-                            className={showExpiredOnly ? "bg-red-600 hover:bg-red-700 text-white" : "text-gray-600"}
-                        >
-                            <Filter size={16} className="mr-2" />
-                            만료된 배정만 보기
-                        </Button>
-                        <Button onClick={() => router.push('/admin/tidal/inactive')} variant="outline" className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50">
-                            <History size={16} /> 지난 내역
-                        </Button>
-                        <Button onClick={exportToExcel} variant="outline" className="gap-2">
+
+                        {/* 5. 엑셀 다운로드 */}
+                        <Button onClick={exportToExcel} variant="outline" className="gap-2 h-8">
                             <Download size={16} /> 엑셀 다운로드
                         </Button>
-                        <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
+
+                        {/* 6. 그룹 추가 */}
+                        <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8">
                             <Plus size={16} /> 그룹 추가
                         </Button>
                     </div>
@@ -911,87 +1102,244 @@ function TidalAccountsContent() {
             <div className={`${styles.content} container`}>
                 {isGridView ? (
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
-                        <table className="w-full text-xs min-w-[1200px]">
+                        <table className="w-full text-xs min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100 border-b">
-                                    <th className="p-2 text-center border-r">ID</th>
-                                    <th className="p-2 text-left border-r">Tidal ID</th>
-                                    <th className="p-2 text-left border-r">PW</th>
-                                    <th className="p-2 text-left border-r">고객명</th>
-                                    <th className="p-2 text-left border-r">전화번호</th>
-                                    <th className="p-2 text-center border-r">주문번호</th>
-                                    <th className="p-2 text-center border-r">시작일</th>
-                                    <th className="p-2 text-center border-r">종료일</th>
-                                    <th className="p-2 text-center border-r">개월수</th>
-                                    <th className="p-2 text-center border-r">계정Type</th>
-                                    <th className="p-2 text-left border-r">Master ID</th>
-                                    <th className="p-2 text-left border-r">결제계정</th>
-                                    <th className="p-2 text-center">결제일</th>
+                                    <th className="p-2 text-center border-r w-10">No</th>
+                                    <th className="p-2 text-left border-r w-32">Tidal ID</th>
+                                    <th className="p-2 text-left border-r w-24">PW</th>
+                                    <th className="p-2 text-left border-r w-20">고객명</th>
+                                    <th className="p-2 text-left border-r w-24">전화번호</th>
+                                    <th className="p-2 text-center border-r w-24">주문번호</th>
+                                    <th className="p-2 text-center border-r w-24 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('start_date')}>
+                                        <div className="flex items-center justify-center gap-1">
+                                            시작일 {sortConfig?.key === 'start_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                    </th>
+                                    <th className="p-2 text-center border-r w-24 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('end_date')}>
+                                        <div className="flex items-center justify-center gap-1">
+                                            종료일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                    </th>
+                                    <th className="p-2 text-center border-r w-12 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('period')}>
+                                        <div className="flex items-center justify-center gap-1">
+                                            개월 {sortConfig?.key === 'period' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                    </th>
+                                    <th className="p-2 text-center border-r w-16">타입</th>
+                                    <th className="p-2 text-left border-r w-32 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('payment_email')}>
+                                        <div className="flex items-center justify-center gap-1">
+                                            결제계정 {sortConfig?.key === 'payment_email' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                    </th>
+                                    <th className="p-2 text-center border-r w-16 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('payment_day')}>
+                                        <div className="flex items-center justify-center gap-1">
+                                            결제일 {sortConfig?.key === 'payment_day' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                    </th>
+                                    <th className="p-2 text-center w-32">관리</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {accounts.map((acc, accIndex) => {
-                                    const masterAssignment = acc.order_accounts?.find(oa => oa.type === 'master');
-                                    const masterId = masterAssignment?.tidal_id || '';
-                                    let sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => a.slot_number - b.slot_number);
+                                {(() => {
+                                    // 1. Flatten assignments
+                                    const flattened: {
+                                        id: string;
+                                        assignment: Assignment;
+                                        account: Account;
+                                        period: number;
+                                        originalAccIndex: number;
+                                    }[] = [];
+                                    accounts.forEach((acc, accIdx) => {
+                                        const assignments = [...(acc.order_accounts || [])];
+                                        assignments.forEach(assignment => {
+                                            // Search Filter
+                                            const query = searchQuery.toLowerCase().trim();
+                                            if (query) {
+                                                const buyerName = (assignment.buyer_name || assignment.orders?.buyer_name || '').toLowerCase();
+                                                const tidalId = (assignment.tidal_id || '').toLowerCase();
+                                                const buyerPhone = (assignment.buyer_phone || assignment.orders?.buyer_phone || '').toLowerCase();
+                                                if (!buyerName.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) return;
+                                            }
 
-                                    // --- Expired Filter Functionality ---
-                                    if (showExpiredOnly) {
+                                            // Expired Filter
+                                            if (showExpiredOnly && assignment.end_date) {
+                                                const today = new Date();
+                                                today.setHours(0, 0, 0, 0);
+                                                if (parseISO(assignment.end_date) >= today) return;
+                                            } else if (showExpiredOnly && !assignment.end_date) {
+                                                return;
+                                            }
+
+                                            let periodNum = assignment.period_months || 0;
+                                            if (!periodNum && assignment.start_date && assignment.end_date) {
+                                                try {
+                                                    const start = parseISO(assignment.start_date);
+                                                    const end = parseISO(assignment.end_date);
+                                                    periodNum = differenceInMonths(end, start);
+                                                } catch { }
+                                            }
+
+                                            flattened.push({
+                                                id: assignment.id,
+                                                assignment,
+                                                account: acc,
+                                                period: periodNum,
+                                                originalAccIndex: accIdx
+                                            });
+                                        });
+                                    });
+
+                                    // 2. Sort
+                                    if (sortConfig) {
+                                        flattened.sort((a, b) => {
+                                            let aVal: string | number | null = null;
+                                            let bVal: string | number | null = null;
+
+                                            switch (sortConfig.key) {
+                                                case 'start_date':
+                                                    aVal = a.assignment.start_date || '0000-00-00';
+                                                    bVal = b.assignment.start_date || '0000-00-00';
+                                                    break;
+                                                case 'end_date':
+                                                    aVal = a.assignment.end_date || '0000-00-00';
+                                                    bVal = b.assignment.end_date || '0000-00-00';
+                                                    break;
+                                                case 'period':
+                                                    aVal = a.period;
+                                                    bVal = b.period;
+                                                    break;
+                                                case 'payment_email':
+                                                    aVal = a.account.payment_email;
+                                                    bVal = b.account.payment_email;
+                                                    break;
+                                                case 'payment_day':
+                                                    aVal = a.account.payment_day;
+                                                    bVal = b.account.payment_day;
+                                                    break;
+                                                default:
+                                                    return 0;
+                                            }
+
+                                            const safeA = aVal ?? '';
+                                            const safeB = bVal ?? '';
+
+                                            if (safeA < safeB) return sortConfig.direction === 'asc' ? -1 : 1;
+                                            if (safeA > safeB) return sortConfig.direction === 'asc' ? 1 : -1;
+                                            return 0;
+                                        });
+                                    }
+
+                                    // 3. Render
+                                    return flattened.map((item, idx) => {
+                                        const assignment = item.assignment;
+                                        const acc = item.account;
+                                        const sIdx = assignment.slot_number;
+                                        const key = `${acc.id}_${sIdx}`;
+                                        const val = gridValues[key] || {};
+                                        const isEditing = editingSlots[key];
+
                                         const today = new Date();
                                         today.setHours(0, 0, 0, 0);
-                                        sortedAssignments = sortedAssignments.filter(assignment => {
-                                            if (!assignment.end_date) return false;
-                                            const end = parseISO(assignment.end_date);
-                                            return end < today;
-                                        });
-
-                                        // If no expired assignments in this account, hide the account row
-                                        if (sortedAssignments.length === 0) return null;
-                                    }
-                                    // ------------------------------------
-
-                                    return sortedAssignments.map((assignment, idx) => {
-                                        let period = '-';
-                                        if (assignment.start_date && assignment.end_date) {
-                                            try {
-                                                const start = parseISO(assignment.start_date);
-                                                const end = parseISO(assignment.end_date);
-                                                const diff = differenceInMonths(end, start);
-                                                if (diff > 0) period = `${diff}`;
-                                            } catch { }
-                                        }
+                                        const isExpired = assignment.end_date ? parseISO(assignment.end_date) < today : false;
 
                                         return (
-                                            <tr key={assignment.id} className="border-b hover:bg-gray-50">
-                                                {idx === 0 ? (
-                                                    <td className="p-2 text-center border-r font-bold" rowSpan={sortedAssignments.length}>
-                                                        {accIndex + 1}
-                                                    </td>
-                                                ) : null}
-                                                <td className="p-2 border-r">{assignment.tidal_id || '-'}</td>
-                                                <td className="p-2 border-r">{assignment.tidal_password || '-'}</td>
-                                                <td className="p-2 border-r">{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</td>
-                                                <td className="p-2 border-r">{assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}</td>
-                                                <td className="p-2 text-center border-r">{assignment.order_number || assignment.orders?.order_number || '-'}</td>
-                                                <td className="p-2 text-center border-r">{assignment.start_date ? format(parseISO(assignment.start_date), 'yyyy-MM-dd') : '-'}</td>
-                                                <td className="p-2 text-center border-r">{assignment.end_date ? format(parseISO(assignment.end_date), 'yyyy-MM-dd') : '-'}</td>
-                                                <td className="p-2 text-center border-r">{period}</td>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''}`}>
+                                                <td className="p-2 text-center border-r font-mono text-gray-500">{idx + 1}</td>
+                                                {isEditing ? (
+                                                    <>
+                                                        <td className="p-1 border-r">
+                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
+                                                        </td>
+                                                        <td className="p-1 border-r">
+                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
+                                                        </td>
+                                                        <td className="p-1 border-r">
+                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
+                                                        </td>
+                                                        <td className="p-1 border-r">
+                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
+                                                        </td>
+                                                        <td className="p-1 border-r text-center text-[10px]">{val.order_number || '-'}</td>
+                                                        <td className="p-1 border-r">
+                                                            <Input type="date" className="h-7 text-[10px] bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
+                                                        </td>
+                                                        <td className="p-1 border-r">
+                                                            <Input type="date" className="h-7 text-[10px] bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
+                                                        </td>
+                                                        <td className="p-1 border-r w-12">
+                                                            <Input type="number" className="h-7 text-[10px] bg-white px-1" placeholder="개월" value={val.period_months !== undefined ? val.period_months : (item.period || '')} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined}>{assignment.tidal_id || '-'}</td>
+                                                        <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined}>{assignment.tidal_password || '-'}</td>
+                                                        <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined}>
+                                                            {assignment.buyer_name || assignment.orders?.buyer_name || '-'}
+                                                        </td>
+                                                        <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined}>
+                                                            {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
+                                                        </td>
+                                                        <td className="p-2 text-center border-r font-mono text-[10px]">
+                                                            {assignment.order_number || assignment.orders?.order_number ? (
+                                                                <button
+                                                                    className="text-blue-600 font-bold underline hover:text-blue-800"
+                                                                    onClick={() => openOrderDetail(assignment.orders || val.full_order)}
+                                                                >
+                                                                    {assignment.order_number || assignment.orders?.order_number}
+                                                                </button>
+                                                            ) : '-'}
+                                                        </td>
+                                                        <td className="p-2 text-center border-r font-mono">{assignment.start_date ? format(parseISO(assignment.start_date), 'yyyy-MM-dd') : '-'}</td>
+                                                        <td className="p-2 text-center border-r font-mono">
+                                                            <span className={isExpired ? "text-red-600 font-bold" : ""}>
+                                                                {assignment.end_date ? format(parseISO(assignment.end_date), 'yyyy-MM-dd') : '-'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 text-center border-r font-mono">{item.period}</td>
+                                                    </>
+                                                )}
                                                 <td className="p-2 text-center border-r">
-                                                    <span className={`px-1 rounded ${assignment.type === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>
-                                                        {assignment.type === 'master' ? 'Master' : 'Slave'}
+                                                    <span className={`px-1 rounded text-[10px] ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
+                                                        {assignment.type === 'master' ? 'Master' : 'User'}
                                                     </span>
                                                 </td>
-                                                <td className="p-2 border-r">{masterId}</td>
-                                                {idx === 0 ? (
-                                                    <>
-                                                        <td className="p-2 border-r" rowSpan={sortedAssignments.length}>{acc.payment_email}</td>
-                                                        <td className="p-2 text-center" rowSpan={sortedAssignments.length}>{acc.payment_day}일</td>
-                                                    </>
-                                                ) : null}
+                                                <td className="p-2 border-r truncate max-w-[150px]" title={acc.payment_email}>{acc.payment_email}</td>
+                                                <td className="p-2 text-center border-r font-mono">{acc.payment_day}일</td>
+                                                <td className="p-2 text-center">
+                                                    <div className="flex justify-center gap-1 items-center">
+                                                        {isEditing ? (
+                                                            <>
+                                                                <Button size="sm" variant="default" className="h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700" title="저장" onClick={() => handleSaveRow(acc.id, sIdx)}>
+                                                                    <Save size={12} />
+                                                                </Button>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, sIdx)}>
+                                                                    <Plus size={12} className="rotate-45" />
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, sIdx)}>
+                                                                    <Pencil size={12} />
+                                                                </Button>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
+                                                                    <ArrowRightLeft size={12} />
+                                                                </Button>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
+                                                                    <PowerOff size={12} />
+                                                                </Button>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
+                                                                    <Trash2 size={12} />
+                                                                </Button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
                                             </tr>
                                         );
                                     });
-                                })}
+                                })()}
                             </tbody>
                         </table>
                     </div>
@@ -1008,265 +1356,290 @@ function TidalAccountsContent() {
                             <div className="col-span-1 text-center">상세</div>
                         </div>
 
-                        {accounts.map((acc, idx) => {
-                            const isExpanded = expandedRows.has(acc.id);
-                            let sortedAssignments = getSortedAssignments(acc);
-
-                            // --- Expired Filter Functionality ---
-                            if (showExpiredOnly) {
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                sortedAssignments = sortedAssignments.filter(assignment => {
-                                    if (!assignment.end_date) return false;
-                                    const end = parseISO(assignment.end_date);
-                                    return end < today;
+                        {accounts
+                            .filter(acc => {
+                                const query = searchQuery.toLowerCase().trim();
+                                if (!query) return true;
+                                if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) return true;
+                                return acc.order_accounts?.some(oa => {
+                                    const tidalId = (oa.tidal_id || '').toLowerCase();
+                                    const buyerName = (oa.buyer_name || oa.orders?.buyer_name || '').toLowerCase();
+                                    const phone = (oa.buyer_phone || oa.orders?.buyer_phone || '').toLowerCase();
+                                    return tidalId.includes(query) || buyerName.includes(query) || phone.includes(query);
+                                });
+                            })
+                            .map((acc, idx) => {
+                                const isExpanded = expandedRows.has(acc.id);
+                                let sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => {
+                                    if (a.type === 'master') return -1;
+                                    if (b.type === 'master') return 1;
+                                    return (a.end_date || '').localeCompare(b.end_date || '');
                                 });
 
-                                // If no expired assignments in this account, hide the account row
-                                if (sortedAssignments.length === 0) return null;
-                            }
-                            // ------------------------------------
+                                // --- Expired Filter Functionality ---
+                                if (showExpiredOnly) {
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+                                    sortedAssignments = sortedAssignments.filter(assignment => {
+                                        if (!assignment.end_date) return false;
+                                        const end = parseISO(assignment.end_date);
+                                        return end < today;
+                                    });
 
-                            const availableSlots = getAvailableSlots(acc.id);
-                            const availableSlotNum = availableSlots.length > 0 ? availableSlots[0] : -1;
+                                    // If no expired assignments in this account, hide the account row
+                                    if (sortedAssignments.length === 0) return null;
+                                }
 
-                            return (
-                                <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                                    <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
-                                        <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                            {String(idx + 1).padStart(3, '0')}
-                                        </div>
-                                        <div className="col-span-3 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
-                                            <div className="font-medium text-xs">
-                                                <span className="text-gray-700">{acc.login_id}</span>
-                                                <span className="text-gray-400 mx-1">-</span>
-                                                <span className="text-blue-600">{acc.payment_email}</span>
+
+
+
+
+                                return (
+                                    <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
+                                        <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
+                                            <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                {String(idx + 1).padStart(3, '0')}
+                                            </div>
+                                            <div className="col-span-3 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
+                                                <div className="font-medium text-xs">
+                                                    <span className="text-gray-700">{acc.login_id}</span>
+                                                    <span className="text-gray-400 mx-1">-</span>
+                                                    <span className="text-blue-600">{acc.payment_email}</span>
+                                                </div>
+                                            </div>
+                                            <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                {acc.payment_day}일
+                                            </div>
+                                            <div className="col-span-2 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
+                                                {acc.memo?.length > 15 ? acc.memo.substring(0, 15) + '...' : acc.memo}
+                                            </div>
+                                            <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={getMasterInfo(acc)} onClick={() => toggleRow(acc.id)}>
+                                                {getMasterInfo(acc)}
+                                            </div>
+                                            <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                                    {acc.order_accounts?.length || 0}/6
+                                                </span>
+                                            </div>
+                                            <div className="col-span-1 text-center flex justify-center gap-1">
+                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="그룹 수정" onClick={(e) => { e.stopPropagation(); handleEditMasterAccount(acc); }}>
+                                                    <Pencil size={14} />
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="그룹 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
+                                                    <Trash2 size={14} />
+                                                </Button>
+                                            </div>
+                                            <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                             </div>
                                         </div>
-                                        <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                            {acc.payment_day}일
-                                        </div>
-                                        <div className="col-span-2 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
-                                            {acc.memo?.length > 15 ? acc.memo.substring(0, 15) + '...' : acc.memo}
-                                        </div>
-                                        <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={getMasterInfo(acc)} onClick={() => toggleRow(acc.id)}>
-                                            {getMasterInfo(acc)}
-                                        </div>
-                                        <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                                                {acc.order_accounts?.length || 0}/6
-                                            </span>
-                                        </div>
-                                        <div className="col-span-1 text-center flex justify-center gap-1">
-                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="그룹 수정" onClick={(e) => { e.stopPropagation(); handleEditMasterAccount(acc); }}>
-                                                <Pencil size={14} />
-                                            </Button>
-                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="그룹 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
-                                                <Trash2 size={14} />
-                                            </Button>
-                                        </div>
-                                        <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                        </div>
-                                    </div>
 
-                                    {isExpanded && (
-                                        <div className="bg-white border-t p-4 overflow-x-auto">
-                                            <table className="w-full text-xs min-w-[1200px]">
-                                                <thead>
-                                                    <tr className="text-gray-400 border-b">
-                                                        <th className="py-2 text-center w-12">Slot</th>
-                                                        <th className="py-2 text-center w-20">Type</th>
-                                                        <th className="py-2 text-left w-32">Tidal ID</th>
-                                                        <th className="py-2 text-left w-24">비밀번호</th>
-                                                        <th className="py-2 text-left w-20">이름</th>
-                                                        <th className="py-2 text-left w-28">이메일</th>
-                                                        <th className="py-2 text-left w-28">전화번호</th>
-                                                        <th className="py-2 text-left w-24">가입일</th>
-                                                        <th className="py-2 text-left w-24">종료일</th>
-                                                        <th className="py-2 text-center w-16">개월</th>
-                                                        <th className="py-2 text-center w-24">주문번호</th>
-                                                        <th className="py-2 text-center w-40">관리</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {sortedAssignments.map((assignment, index) => {
-                                                        const sIdx = assignment.slot_number;
-                                                        const key = `${acc.id}_${sIdx}`;
-                                                        const val = gridValues[key] || {}; // Current Input Values
-                                                        const isEditing = editingSlots[key];
+                                        {isExpanded && (
+                                            <div className="bg-white border-t p-4 overflow-x-auto">
+                                                {(() => {
+                                                    const available = getAvailableSlots(acc.id);
+                                                    const availableSlotNum = available.length > 0 ? available[0] : -1;
+                                                    return (
+                                                        <table className="w-full text-xs min-w-[1200px]">
+                                                            <thead>
+                                                                <tr className="text-gray-400 border-b">
+                                                                    <th className="py-2 text-center w-12">Slot</th>
+                                                                    <th className="py-2 text-center w-20">Type</th>
+                                                                    <th className="py-2 text-left w-32">Tidal ID</th>
+                                                                    <th className="py-2 text-left w-24">비밀번호</th>
+                                                                    <th className="py-2 text-left w-20">이름</th>
+                                                                    <th className="py-2 text-left w-28">이메일</th>
+                                                                    <th className="py-2 text-left w-28">전화번호</th>
+                                                                    <th className="py-2 text-left w-24">가입일</th>
+                                                                    <th className="py-2 text-left w-24">종료일</th>
+                                                                    <th className="py-2 text-center w-16">개월</th>
+                                                                    <th className="py-2 text-center w-24">주문번호</th>
+                                                                    <th className="py-2 text-center w-40">관리</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {sortedAssignments.map((assignment, index) => {
+                                                                    const sIdx = assignment.slot_number;
+                                                                    const key = `${acc.id}_${sIdx}`;
+                                                                    const val = gridValues[key] || {}; // Current Input Values
+                                                                    const isEditing = editingSlots[key];
 
-                                                        // Period Calc for display
-                                                        let period = '-';
-                                                        let isExpired = false;
-                                                        if (val.start_date && val.end_date) {
-                                                            try {
-                                                                const start = parseISO(val.start_date);
-                                                                const end = parseISO(val.end_date);
-                                                                const diff = differenceInMonths(end, start);
-                                                                if (diff > 0) period = `${diff}개월`;
+                                                                    // Period Calc for display
+                                                                    let period = '-';
+                                                                    let isExpired = false;
+                                                                    if (val.start_date && val.end_date) {
+                                                                        try {
+                                                                            const start = parseISO(val.start_date);
+                                                                            const end = parseISO(val.end_date);
+                                                                            const diff = differenceInMonths(end, start);
+                                                                            if (diff > 0) period = `${diff}개월`;
 
-                                                                // Check expiry
-                                                                const today = new Date();
-                                                                today.setHours(0, 0, 0, 0);
-                                                                if (end < today) isExpired = true;
-                                                            } catch { }
-                                                        }
+                                                                            // Check expiry
+                                                                            const today = new Date();
+                                                                            today.setHours(0, 0, 0, 0);
+                                                                            if (end < today) isExpired = true;
+                                                                        } catch { }
+                                                                    }
 
-                                                        return (
-                                                            <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
-                                                                <td className="text-center font-bold text-gray-400">#{index + 1}</td>
+                                                                    return (
+                                                                        <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
+                                                                            <td className="text-center font-bold text-gray-400">#{index + 1}</td>
 
-                                                                {isEditing ? (
-                                                                    <>
-                                                                        <td className="px-1">
-                                                                            <Select value={val.type || 'user'} onValueChange={(value) => {
-                                                                                if (value === 'master') {
-                                                                                    const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master' && oa.slot_number !== sIdx);
-                                                                                    if (hasMaster) {
-                                                                                        alert('이미 Master가 설정되어 있습니다.');
-                                                                                        return;
-                                                                                    }
-                                                                                }
-                                                                                updateGridValue(acc.id, sIdx, 'type', value);
-                                                                            }}>
-                                                                                <SelectTrigger className="h-8 text-xs bg-white">
-                                                                                    <SelectValue />
-                                                                                </SelectTrigger>
-                                                                                <SelectContent>
-                                                                                    <SelectItem value="master">Master</SelectItem>
-                                                                                    <SelectItem value="user">User</SelectItem>
-                                                                                </SelectContent>
-                                                                            </Select>
+                                                                            {isEditing ? (
+                                                                                <>
+                                                                                    <td className="px-1">
+                                                                                        <Select value={val.type || 'user'} onValueChange={(value) => {
+                                                                                            if (value === 'master') {
+                                                                                                const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master' && oa.slot_number !== sIdx);
+                                                                                                if (hasMaster) {
+                                                                                                    alert('이미 Master가 설정되어 있습니다.');
+                                                                                                    return;
+                                                                                                }
+                                                                                            }
+                                                                                            updateGridValue(acc.id, sIdx, 'type', value);
+                                                                                        }}>
+                                                                                            <SelectTrigger className="h-8 text-xs bg-white">
+                                                                                                <SelectValue />
+                                                                                            </SelectTrigger>
+                                                                                            <SelectContent>
+                                                                                                <SelectItem value="master">Master</SelectItem>
+                                                                                                <SelectItem value="user">User</SelectItem>
+                                                                                            </SelectContent>
+                                                                                        </Select>
+                                                                                    </td>
+                                                                                    <td className="px-1">
+                                                                                        <Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
+                                                                                    </td>
+                                                                                    <td className="px-1">
+                                                                                        <Input className="h-8 text-xs bg-white" placeholder="PW" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
+                                                                                    </td>
+                                                                                    <td className="px-1">
+                                                                                        <Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
+                                                                                    </td>
+                                                                                    <td className="px-1">
+                                                                                        <Input className="h-8 text-xs bg-white" placeholder="Email" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} />
+                                                                                    </td>
+                                                                                    <td className="px-1">
+                                                                                        <Input className="h-8 text-xs bg-white" placeholder="전화번호" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
+                                                                                    </td>
+                                                                                    <td className="px-1">
+                                                                                        <Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
+                                                                                    </td>
+                                                                                    <td className="px-1 w-12">
+                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
+                                                                                    </td>
+                                                                                    <td className="px-1">
+                                                                                        <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
+                                                                                    </td>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <td className="px-2 text-center">
+                                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                                            {val.type === 'master' ? 'Master' : 'User'}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>{val.tidal_id || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password || undefined}>{val.tidal_password || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>{val.buyer_name || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
+                                                                                    <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
+                                                                                    <td className="px-2 font-mono">
+                                                                                        <span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>
+                                                                                            {val.end_date || '-'}
+                                                                                            {isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                </>
+                                                                            )}
+
+                                                                            <td className="text-center text-gray-500 font-mono">
+                                                                                {period}
+                                                                            </td>
+                                                                            <td className="text-center text-gray-400 font-mono text-[10px]">
+                                                                                {val.order_number ? (
+                                                                                    <button
+                                                                                        className="text-blue-600 font-bold underline hover:text-blue-800"
+                                                                                        onClick={() => {
+                                                                                            const orderToView = val.full_order || assignment?.orders;
+                                                                                            if (orderToView) openOrderDetail(orderToView);
+                                                                                        }}
+                                                                                    >
+                                                                                        {val.order_number}
+                                                                                    </button>
+                                                                                ) : isEditing ? (
+                                                                                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openAssignModal(acc, assignment.slot_number)}>
+                                                                                        배정
+                                                                                    </Button>
+                                                                                ) : (
+                                                                                    <span>-</span>
+                                                                                )}
+                                                                            </td>
+                                                                            <td>
+                                                                                <div className="flex justify-center gap-1 items-center">
+                                                                                    {isEditing ? (
+                                                                                        <>
+                                                                                            <Button size="sm" variant="default" className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700" title="저장" onClick={() => handleSaveRow(acc.id, assignment.slot_number)}>
+                                                                                                <Save size={14} />
+                                                                                            </Button>
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, assignment.slot_number)}>
+                                                                                                X
+                                                                                            </Button>
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, assignment.slot_number)}>
+                                                                                                <Pencil size={14} />
+                                                                                            </Button>
+
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
+                                                                                                <ArrowRightLeft size={14} />
+                                                                                            </Button>
+
+                                                                                            {/* Deactivate Button for Expired/Active Accounts */}
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
+                                                                                                <PowerOff size={14} />
+                                                                                            </Button>
+
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
+                                                                                                <Trash2 size={14} />
+                                                                                            </Button>
+                                                                                        </>
+                                                                                    )}
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+
+                                                                {sortedAssignments.length < 6 && availableSlotNum !== -1 && (
+                                                                    <tr className="border-b last:border-0 h-10 bg-blue-50/30">
+                                                                        <td className="text-center font-bold text-gray-300">#{sortedAssignments.length + 1}</td>
+                                                                        <td colSpan={10} className="px-4 py-1">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-gray-400 italic">신규 슬롯을 추가하려면 우측 &apos;배정&apos; 버튼을 클릭하세요.</span>
+                                                                            </div>
                                                                         </td>
-                                                                        <td className="px-1">
-                                                                            <Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
+                                                                        <td className="text-center">
+                                                                            <Button size="sm" variant="outline" className="h-7 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                                                                onClick={() => openAssignModal(acc, availableSlotNum)}
+                                                                            >
+                                                                                <Plus size={14} className="mr-1" /> 배정
+                                                                            </Button>
                                                                         </td>
-                                                                        <td className="px-1">
-                                                                            <Input className="h-8 text-xs bg-white" placeholder="PW" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
-                                                                        </td>
-                                                                        <td className="px-1">
-                                                                            <Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
-                                                                        </td>
-                                                                        <td className="px-1">
-                                                                            <Input className="h-8 text-xs bg-white" placeholder="Email" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} />
-                                                                        </td>
-                                                                        <td className="px-1">
-                                                                            <Input className="h-8 text-xs bg-white" placeholder="전화번호" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
-                                                                        </td>
-                                                                        <td className="px-1">
-                                                                            <Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
-                                                                        </td>
-                                                                        <td className="px-1">
-                                                                            <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
-                                                                        </td>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <td className="px-2 text-center">
-                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                                                {val.type === 'master' ? 'Master' : 'User'}
-                                                                            </span>
-                                                                        </td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>{val.tidal_id || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password || undefined}>{val.tidal_password || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>{val.buyer_name || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
-                                                                        <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
-                                                                        <td className="px-2 font-mono">
-                                                                            <span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>
-                                                                                {val.end_date || '-'}
-                                                                                {isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}
-                                                                            </span>
-                                                                        </td>
-                                                                    </>
+                                                                    </tr>
                                                                 )}
+                                                            </tbody>
 
-                                                                <td className="text-center text-gray-500 font-mono">
-                                                                    {period}
-                                                                </td>
-                                                                <td className="text-center text-gray-400 font-mono text-[10px]">
-                                                                    {val.order_number ? (
-                                                                        <button
-                                                                            className="text-blue-600 font-bold underline hover:text-blue-800"
-                                                                            onClick={() => {
-                                                                                const orderToView = val.full_order || assignment?.orders;
-                                                                                if (orderToView) openOrderDetail(orderToView);
-                                                                            }}
-                                                                        >
-                                                                            {val.order_number}
-                                                                        </button>
-                                                                    ) : isEditing ? (
-                                                                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openAssignModal(acc, assignment.slot_number)}>
-                                                                            배정
-                                                                        </Button>
-                                                                    ) : (
-                                                                        <span>-</span>
-                                                                    )}
-                                                                </td>
-                                                                <td>
-                                                                    <div className="flex justify-center gap-1 items-center">
-                                                                        {isEditing ? (
-                                                                            <>
-                                                                                <Button size="sm" variant="default" className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700" title="저장" onClick={() => handleSaveRow(acc.id, assignment.slot_number)}>
-                                                                                    <Save size={14} />
-                                                                                </Button>
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, assignment.slot_number)}>
-                                                                                    X
-                                                                                </Button>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, assignment.slot_number)}>
-                                                                                    <Pencil size={14} />
-                                                                                </Button>
-
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
-                                                                                    <ArrowRightLeft size={14} />
-                                                                                </Button>
-
-                                                                                {/* Deactivate Button for Expired/Active Accounts */}
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                                    <PowerOff size={14} />
-                                                                                </Button>
-
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                                    <Trash2 size={14} />
-                                                                                </Button>
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-
-                                                    {sortedAssignments.length < 6 && availableSlotNum !== -1 && (
-                                                        <tr className="border-b last:border-0 h-10 bg-blue-50/30">
-                                                            <td className="text-center font-bold text-gray-300">#{sortedAssignments.length + 1}</td>
-                                                            <td colSpan={10} className="px-4 py-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-gray-400 italic">신규 슬롯을 추가하려면 우측 &apos;배정&apos; 버튼을 클릭하세요.</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="text-center">
-                                                                <Button size="sm" variant="outline" className="h-7 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white"
-                                                                    onClick={() => openAssignModal(acc, availableSlotNum)}
-                                                                >
-                                                                    <Plus size={14} className="mr-1" /> 배정
-                                                                </Button>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-
-                                            </table>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                                        </table>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                     </div>
                 )}
             </div>
@@ -1432,12 +1805,10 @@ function TidalAccountsContent() {
                                 <span className="font-bold text-gray-500">연락처</span>
                                 <span className="col-span-2">{viewOrder.buyer_phone}</span>
                             </div>
-                            {viewOrder.user_id && (
-                                <div className="grid grid-cols-3 border-b pb-2 bg-blue-50/50">
-                                    <span className="font-bold text-blue-600">회원 ID</span>
-                                    <span className="col-span-2 font-mono text-blue-600">{viewOrder.user_id}</span>
-                                </div>
-                            )}
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">회원 ID</span>
+                                <span className="col-span-2 font-mono">{viewOrder.profiles?.email || viewOrder.user_id || '-'}</span>
+                            </div>
                             <div className="grid grid-cols-3 border-b pb-2">
                                 <span className="font-bold text-gray-500">서비스 (기간)</span>
                                 <span className="col-span-2">
@@ -1456,7 +1827,16 @@ function TidalAccountsContent() {
                             <div className="grid grid-cols-3 border-b pb-2">
                                 <span className="font-bold text-gray-500">상태</span>
                                 <span className="col-span-2">
-                                    <span className="capitalize">{viewOrder.payment_status}</span> / <span className="capitalize">{viewOrder.assignment_status}</span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${viewOrder.assignment_status === 'completed' ? 'bg-green-100 text-green-700' :
+                                        viewOrder.assignment_status === 'assigned' ? 'bg-blue-100 text-blue-700' :
+                                            viewOrder.payment_status === 'paid' ? 'bg-blue-50 text-blue-600' :
+                                                'bg-gray-100 text-gray-600'
+                                        }`}>
+                                        {getStatusLabel(viewOrder)}
+                                    </span>
+                                    <span className="ml-2 text-xs text-gray-400">
+                                        ({viewOrder.payment_status} / {viewOrder.assignment_status})
+                                    </span>
                                 </span>
                             </div>
                         </div>
@@ -1506,7 +1886,7 @@ function TidalAccountsContent() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </main>
+        </main >
     );
 }
 

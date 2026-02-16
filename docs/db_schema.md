@@ -25,6 +25,7 @@ erDiagram
         string name
         string phone
         enum role
+        text memo "Admin only"
         timestamp created_at
         timestamp updated_at
     }
