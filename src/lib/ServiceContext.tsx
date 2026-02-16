@@ -146,42 +146,57 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_OUT') {
-                // 로그아웃 이벤트 명시적 처리
-                setUser(null);
-                setIsAdmin(false);
-                localStorage.removeItem('dalbus-user');
-                localStorage.removeItem('dalbus-isAdmin');
-            } else if (session?.user) {
-                // 로그인 이벤트
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('name, email, phone, role')
-                    .eq('id', session.user.id)
-                    .single();
-
-                const userObj: User = {
-                    id: session.user.id,
-                    name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                    email: profile?.email || session.user.email || '',
-                    phone: profile?.phone || ''
-                };
-                setUser(userObj);
-                localStorage.setItem('dalbus-user', JSON.stringify(userObj));
-
-                if (profile?.role === 'admin') {
-                    setIsAdmin(true);
-                    localStorage.setItem('dalbus-isAdmin', 'true');
-                } else {
+            try {
+                if (event === 'SIGNED_OUT') {
+                    // 로그아웃 이벤트 명시적 처리
+                    setUser(null);
                     setIsAdmin(false);
+                    localStorage.removeItem('dalbus-user');
+                    localStorage.removeItem('dalbus-isAdmin');
+                } else if (session?.user) {
+                    // 로그인 이벤트
+                    const { data: profile, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('name, email, phone, role')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (profileError) {
+                        // Ignore AbortError if navigation happened during fetch
+                        if (profileError.message?.includes('AbortError') || profileError.code === 'PGRST301') {
+                            return;
+                        }
+                        console.error('Profile fetch error during auth change:', profileError);
+                    }
+
+                    const userObj: User = {
+                        id: session.user.id,
+                        name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+                        email: profile?.email || session.user.email || '',
+                        phone: profile?.phone || ''
+                    };
+                    setUser(userObj);
+                    localStorage.setItem('dalbus-user', JSON.stringify(userObj));
+
+                    if (profile?.role === 'admin') {
+                        setIsAdmin(true);
+                        localStorage.setItem('dalbus-isAdmin', 'true');
+                    } else {
+                        setIsAdmin(false);
+                        localStorage.removeItem('dalbus-isAdmin');
+                    }
+                } else {
+                    // session이 없는 경우
+                    setUser(null);
+                    setIsAdmin(false);
+                    localStorage.removeItem('dalbus-user');
                     localStorage.removeItem('dalbus-isAdmin');
                 }
-            } else {
-                // session이 없는 경우
-                setUser(null);
-                setIsAdmin(false);
-                localStorage.removeItem('dalbus-user');
-                localStorage.removeItem('dalbus-isAdmin');
+            } catch (error: any) {
+                // AbortError silent catch
+                if (error?.name !== 'AbortError' && !error?.message?.includes('aborted')) {
+                    console.error('Unexpected error in onAuthStateChange:', error);
+                }
             }
         });
 

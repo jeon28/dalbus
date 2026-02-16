@@ -34,7 +34,8 @@ export default function MyPage() {
                 assignment_status,
                 products(name),
                 product_plans(duration_months),
-                order_number
+                order_number,
+                order_accounts(end_date)
             `)
             .eq('user_id', user?.id)
             .order('created_at', { ascending: false });
@@ -47,7 +48,7 @@ export default function MyPage() {
                 return {
                     service_name: item.products?.name || 'Service',
                     duration: duration > 0 ? `${duration}개월` : '-',
-                    end_date: item.end_date || '-', // end_date is on order in v2
+                    end_date: item.order_accounts?.[0]?.end_date || '-',
                     account_id: '계정 정보 확인 중', // In a full impl, we'd join order_accounts -> accounts
                     account_pw: '계정 정보 확인 중',
                     status: item.assignment_status

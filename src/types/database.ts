@@ -172,6 +172,11 @@ export interface Database {
           buyer_name: string | null
           buyer_phone: string | null
           buyer_email: string | null
+          order_number: string | null
+          start_date: string | null
+          end_date: string | null
+          assigned_at: string | null
+          account_id: string
         }
         Insert: {
           account_id: string
@@ -185,6 +190,9 @@ export interface Database {
           buyer_name?: string | null
           buyer_phone?: string | null
           buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
         }
         Update: {
           account_id?: string
@@ -198,6 +206,9 @@ export interface Database {
           buyer_name?: string | null
           buyer_phone?: string | null
           buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
         }
         Relationships: [
           {
@@ -220,7 +231,6 @@ export interface Database {
           assigned_at: string | null
           assignment_status: 'waiting' | 'assigned' | 'expired' | 'replaced'
           created_at: string
-          end_date: string | null
           id: string
           order_number: string
           paid_at: string | null
@@ -228,15 +238,15 @@ export interface Database {
           plan_id: string
           portone_payment_id: string | null
           product_id: string
-          start_date: string | null
           user_id: string
+          order_type: 'NEW' | 'EXT'
+          related_order_id: string | null
         }
         Insert: {
           amount: number
           assigned_at?: string | null
           assignment_status?: 'waiting' | 'assigned' | 'expired' | 'replaced'
           created_at?: string
-          end_date?: string | null
           id?: string
           order_number?: string
           paid_at?: string | null
@@ -244,15 +254,15 @@ export interface Database {
           plan_id: string
           portone_payment_id?: string | null
           product_id: string
-          start_date?: string | null
           user_id: string
+          order_type?: 'NEW' | 'EXT'
+          related_order_id?: string | null
         }
         Update: {
           amount?: number
           assigned_at?: string | null
           assignment_status?: 'waiting' | 'assigned' | 'expired' | 'replaced'
           created_at?: string
-          end_date?: string | null
           id?: string
           order_number?: string
           paid_at?: string | null
@@ -260,8 +270,9 @@ export interface Database {
           plan_id?: string
           portone_payment_id?: string | null
           product_id?: string
-          start_date?: string | null
           user_id?: string
+          order_type?: 'NEW' | 'EXT'
+          related_order_id?: string | null
         }
         Relationships: [
           {
@@ -421,6 +432,7 @@ export interface Database {
       notification_channel: 'sms' | 'alimtalk'
       notification_status: 'pending' | 'sent' | 'failed'
       notification_type: 'assignment' | 'expiry_d7' | 'expiry_d1' | 'replacement' | 'delay'
+      order_type: 'NEW' | 'EXT'
       payment_status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded'
       user_role: 'user' | 'admin'
     }

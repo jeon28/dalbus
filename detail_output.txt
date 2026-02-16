@@ -1,0 +1,28 @@
+--- 1. Orders without order_type ---
+null
+
+--- 2. Extension orders missing related_order_id ---
+[]
+
+--- 3. Duplicate Slot Assignments ---
+[
+  [
+    "92bede0a-bfdb-4ff1-91ad-c533ef74c9ab_null",
+    [
+      {
+        "id": "583ef868-a892-4dd6-b892-23879b54e486",
+        "account_id": "92bede0a-bfdb-4ff1-91ad-c533ef74c9ab",
+        "slot_number": null,
+        "buyer_name": null,
+        "order_id": "2c9c9243-4f9a-410c-ba90-1a5f47b156e1"
+      },
+      {
+        "id": "f18965e1-cb4b-4b1d-ace1-f1b5f867b39d",
+        "account_id": "92bede0a-bfdb-4ff1-91ad-c533ef74c9ab",
+        "slot_number": null,
+        "buyer_name": null,
+        "order_id": "2c9c9243-4f9a-410c-ba90-1a5f47b156e1"
+      }
+    ]
+  ]
+]

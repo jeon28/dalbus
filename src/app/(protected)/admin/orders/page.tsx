@@ -12,6 +12,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -23,17 +24,19 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { CheckCircle2, Circle, HelpCircle, Timer, Download } from "lucide-react";
+import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
-import { differenceInMonths, parseISO } from 'date-fns';
+import { addMonths, differenceInMonths, format, parseISO } from 'date-fns';
 
 
 export default function OrderHistoryPage() {
-    const { isAdmin } = useServices();
+    const { isAdmin, isHydrated } = useServices();
     const [orders, setOrders] = useState<Record<string, any>[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+    const [selectedOrderTypes, setSelectedOrderTypes] = useState<string[]>([]);
     const [phoneSearch, setPhoneSearch] = useState<string>('');
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: 'created_at', direction: 'desc' });
     const router = useRouter();
 
     const statuses = [
@@ -59,20 +62,44 @@ export default function OrderHistoryPage() {
         },
     ]
 
+    const orderTypes = [
+        {
+            value: "NEW",
+            label: "신규",
+        },
+        {
+            value: "EXT",
+            label: "연장",
+        },
+    ]
+
     // Matching Modal State
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [availableAccounts, setAvailableAccounts] = useState<any[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
+    const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
+    const [previousAssignment, setPreviousAssignment] = useState<any>(null);
+    const [extDuration, setExtDuration] = useState<number>(7);
+    const [extEndDate, setExtEndDate] = useState<string>('');
+
+    // New Order Assignment State
+    const [newTidalId, setNewTidalId] = useState('');
+    const [newTidalPw, setNewTidalPw] = useState('');
+    const [newStartDate, setNewStartDate] = useState('');
+    const [newEndDate, setNewEndDate] = useState('');
+    const [newDuration, setNewDuration] = useState<number>(1);
+    const [newBuyerName, setNewBuyerName] = useState('');
+    const [newBuyerEmail, setNewBuyerEmail] = useState('');
 
     useEffect(() => {
-        if (!isAdmin) {
+        if (isHydrated && !isAdmin) {
             router.push('/admin');
-        } else {
+        } else if (isHydrated && isAdmin) {
             fetchOrders();
         }
-    }, [isAdmin, router]);
+    }, [isAdmin, isHydrated, router]);
 
     const fetchOrders = async () => {
         try {
@@ -97,6 +124,7 @@ export default function OrderHistoryPage() {
         const memberData = memberOrders.map(order => ({
             '날짜': new Date(order.created_at).toLocaleDateString(),
             '주문번호': order.order_number,
+            '구분': order.order_type === 'NEW' ? '신규' : '연장',
             '고객명': order.profiles?.name || order.buyer_name || 'Unknown',
             '이메일': order.profiles?.email || order.buyer_email || '-',
             '연락처': order.profiles?.phone || order.buyer_phone || '-',
@@ -110,6 +138,7 @@ export default function OrderHistoryPage() {
         const guestData = guestOrders.map(order => ({
             '날짜': new Date(order.created_at).toLocaleDateString(),
             '주문번호': order.order_number,
+            '구분': order.order_type === 'NEW' ? '신규' : '연장',
             '고객명': order.profiles?.name || order.buyer_name || 'Unknown',
             '이메일': order.profiles?.email || order.buyer_email || '-',
             '연락처': order.profiles?.phone || order.buyer_phone || '-',
@@ -138,29 +167,136 @@ export default function OrderHistoryPage() {
     const handleOpenMatchModal = async (order: any) => {
         setSelectedOrder(order);
         setSelectedAccount('');
+        setSelectedSlot(null);
         setSlotPasswordModal('');
+        setPreviousAssignment(null);
 
-        // Fetch available accounts
+        // Reset New Order States
+        setNewTidalId('');
+        setNewTidalPw('');
+        setNewStartDate('');
+        setNewEndDate('');
+        setNewDuration(order.product_plans?.duration_months || 1);
+        setNewBuyerName(order.profiles?.name || order.buyer_name || '');
+        setNewBuyerEmail(order.profiles?.email || order.buyer_email || '');
+
+        let prev = null;
+
+        // 1. If it's an extension, find the assignment of the related order
+        if (order.order_type === 'EXT') {
+            try {
+                // Try finding by related_order_id first, then fallback to buyer_email
+                const lookupId = order.related_order_id || order.id;
+                const res = await fetch(`/api/admin/orders/${lookupId}/assignment`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.assignment) {
+                        prev = data.assignment;
+                        setPreviousAssignment(prev);
+                        console.log('Found previous assignment:', prev);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch previous assignment:', error);
+            }
+        }
+
+        // 2. Fetch available accounts
         try {
             const res = await fetch('/api/admin/accounts');
             if (res.ok) {
                 const data = await res.json();
+
                 // Filter accounts with available slots
-                const available = data.filter((acc: any) => acc.used_slots < acc.max_slots);
+                // Note: For extensions, the account of the previous assignment should be included even if it's full (since we'll be re-using a slot)
+                let available = data.filter((acc: any) => acc.used_slots < acc.max_slots);
+
+                if (prev) {
+                    const alreadyIn = available.some((acc: any) => acc.id === prev.account_id);
+                    if (!alreadyIn) {
+                        const prevAcc = data.find((acc: any) => acc.id === prev.account_id);
+                        if (prevAcc) {
+                            available = [prevAcc, ...available];
+                        }
+                    }
+                }
 
                 // Sort by master account expiry date (end_date)
                 available.sort((a: any, b: any) => {
                     const getExpiry = (acc: any) => {
                         const masterSlot = acc.order_accounts?.find((oa: any) => oa.type === 'master');
-                        return masterSlot?.orders?.end_date || '9999-12-31';
+                        return masterSlot?.end_date || '9999-12-31';
                     };
                     return getExpiry(b).localeCompare(getExpiry(a));
                 });
 
                 setAvailableAccounts(available);
+
+                // Set selected account and slot if it's an extension
+                if (prev) {
+                    // Set default extension duration/expiry
+                    const duration = 7; // Default as requested
+                    setExtDuration(duration);
+
+                    if (prev.end_date || prev.orders?.end_date) {
+                        try {
+                            const currentEnd = parseISO(prev.end_date || prev.orders.end_date);
+                            const newEnd = format(addMonths(currentEnd, duration), 'yyyy-MM-dd');
+                            setExtEndDate(newEnd);
+                        } catch (e) {
+                            console.error('Date calculation error:', e);
+                        }
+                    }
+
+                    // Use timeout to ensure state is processed and Select component is ready
+                    setTimeout(() => {
+                        setSelectedAccount(prev.account_id);
+                        setSelectedSlot(prev.slot_number);
+                        console.log('Set selected account and slot:', prev.account_id, prev.slot_number);
+                    }, 0);
+                } else {
+                    // Pre-calculate for NEW order
+                    const email = order.profiles?.email || order.buyer_email || '';
+                    const phone = order.profiles?.phone || order.buyer_phone || '';
+                    const duration = order.product_plans?.duration_months || 1;
+                    const start = format(new Date(), 'yyyy-MM-dd');
+                    const end = format(addMonths(parseISO(start), duration), 'yyyy-MM-dd');
+
+                    setNewStartDate(start);
+                    setNewEndDate(end);
+                    setNewDuration(duration);
+
+                    // Generate Password from phone (last 8 digits or padded)
+                    const purePhone = phone.replace(/[^0-9]/g, '');
+                    const generatedPw = purePhone.length >= 8 ? purePhone.slice(-8) : purePhone.padEnd(8, '0');
+                    setNewTidalPw(generatedPw);
+
+                    // Generate Unique Tidal ID
+                    if (email) {
+                        const prefix = email.split('@')[0];
+                        let finalId = `${prefix}@hifitidal.com`;
+
+                        // Check for duplicates across ALL accounts' slots
+                        const allTakenIds = new Set<string>();
+                        data.forEach((acc: any) => {
+                            acc.order_accounts?.forEach((oa: any) => {
+                                if (oa.tidal_id) allTakenIds.add(oa.tidal_id.toLowerCase());
+                            });
+                        });
+
+                        let counter = 1;
+                        while (allTakenIds.has(finalId.toLowerCase())) {
+                            finalId = `${prefix}${counter}@hifitidal.com`;
+                            counter++;
+                        }
+                        setNewTidalId(finalId);
+                    }
+                }
+
                 setIsMatchModalOpen(true);
             }
-        } catch {
+        } catch (error) {
+            console.error('Failed to fetch available accounts:', error);
             alert('계정 목록 불러오기 실패');
         }
     };
@@ -172,12 +308,12 @@ export default function OrderHistoryPage() {
         }
 
         const tidalId = masterSlot.tidal_id || '';
-        const endDate = masterSlot.orders.end_date || '';
+        const endDate = masterSlot.end_date || '';
         let duration = '';
 
-        if (masterSlot.orders.start_date) {
+        if (masterSlot.start_date) {
             try {
-                const startDate = parseISO(masterSlot.orders.start_date);
+                const startDate = parseISO(masterSlot.start_date);
                 const now = new Date();
                 const months = differenceInMonths(now, startDate);
                 duration = `${months}개월`;
@@ -206,13 +342,16 @@ export default function OrderHistoryPage() {
     const confirmMatch = async () => {
         if (!selectedOrder || !selectedAccount) return;
 
-        // 자동으로 가장 낮은 번호의 빈 슬롯 선택
-        const availableSlots = getAvailableSlots(selectedAccount);
-        if (availableSlots.length === 0) {
-            alert('사용 가능한 슬롯이 없습니다.');
-            return;
+        // 자동으로 가장 낮은 번호의 빈 슬롯 선택 (단, 연장인 경우 기존 슬롯 고수)
+        let targetSlot = selectedSlot;
+        if (targetSlot === null) {
+            const availableSlots = getAvailableSlots(selectedAccount);
+            if (availableSlots.length === 0) {
+                alert('사용 가능한 슬롯이 없습니다.');
+                return;
+            }
+            targetSlot = availableSlots[0]; // 가장 낮은 번호 선택
         }
-        const autoSelectedSlot = availableSlots[0]; // 가장 낮은 번호 선택
 
         try {
             const res = await fetch(`/api/admin/accounts/${selectedAccount}/assign`, {
@@ -220,19 +359,31 @@ export default function OrderHistoryPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     order_id: selectedOrder.id,
-                    slot_number: autoSelectedSlot,
-                    tidal_password: slotPasswordModal
+                    slot_number: targetSlot,
+                    tidal_password: selectedOrder.order_type === 'NEW' ? newTidalPw : slotPasswordModal,
+                    tidal_id: selectedOrder.order_type === 'NEW' ? newTidalId : undefined,
+                    buyer_name: selectedOrder.order_type === 'NEW' ? newBuyerName : undefined,
+                    buyer_phone: undefined, // Already in order
+                    buyer_email: selectedOrder.order_type === 'NEW' ? newBuyerEmail : undefined,
+                    start_date: selectedOrder.order_type === 'NEW' ? newStartDate : undefined,
+                    end_date: selectedOrder.order_type === 'NEW' ? newEndDate : extEndDate
                 })
             });
-            if (!res.ok) throw new Error('Match failed');
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Match failed');
+            }
 
             alert('배정되었습니다.');
             setIsMatchModalOpen(false);
 
-            // Tidal 계정 관리 페이지로 이동 (배정된 계정 자동 expand)
-            router.push(`/admin/tidal?accountId=${selectedAccount}`);
-        } catch {
-            alert('배정 실패');
+            // Tidal 계정 관리 페이지를 새 탭으로 열기
+            window.open(`/admin/tidal?accountId=${selectedAccount}`, '_blank');
+
+            // 주문 목록 새로고침
+            fetchOrders();
+        } catch (error: any) {
+            alert(error.message || '배정 실패');
         }
     };
 
@@ -302,6 +453,48 @@ export default function OrderHistoryPage() {
         }
     };
 
+    const handleDeleteOrder = async (order: any) => {
+        if (order.order_accounts && order.order_accounts.length > 0) {
+            alert('배정된 계정이 있는 주문은 삭제할 수 없습니다. 먼저 배정 취소를 해주세요.');
+            return;
+        }
+
+        if (!confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'}) 내역을 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/admin/orders/${order.id}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || '삭제 실패');
+            }
+
+            alert('삭제되었습니다.');
+            fetchOrders();
+        } catch (error: any) {
+            alert(error.message);
+        }
+    };
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' | null = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+            direction = null;
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: string) => {
+        if (sortConfig.key !== key || !sortConfig.direction) return <ArrowUpDown className="ml-1 h-3 w-3" />;
+        return sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />;
+    };
+
     if (!isAdmin) return null;
 
     const renderTable = (list: any[]) => (
@@ -309,12 +502,19 @@ export default function OrderHistoryPage() {
             <table className={styles.table}>
                 <thead>
                     <tr>
-                        <th>날짜/주문번호</th>
-                        <th>고객명</th>
+                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center">날짜/주문번호 {getSortIcon('created_at')}</div>
+                        </th>
+                        <th>구분</th>
+                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center">고객명 {getSortIcon('name')}</div>
+                        </th>
                         <th>연락처/이메일</th>
                         <th>서비스</th>
                         <th>금액</th>
-                        <th>상태</th>
+                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center">상태 {getSortIcon('status')}</div>
+                        </th>
                         <th>관리</th>
                     </tr>
                 </thead>
@@ -326,6 +526,12 @@ export default function OrderHistoryPage() {
                                 <td>
                                     <div className="text-sm">{new Date(o.created_at).toLocaleDateString()}</div>
                                     <div className="text-xs text-gray-500">{o.order_number}</div>
+                                </td>
+                                <td>
+                                    <span className={`px-2 py-1 rounded text-xs font-medium
+                                        ${o.order_type === 'NEW' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'}`}>
+                                        {o.order_type === 'NEW' ? '신규' : '연장'}
+                                    </span>
                                 </td>
                                 <td>
                                     <div className="font-medium">{o.profiles?.name || o.buyer_name || 'Unknown'}</div>
@@ -369,6 +575,9 @@ export default function OrderHistoryPage() {
                                                 <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)}>배정취소</Button>
                                             </>
                                         )}
+                                        {o.order_accounts?.length === 0 && (
+                                            <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)}>삭제</Button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -386,6 +595,14 @@ export default function OrderHistoryPage() {
             if (!selectedStatuses.includes(status)) return false;
         }
 
+        // Order Type filter
+        if (selectedOrderTypes.length > 0) {
+            // If order_type is null/undefined (old data), treat as NEW or handle as needed. 
+            // For now, let's assume valid data or default 'NEW' from DB.
+            const type = order.order_type || 'NEW';
+            if (!selectedOrderTypes.includes(type)) return false;
+        }
+
         // Phone number filter
         if (phoneSearch) {
             const phone = order.profiles?.phone || order.buyer_phone || '';
@@ -393,6 +610,26 @@ export default function OrderHistoryPage() {
         }
 
         return true;
+    }).sort((a, b) => {
+        if (!sortConfig.direction || !sortConfig.key) return 0;
+
+        let aValue: any;
+        let bValue: any;
+
+        if (sortConfig.key === 'created_at') {
+            aValue = new Date(a.created_at).getTime();
+            bValue = new Date(b.created_at).getTime();
+        } else if (sortConfig.key === 'name') {
+            aValue = a.profiles?.name || a.buyer_name || '';
+            bValue = b.profiles?.name || b.buyer_name || '';
+        } else if (sortConfig.key === 'status') {
+            aValue = getOrderStatus(a);
+            bValue = getOrderStatus(b);
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
     });
 
     const memberOrders = filteredOrders.filter(o => !o.is_guest);
@@ -420,6 +657,12 @@ export default function OrderHistoryPage() {
                             className="max-w-xs"
                         />
                         <DataTableFacetedFilter
+                            title="구분"
+                            options={orderTypes}
+                            selectedValues={selectedOrderTypes}
+                            setFilter={setSelectedOrderTypes}
+                        />
+                        <DataTableFacetedFilter
                             title="Status"
                             options={statuses}
                             selectedValues={selectedStatuses}
@@ -440,27 +683,227 @@ export default function OrderHistoryPage() {
 
             <Dialog open={isMatchModalOpen} onOpenChange={setIsMatchModalOpen}>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>계정 배정</DialogTitle></DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">마스터 계정</Label>
-                            <Select onValueChange={setSelectedAccount} value={selectedAccount}>
-                                <SelectTrigger className="col-span-3"><SelectValue placeholder="마스터 계정 선택" /></SelectTrigger>
-                                <SelectContent>
-                                    {availableAccounts.map(acc => (
-                                        <SelectItem key={acc.id} value={acc.id}>
-                                            <div className="text-xs">
-                                                {acc.login_id}/{getMasterInfo(acc)}/잔여 {acc.max_slots - acc.used_slots}
+                    <DialogHeader>
+                        <DialogTitle>계정 배정</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            주문에 마스터 계정과 슬롯을 배정합니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-2 space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                        {previousAssignment ? (
+                            <div className="space-y-4">
+                                {/* 1. Master Account Info */}
+                                <div className="space-y-2">
+                                    <h3 className="text-sm font-bold flex items-center gap-2">
+                                        <div className="w-1 h-4 bg-blue-500 rounded-full" />
+                                        마스터 계정
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-sm">
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">결제계좌:</span>
+                                            <span className="font-semibold text-blue-700 truncate">{previousAssignment.accounts?.login_id || '-'}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">잔여개월수:</span>
+                                            <span className="font-semibold text-blue-700">{previousAssignment.accounts?.memo || '0개월'}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">잔여 slot:</span>
+                                            <span className="font-semibold text-blue-700">{(previousAssignment.accounts?.max_slots || 0) - (previousAssignment.accounts?.used_slots || 0)}개</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 2. Extension Order Info */}
+                                <div className="space-y-2">
+                                    <h3 className="text-sm font-bold flex items-center gap-2 text-orange-600">
+                                        <div className="w-1 h-4 bg-orange-500 rounded-full" />
+                                        연장 주문
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs bg-orange-50/30 p-4 rounded-xl border border-orange-100 shadow-sm">
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">Tidal ID:</span>
+                                            <span className="font-semibold text-orange-800">{previousAssignment.tidal_id || '-'}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">이름:</span>
+                                            <span className="font-semibold text-orange-800">{selectedOrder?.profiles?.name || selectedOrder?.buyer_name || '-'}</span>
+                                        </div>
+                                        <div className="col-span-2 flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">이메일:</span>
+                                            <span className="font-semibold text-orange-800 truncate">{selectedOrder?.profiles?.email || selectedOrder?.buyer_email || '-'}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">가입일:</span>
+                                            <span className="font-medium">{previousAssignment.start_date || '-'}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-600 font-medium shrink-0">종료예정일:</span>
+                                            <span className="font-bold text-orange-600 underline">
+                                                {previousAssignment.end_date || '-'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-gray-500 shrink-0">개월:</span>
+                                            <span className="font-medium">{previousAssignment.orders?.product_plans?.duration_months || '-'}개월</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 3. Change Info (Active Modification) */}
+                                <div className="space-y-2 pt-2 border-t border-dashed">
+                                    <h3 className="text-sm font-bold flex items-center gap-2 text-green-700">
+                                        <div className="w-1 h-4 bg-green-600 rounded-full" />
+                                        변경 정보
+                                    </h3>
+                                    <div className="space-y-4 bg-green-50/20 p-4 rounded-xl border border-green-100/50 shadow-inner">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <Label className="text-xs font-semibold text-gray-600">개월수 변경</Label>
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    type="number"
+                                                    value={extDuration}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value) || 0;
+                                                        setExtDuration(val);
+                                                        const baseDate = previousAssignment.end_date;
+                                                        if (baseDate) {
+                                                            try {
+                                                                const newEnd = format(addMonths(parseISO(baseDate), val), 'yyyy-MM-dd');
+                                                                setExtEndDate(newEnd);
+                                                            } catch (err) {
+                                                                console.error('Calc Error:', err);
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="w-24 h-9 text-center font-bold text-green-700 border-green-200 focus:ring-green-500"
+                                                />
+                                                <span className="text-xs font-medium text-gray-500">개월</span>
                                             </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {selectedAccount && (
-                            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
-                                💡 슬롯은 가장 낮은 번호의 빈 슬롯으로 자동 배정됩니다.
+                                        </div>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <Label className="text-xs font-semibold text-gray-600">수정 종료일</Label>
+                                            <Input
+                                                type="date"
+                                                value={extEndDate}
+                                                onChange={(e) => setExtEndDate(e.target.value)}
+                                                className="w-40 h-9 text-sm font-semibold text-green-700 border-green-200 focus:ring-green-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">마스터 계정</Label>
+                                    <Select onValueChange={setSelectedAccount} value={selectedAccount}>
+                                        <SelectTrigger className="col-span-3"><SelectValue placeholder="마스터 계정 선택" /></SelectTrigger>
+                                        <SelectContent>
+                                            {availableAccounts.map(acc => (
+                                                <SelectItem key={acc.id} value={acc.id}>
+                                                    <div className="text-xs">
+                                                        {acc.login_id}/{getMasterInfo(acc)}/잔여 {acc.max_slots - acc.used_slots}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {selectedAccount && (
+                                    <>
+                                        {/* New Order Info Section */}
+                                        <div className="space-y-2 pt-2 border-t border-dashed">
+                                            <h3 className="text-sm font-bold flex items-center gap-2 text-purple-600">
+                                                <div className="w-1 h-4 bg-purple-500 rounded-full" />
+                                                신규 고객 정보
+                                            </h3>
+                                            <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs bg-purple-50/30 p-4 rounded-xl border border-purple-100 shadow-sm">
+                                                <div className="col-span-2 space-y-1">
+                                                    <Label className="text-[10px] text-gray-400">Tidal ID</Label>
+                                                    <Input
+                                                        value={newTidalId}
+                                                        onChange={(e) => setNewTidalId(e.target.value)}
+                                                        className="h-8 text-xs font-semibold text-purple-800"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] text-gray-400">비밀번호</Label>
+                                                    <Input
+                                                        value={newTidalPw}
+                                                        onChange={(e) => setNewTidalPw(e.target.value)}
+                                                        className="h-8 text-xs font-semibold"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] text-gray-400">이름</Label>
+                                                    <Input
+                                                        value={newBuyerName}
+                                                        onChange={(e) => setNewBuyerName(e.target.value)}
+                                                        className="h-8 text-xs font-semibold"
+                                                    />
+                                                </div>
+                                                <div className="col-span-2 space-y-1">
+                                                    <Label className="text-[10px] text-gray-400">이메일</Label>
+                                                    <Input
+                                                        value={newBuyerEmail}
+                                                        onChange={(e) => setNewBuyerEmail(e.target.value)}
+                                                        className="h-8 text-xs font-semibold"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] text-gray-400">가입일</Label>
+                                                    <Input
+                                                        type="date"
+                                                        value={newStartDate}
+                                                        onChange={(e) => {
+                                                            const start = e.target.value;
+                                                            setNewStartDate(start);
+                                                            try {
+                                                                const end = format(addMonths(parseISO(start), newDuration), 'yyyy-MM-dd');
+                                                                setNewEndDate(end);
+                                                            } catch (err) { console.error(err); }
+                                                        }}
+                                                        className="h-8 text-xs font-medium"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] text-gray-400 text-purple-600 font-bold">종료예정일</Label>
+                                                    <Input
+                                                        type="date"
+                                                        value={newEndDate}
+                                                        onChange={(e) => setNewEndDate(e.target.value)}
+                                                        className="h-8 text-xs font-bold text-purple-700 bg-white"
+                                                    />
+                                                </div>
+                                                <div className="col-span-2 flex items-center justify-between gap-4 pt-1">
+                                                    <Label className="text-[10px] text-gray-400">개월수</Label>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            value={newDuration}
+                                                            onChange={(e) => {
+                                                                const val = parseInt(e.target.value) || 0;
+                                                                setNewDuration(val);
+                                                                try {
+                                                                    const end = format(addMonths(parseISO(newStartDate), val), 'yyyy-MM-dd');
+                                                                    setNewEndDate(end);
+                                                                } catch (err) { console.error(err); }
+                                                            }}
+                                                            className="w-16 h-7 text-center text-xs font-bold text-purple-700"
+                                                        />
+                                                        <span className="text-[10px] text-gray-500">개월</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-[11px] text-gray-500 bg-blue-50/50 p-2 rounded-md flex items-start gap-1.5 border border-blue-100/50">
+                                            <HelpCircle className="w-3.5 h-3.5 text-blue-400 mt-0.5" />
+                                            <span>슬롯은 가장 낮은 번호의 빈 슬롯으로 자동 배정됩니다.</span>
+                                        </div>
+                                    </>
+                                )}
+                            </>
                         )}
                     </div>
                     <DialogFooter>

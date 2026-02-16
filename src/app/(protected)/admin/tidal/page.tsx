@@ -37,6 +37,8 @@ interface Assignment {
     buyer_phone?: string;
     buyer_email?: string;
     order_number?: string;
+    start_date?: string;
+    end_date?: string;
 }
 
 interface Account {
@@ -61,8 +63,6 @@ interface Order {
     amount?: number;
     payment_status?: string;
     assignment_status?: string;
-    start_date: string;
-    end_date: string;
     created_at: string;
     user_id?: string;
     products?: {
@@ -86,7 +86,7 @@ interface GridValue {
 }
 
 function TidalAccountsContent() {
-    const { isAdmin } = useServices();
+    const { isAdmin, isHydrated } = useServices();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -173,18 +173,19 @@ function TidalAccountsContent() {
     };
 
     useEffect(() => {
-        if (!isAdmin) {
+        if (isHydrated && !isAdmin) {
             router.push('/admin');
-        } else {
+        } else if (isHydrated && isAdmin) {
             fetchAccounts();
             fetchPendingOrders();
         }
-    }, [isAdmin, router]);
+    }, [isAdmin, isHydrated, router]);
 
     // URL에서 accountId 읽어서 해당 계정 자동 expand
     useEffect(() => {
         const accountId = searchParams.get('accountId');
         if (accountId && accounts.length > 0) {
+            console.log('Detected accountId in URL, expanding group:', accountId);
             // 해당 계정을 expandedRows에 추가
             setExpandedRows(prev => {
                 const newSet = new Set(prev);
@@ -192,18 +193,25 @@ function TidalAccountsContent() {
                 return newSet;
             });
 
-            // 해당 계정으로 스크롤
-            setTimeout(() => {
+            // 해당 계정으로 스크롤 및 하이라이트
+            const scrollToAndHighlight = () => {
                 const element = document.getElementById(`account-${accountId}`);
                 if (element) {
                     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     // 하이라이트 효과
-                    element.classList.add('bg-blue-50');
+                    element.style.transition = 'background-color 0.5s ease-in-out';
+                    element.style.backgroundColor = '#e0f2fe'; // blue-100
+
                     setTimeout(() => {
-                        element.classList.remove('bg-blue-50');
-                    }, 2000);
+                        element.style.backgroundColor = '';
+                    }, 3000);
+                } else {
+                    // If element not found yet, retry once
+                    setTimeout(scrollToAndHighlight, 500);
                 }
-            }, 300);
+            };
+
+            setTimeout(scrollToAndHighlight, 500);
         }
     }, [searchParams, accounts]);
 
@@ -234,8 +242,8 @@ function TidalAccountsContent() {
                         buyer_name: assignment?.buyer_name || assignment?.orders?.buyer_name || assignment?.orders?.profiles?.name || '',
                         buyer_phone: assignment?.buyer_phone || assignment?.orders?.buyer_phone || assignment?.orders?.profiles?.phone || '',
                         buyer_email: assignment?.buyer_email || assignment?.orders?.buyer_email || '',
-                        start_date: assignment?.orders?.start_date || '',
-                        end_date: assignment?.orders?.end_date || '',
+                        start_date: assignment?.start_date || '',
+                        end_date: assignment?.end_date || '',
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'), // Slot 1 defaults to master, others to user
                     };
@@ -280,12 +288,12 @@ function TidalAccountsContent() {
         }
 
         const tidalId = masterSlot.tidal_id || '';
-        const endDate = masterSlot.orders.end_date || '';
+        const endDate = masterSlot.end_date || '';
         let duration = '';
 
-        if (masterSlot.orders.start_date) {
+        if (masterSlot.start_date) {
             try {
-                const startDate = parseISO(masterSlot.orders.start_date);
+                const startDate = parseISO(masterSlot.start_date);
                 const now = new Date();
                 const months = differenceInMonths(now, startDate);
                 duration = `${months}개월`;
@@ -582,8 +590,8 @@ function TidalAccountsContent() {
                     '주문번호': order?.order_number || '',
                     '소속 ID': assignment.tidal_id || '',
                     '소속 PW': assignment.tidal_password || '',
-                    '시작일': order?.start_date ? new Date(order.start_date).toLocaleDateString() : '',
-                    '종료일': order?.end_date ? new Date(order.end_date).toLocaleDateString() : '',
+                    '시작일': assignment.start_date ? new Date(assignment.start_date).toLocaleDateString() : '',
+                    '종료일': assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : '',
                 });
             });
         });
@@ -678,8 +686,8 @@ function TidalAccountsContent() {
                 buyer_name: order.buyer_name || order.profiles?.name || '',
                 buyer_email: order.buyer_email || '',
                 buyer_phone: order.buyer_phone || order.profiles?.phone || '',
-                start_date: order.start_date || '',
-                end_date: order.end_date || '',
+                start_date: (order as any).start_date || '',
+                end_date: (order as any).end_date || '',
                 order_number: order.order_number || '',
                 tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : null,
                 tidal_password: slotPasswordModal || '',
@@ -774,8 +782,8 @@ function TidalAccountsContent() {
             .sort((a, b) => {
                 if (a.type === 'master') return -1;
                 if (b.type === 'master') return 1;
-                const dateA = a.orders?.end_date || '9999-12-31';
-                const dateB = b.orders?.end_date || '9999-12-31';
+                const dateA = a.end_date || '9999-12-31';
+                const dateB = b.end_date || '9999-12-31';
                 return dateA.localeCompare(dateB);
             });
     };
@@ -844,10 +852,10 @@ function TidalAccountsContent() {
 
                                     return sortedAssignments.map((assignment, idx) => {
                                         let period = '-';
-                                        if (assignment.orders?.start_date && assignment.orders?.end_date) {
+                                        if (assignment.start_date && assignment.end_date) {
                                             try {
-                                                const start = parseISO(assignment.orders.start_date);
-                                                const end = parseISO(assignment.orders.end_date);
+                                                const start = parseISO(assignment.start_date);
+                                                const end = parseISO(assignment.end_date);
                                                 const diff = differenceInMonths(end, start);
                                                 if (diff > 0) period = `${diff}`;
                                             } catch { }
@@ -865,8 +873,8 @@ function TidalAccountsContent() {
                                                 <td className="p-2 border-r">{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</td>
                                                 <td className="p-2 border-r">{assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}</td>
                                                 <td className="p-2 text-center border-r">{assignment.order_number || assignment.orders?.order_number || '-'}</td>
-                                                <td className="p-2 text-center border-r">{assignment.orders?.start_date ? format(parseISO(assignment.orders.start_date), 'yyyy-MM-dd') : '-'}</td>
-                                                <td className="p-2 text-center border-r">{assignment.orders?.end_date ? format(parseISO(assignment.orders.end_date), 'yyyy-MM-dd') : '-'}</td>
+                                                <td className="p-2 text-center border-r">{assignment.start_date ? format(parseISO(assignment.start_date), 'yyyy-MM-dd') : '-'}</td>
+                                                <td className="p-2 text-center border-r">{assignment.end_date ? format(parseISO(assignment.end_date), 'yyyy-MM-dd') : '-'}</td>
                                                 <td className="p-2 text-center border-r">{period}</td>
                                                 <td className="p-2 text-center border-r">
                                                     <span className={`px-1 rounded ${assignment.type === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}>
@@ -1301,9 +1309,9 @@ function TidalAccountsContent() {
                                 <span className="font-bold text-gray-500">서비스 (기간)</span>
                                 <span className="col-span-2">
                                     {viewOrder.products?.name}
-                                    {viewOrder.start_date && viewOrder.end_date && (
+                                    {(viewOrder as any).start_date && (viewOrder as any).end_date && (
                                         <span className="ml-1 text-blue-600">
-                                            ({differenceInMonths(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date))}개월)
+                                            ({differenceInMonths(parseISO((viewOrder as any).end_date), parseISO((viewOrder as any).start_date))}개월)
                                         </span>
                                     )}
                                 </span>

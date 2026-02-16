@@ -101,6 +101,13 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [bankAccounts, setBankAccounts] = useState<any[]>([]);
     const [selectedBankId, setSelectedBankId] = useState<string>('');
 
+    // Extension Flow State
+    const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
+    const [lookupLoading, setLookupLoading] = useState(false);
+    const [lookupResults, setLookupResults] = useState<any[]>([]);
+    const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+    const [lookupMessage, setLookupMessage] = useState('');
+
     useEffect(() => {
         const fetchBanks = async () => {
             try {
@@ -187,6 +194,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             buyer_phone: guestInfo.phone,
             buyer_email: guestInfo.email,
             depositor_name: guestInfo.depositor,
+            order_type: orderMode,
+            related_order_id: selectedOrder?.id || null,
         };
 
         if (user) {
@@ -232,7 +241,54 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     };
 
+
+
     if (!product) return <div className="container py-20 text-center">Loading...</div>;
+
+    const handleLookup = async () => {
+        if (!guestInfo.name || !guestInfo.phone) {
+            alert('이름과 전화번호를 입력해주세요.');
+            return;
+        }
+
+        setLookupLoading(true);
+        setLookupMessage('');
+        setLookupResults([]);
+        setSelectedOrder(null);
+
+        try {
+            const res = await fetch('/api/orders/lookup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: guestInfo.name, phone: guestInfo.phone })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                // Filter orders for the current product
+                const filtered = (data.orders || []).filter((o: any) => o.products?.name === product.name);
+                setLookupResults(filtered);
+                if (filtered.length === 0) {
+                    setLookupMessage('연장 가능한 주문 내역이 없습니다.');
+                }
+            } else {
+                setLookupMessage('조회 중 오류가 발생했습니다.');
+            }
+        } catch (err) {
+            console.error('Lookup failed:', err);
+            setLookupMessage('조회에 실패했습니다.');
+        } finally {
+            setLookupLoading(false);
+        }
+    };
+
+    const handleSelectOrderForExtension = (order: any) => {
+        setSelectedOrder(order);
+        // Pre-fill email if available
+        if (order.buyer_email) {
+            setGuestInfo(prev => ({ ...prev, email: order.buyer_email }));
+        }
+    };
 
     // Use selected plan price for display
     const currentPlan = plans.find(p => p.duration_months === selectedPeriod);
@@ -312,29 +368,119 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
                 {/* Checkout Form (Unified for Guest and User) */}
                 <div className="mt-8 space-y-6 animate-fade-in">
+                    <div className="flex border-b border-input mb-6">
+                        <button
+                            className={`flex-1 py-3 text-sm font-bold transition-all ${orderMode === 'NEW' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'}`}
+                            onClick={() => {
+                                setOrderMode('NEW');
+                                setSelectedOrder(null);
+                                setLookupResults([]);
+                            }}
+                        >
+                            신규 신청
+                        </button>
+                        <button
+                            className={`flex-1 py-3 text-sm font-bold transition-all ${orderMode === 'EXT' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'}`}
+                            onClick={() => setOrderMode('EXT')}
+                        >
+                            기간 연장
+                        </button>
+                    </div>
+
                     <h3 className="text-xl font-bold text-center">
                         {user ? '회원 정보' : '구매자 정보'}
                     </h3>
-                    <div className="space-y-4">
-                        <Input
-                            placeholder="성함을 입력해 주세요."
-                            value={guestInfo.name}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, name: e.target.value })}
-                        />
-                        <Input
-                            type="tel"
-                            placeholder="휴대폰번호를 입력해 주세요."
-                            value={guestInfo.phone}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
-                        />
-                        <Input
-                            type="email"
-                            placeholder="이메일을 입력해 주세요."
-                            value={guestInfo.email}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
-                        />
-                        <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
-                    </div>
+
+                    {orderMode === 'EXT' && !selectedOrder && (
+                        <div className="glass p-5 rounded-xl space-y-4 border border-primary/20 bg-primary/5">
+                            <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
+                            <div className="space-y-4">
+                                <Input
+                                    placeholder="구매 시 사용한 이름"
+                                    value={guestInfo.name}
+                                    onChange={(e) => setGuestInfo({ ...guestInfo, name: e.target.value })}
+                                />
+                                <Input
+                                    type="tel"
+                                    placeholder="구매 시 사용한 전화번호"
+                                    value={guestInfo.phone}
+                                    onChange={(e) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
+                                />
+                                <button
+                                    className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
+                                    onClick={handleLookup}
+                                    disabled={lookupLoading}
+                                >
+                                    {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
+                                </button>
+                            </div>
+
+                            {lookupMessage && <p className="text-xs text-center text-red-500 mt-2">{lookupMessage}</p>}
+
+                            {lookupResults.length > 0 && (
+                                <div className="mt-4 space-y-2">
+                                    <p className="text-xs font-bold text-muted-foreground mb-2">연장 가능한 내역 ({lookupResults.length})</p>
+                                    {lookupResults.map((o: any) => (
+                                        <div
+                                            key={o.id}
+                                            className="p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
+                                            onClick={() => handleSelectOrderForExtension(o)}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-bold">{o.products?.name}</span>
+                                                <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">{o.order_number}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <span className="text-xs text-muted-foreground">만료일: {o.end_date || '정보없음'}</span>
+                                                <span className="text-xs text-primary font-bold">선택하기 →</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {(orderMode === 'NEW' || selectedOrder) && (
+                        <div className="space-y-4">
+                            {selectedOrder && (
+                                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 mb-4 flex justify-between items-center">
+                                    <div>
+                                        <p className="text-xs text-primary font-bold">선택된 연장 대상</p>
+                                        <p className="text-sm font-medium">{product.name} ({selectedOrder.order_number})</p>
+                                    </div>
+                                    <button
+                                        className="text-xs text-muted-foreground underline"
+                                        onClick={() => setSelectedOrder(null)}
+                                    >
+                                        변경
+                                    </button>
+                                </div>
+                            )}
+                            <Input
+                                placeholder="성함을 입력해 주세요."
+                                value={guestInfo.name}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, name: e.target.value })}
+                                readOnly={!!selectedOrder}
+                                className={selectedOrder ? 'bg-gray-50 cursor-not-allowed' : ''}
+                            />
+                            <Input
+                                type="tel"
+                                placeholder="휴대폰번호를 입력해 주세요."
+                                value={guestInfo.phone}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
+                                readOnly={!!selectedOrder}
+                                className={selectedOrder ? 'bg-gray-50 cursor-not-allowed' : ''}
+                            />
+                            <Input
+                                type="email"
+                                placeholder="이메일을 입력해 주세요."
+                                value={guestInfo.email}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                            />
+                            <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
+                        </div>
+                    )}
 
                     <h3 className="text-xl font-bold text-center mt-8">결제 수단</h3>
                     <div className="glass p-4 rounded-xl">

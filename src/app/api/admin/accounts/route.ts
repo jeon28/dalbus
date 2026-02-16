@@ -22,11 +22,11 @@ export async function GET() {
                     buyer_phone,
                     buyer_email,
                     order_number,
+                    start_date,
+                    end_date,
                     orders (
                         id,
                         order_number,
-                        start_date,
-                        end_date,
                         created_at,
                         amount,
                         payment_status,

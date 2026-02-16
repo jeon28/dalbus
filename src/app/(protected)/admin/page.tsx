@@ -24,7 +24,7 @@ interface BankAccount {
 }
 
 export default function AdminPage() {
-    const { isAdmin, loginAdmin } = useServices();
+    const { user, isAdmin, loginAdmin, isHydrated } = useServices();
 
     // Auth Form State
     const [loginId, setLoginId] = useState('');
@@ -123,7 +123,18 @@ export default function AdminPage() {
         if (res.ok) fetchBankAccounts();
     };
 
+    if (!isHydrated) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                <div className="animate-pulse text-gray-500 font-medium">관리자 상태 확인 중...</div>
+            </div>
+        );
+    }
+
     if (!isAdmin) {
+        // If user is logged in but not admin, maybe they shouldn't be here at all? 
+        // For now, if user is logged in and isHydrated, but not admin, show login.
+        // But if they are admin, we transition.
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
                 <Card className="w-full max-w-[400px] shadow-2xl border-none">

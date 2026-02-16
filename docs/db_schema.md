@@ -1,4 +1,4 @@
-# Dalbus Database Schema (v2.3)
+# Dalbus Database Schema (v3.0)
 
 이 문서는 달버스의 데이터베이스 구조와 관계를 정리한 문서입니다. Supabase (PostgreSQL) 환경을 기준으로 합니다.
 
@@ -80,10 +80,8 @@ erDiagram
         string buyer_phone
         string depositor_name
         boolean is_guest
-        enum order_type "NEW/REPURCHASE"
+        enum order_type "NEW/EXT"
         uuid related_order_id FK "nullable (for extensions)"
-        date start_date
-        date end_date
         timestamp paid_at
         timestamp assigned_at
     }
@@ -100,6 +98,8 @@ erDiagram
         string buyer_phone "Added in v2.8"
         string buyer_email "Added in v2.8"
         string order_number
+        date start_date "Added in v2.9"
+        date end_date "Added in v2.9"
     }
     
     qna {
@@ -162,7 +162,7 @@ erDiagram
 ### `orders` (주문)
 - `payment_status`: `pending`, `paid`, `failed`, `cancelled`, `refunded`
 - `assignment_status`: `waiting`, `assigned`, `expired`, `replaced`, `completed`
-- `order_type`: `NEW` (신규), `REPURCHASE` (재구매/연장)
+- `order_type`: `NEW` (신규), `EXT` (연장)
 - `related_order_id`: 연장 주문인 경우 이전 주문의 UUID를 저장
 - `user_id`: 회원 주문인 경우만 존재 (비회원은 `is_guest = true`)
 

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import styles from './auth.module.css';
 
@@ -11,6 +12,7 @@ export default function LoginPage() {
     const [id, setId] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -21,6 +23,9 @@ export default function LoginPage() {
             return;
         }
 
+        setIsLoading(true);
+        logger.debug('Login attempt started for:', id);
+
         // 1. Check if email exists using API (bypasses RLS)
         try {
             const checkResponse = await fetch('/api/auth/check-user', {
@@ -29,53 +34,88 @@ export default function LoginPage() {
                 body: JSON.stringify({ email: id })
             });
 
+            logger.debug('Check-user response status:', checkResponse.status);
             const checkResult = await checkResponse.json();
 
             if (!checkResult.exists) {
                 // Email doesn't exist
                 alert('❌ 가입되지 않은 이메일입니다.\n\n회원가입을 먼저 진행해주세요.');
+                setIsLoading(false);
                 return;
             }
+            logger.info('Email exists, proceeding to signInWithPassword');
         } catch (error) {
-            console.error('Email check error:', error);
+            logger.error('Email check error:', error);
             // Continue with login attempt even if check fails
         }
 
         // 2. Email exists, try to login
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: id,
-            password: password,
-        });
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: id,
+                password: password,
+            });
 
-        if (error) {
-            // Email exists but password is wrong or other error
-            if (error.message.includes('Invalid login credentials') ||
-                error.message.includes('invalid') ||
-                error.message.includes('credentials')) {
-                alert('❌ 비밀번호가 일치하지 않습니다.\n\n비밀번호를 다시 확인해주세요.');
-            } else {
-                // 기타 예상치 못한 오류
-                alert('❌ 로그인 중 오류가 발생했습니다.\n\n' + error.message + '\n\n잠시 후 다시 시도해주세요.');
+            console.log('signInWithPassword result:', data.user ? 'Success' : 'Fail', error ? error.message : '');
+
+            if (error) {
+                // Email exists but password is wrong or other error
+                if (error.message.includes('Invalid login credentials') ||
+                    error.message.includes('invalid') ||
+                    error.message.includes('credentials')) {
+                    alert('❌ 비밀번호가 일치하지 않습니다.\n\n비밀번호를 다시 확인해주세요.');
+                } else {
+                    // 기타 예상치 못한 오류
+                    if (!error.message.includes('aborted')) {
+                        alert('❌ 로그인 중 오류가 발생했습니다.\n\n' + error.message + '\n\n잠시 후 다시 시도해주세요.');
+                    }
+                }
+                setIsLoading(false);
+                return;
             }
-        } else {
+
             // Success - check if user is admin
             if (data.user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', data.user.id)
-                    .single();
+                try {
+                    const { data: profile, error: profileErr } = await supabase
+                        .from('profiles')
+                        .select('role')
+                        .eq('id', data.user.id)
+                        .single();
 
-                if (profile?.role === 'admin') {
-                    // Admin user - redirect to admin page
-                    router.push('/admin');
-                } else {
-                    // Regular user - redirect to home
-                    router.push('/');
+                    if (profileErr) {
+                        // Silent fail for AbortError during navigation
+                        if (!profileErr.message.includes('AbortError') && !profileErr.message.includes('aborted')) {
+                            console.error('Profile fetch error:', profileErr);
+                        }
+                    }
+
+                    if (profile?.role === 'admin') {
+                        console.log('User is admin, navigating to /admin');
+                        router.push('/admin');
+                    } else {
+                        console.log('User is regular user, navigating to /');
+                        router.push('/');
+                    }
+                } catch (profileCatchErr: any) {
+                    // If navigation already triggered and fetch aborted
+                    if (!profileCatchErr?.message?.includes('aborted')) {
+                        router.push('/');
+                    }
                 }
             } else {
                 router.push('/');
             }
+        } catch (loginError: any) {
+            if (!loginError?.message?.includes('aborted')) {
+                console.error('Unhandled login error:', loginError);
+                alert('로그인 처리 중 예기치 못한 오류가 발생했습니다.');
+            }
+        } finally {
+            // Do not setIsLoading(false) if we are navigating, but if we stay on page (error case), we should.
+            // However, it's safer to keep it true if navigation might take time.
+            // If the user reaches here without a redirect, let's reset it.
+            setTimeout(() => setIsLoading(false), 5000);
         }
     };
 
@@ -107,6 +147,7 @@ export default function LoginPage() {
                                 value={id}
                                 onChange={(e) => setId(e.target.value)}
                                 style={{ paddingLeft: '45px' }}
+                                disabled={isLoading}
                                 required
                             />
                         </div>
@@ -137,6 +178,7 @@ export default function LoginPage() {
                                     paddingLeft: '45px',
                                     paddingRight: '50px'
                                 }}
+                                disabled={isLoading}
                             />
                             <button
                                 type="button"
@@ -164,7 +206,13 @@ export default function LoginPage() {
                             </button>
                         </div>
                     </div>
-                    <button type="submit" className={styles.submitBtn}>로그인</button>
+                    <button
+                        type="submit"
+                        className={styles.submitBtn}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? '로그인 처리 중...' : '로그인'}
+                    </button>
                 </form>
 
                 <p className={styles.footer}>

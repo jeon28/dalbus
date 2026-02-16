@@ -26,7 +26,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         // 1. If no order_id, create a MANUAL order
         if (!targetOrderId && (buyer_name || buyer_email)) {
-            // Fetch Account details to get product_id
             const { data: acc } = await supabaseAdmin.from('accounts').select('product_id').eq('id', account_id).single();
 
             let targetProductId = null;
@@ -34,7 +33,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             if (acc?.product_id) {
                 targetProductId = acc.product_id;
-                // Fetch a default plan for this product to satisfy NOT NULL constraint
                 const { data: plan } = await supabaseAdmin
                     .from('product_plans')
                     .select('id, duration_months')
@@ -45,125 +43,133 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 if (plan) {
                     targetPlanId = plan.id;
                     const durationMonths = plan.duration_months || 1;
-
-                    // Automate dates for manual order
                     const now = new Date();
                     finalStartDate = finalStartDate || format(now, 'yyyy-MM-dd');
                     finalEndDate = finalEndDate || format(addMonths(parseISO(finalStartDate), durationMonths), 'yyyy-MM-dd');
                 }
             }
 
-            const newOrder = {
-                user_id: null,
-                product_id: targetProductId,
-                plan_id: targetPlanId,
-                payment_status: 'paid',
-                assignment_status: 'waiting',
-                buyer_name: buyer_name || '',
-                buyer_phone: buyer_phone || '',
-                buyer_email: buyer_email || '',
-                start_date: finalStartDate,
-                end_date: finalEndDate,
-                amount: 0,
-                is_guest: true
-            };
-
             const { data: createdOrder, error: createError } = await supabaseAdmin
                 .from('orders')
-                .insert([newOrder])
+                .insert([{
+                    user_id: null,
+                    product_id: targetProductId,
+                    plan_id: targetPlanId,
+                    payment_status: 'paid',
+                    assignment_status: 'waiting',
+                    buyer_name: buyer_name || '',
+                    buyer_phone: buyer_phone || '',
+                    buyer_email: buyer_email || '',
+                    amount: 0,
+                    is_guest: true
+                }])
                 .select()
                 .single();
 
-            if (createError) {
-                console.error('Manual Order Create Error:', createError);
-                throw createError;
-            }
+            if (createError) throw createError;
             targetOrderId = createdOrder.id;
-            finalOrderNumber = createdOrder.order_number; // Use generated order_number
+            finalOrderNumber = createdOrder.order_number;
         }
 
         if (!targetOrderId) {
             return NextResponse.json({ error: 'Order ID or User Details required' }, { status: 400 });
         }
 
-        // If order_id was provided but not order_number, fetch it
         let finalBuyerName = buyer_name;
         let finalBuyerPhone = buyer_phone;
         let finalBuyerEmail = buyer_email;
 
-        // If order_id was provided, fetch any missing info from the orders table
-        if (targetOrderId) {
-            const { data: ord } = await supabaseAdmin
-                .from('orders')
-                .select(`
-                    order_number, 
-                    buyer_name, 
-                    buyer_phone, 
-                    buyer_email, 
-                    created_at, 
-                    start_date, 
-                    end_date,
-                    product_plans ( duration_months )
-                `)
-                .eq('id', targetOrderId)
-                .single();
+        // Fetch order details if needed
+        const { data: ord } = await supabaseAdmin
+            .from('orders')
+            .select(`
+                order_number, 
+                buyer_name, 
+                buyer_phone, 
+                buyer_email, 
+                created_at, 
+                product_plans ( duration_months )
+            `)
+            .eq('id', targetOrderId)
+            .single();
 
-            if (ord) {
-                if (!finalOrderNumber) finalOrderNumber = ord.order_number;
-                if (!finalBuyerName) finalBuyerName = ord.buyer_name;
-                if (!finalBuyerPhone) finalBuyerPhone = ord.buyer_phone;
-                if (!finalBuyerEmail) finalBuyerEmail = ord.buyer_email;
+        if (ord) {
+            if (!finalOrderNumber) finalOrderNumber = ord.order_number;
+            if (!finalBuyerName) finalBuyerName = ord.buyer_name;
+            if (!finalBuyerPhone) finalBuyerPhone = ord.buyer_phone;
+            if (!finalBuyerEmail) finalBuyerEmail = ord.buyer_email;
 
-                // Date automation for existing order
-                // "주문날을 가입일에 저장" -> start_date = created_at
-                const orderDate = ord.created_at ? new Date(ord.created_at) : new Date();
-                finalStartDate = ord.start_date || format(orderDate, 'yyyy-MM-dd');
-
-                const durationMonths = (ord.product_plans as unknown as { duration_months: number })?.duration_months || 1;
-                finalEndDate = ord.end_date || format(addMonths(parseISO(finalStartDate), durationMonths), 'yyyy-MM-dd');
-
-                // Sync dates back to orders table
-                await supabaseAdmin
-                    .from('orders')
-                    .update({
-                        start_date: finalStartDate,
-                        end_date: finalEndDate
-                    })
-                    .eq('id', targetOrderId);
-            }
+            const orderDate = ord.created_at ? new Date(ord.created_at) : new Date();
+            finalStartDate = finalStartDate || format(orderDate, 'yyyy-MM-dd');
+            const durationMonths = (ord.product_plans as any)?.duration_months || 1;
+            finalEndDate = finalEndDate || format(addMonths(parseISO(finalStartDate), durationMonths), 'yyyy-MM-dd');
         }
 
         // 2. Validate Slot
         const { data: existing } = await supabaseAdmin
             .from('order_accounts')
-            .select('*')
+            .select('*, orders(related_order_id)')
             .eq('account_id', account_id)
             .eq('slot_number', slot_number)
-            .single();
+            .maybeSingle();
 
         if (existing) {
-            return NextResponse.json({ error: 'Slot is already taken' }, { status: 409 });
+            const { data: targetOrder } = await supabaseAdmin
+                .from('orders')
+                .select('related_order_id, order_type, buyer_email, buyer_name')
+                .eq('id', targetOrderId)
+                .single();
+
+            const isSameOrder = targetOrderId === existing.order_id;
+            const isExtensionOfExisting = targetOrder?.related_order_id === existing.order_id;
+            const isBuyerMatch = targetOrder?.order_type === 'EXT' &&
+                ((targetOrder.buyer_email && targetOrder.buyer_email === existing.buyer_email) ||
+                    (targetOrder.buyer_name && targetOrder.buyer_name === existing.buyer_name));
+
+            if (!isSameOrder && !isExtensionOfExisting && !isBuyerMatch) {
+                return NextResponse.json({
+                    error: `선택하신 슬롯은 이미 다른 주문(번호: ${existing.order_number || '번호없음'}, 고객: ${existing.buyer_name || '이름없음'})이 점유하고 있습니다.`
+                }, { status: 409 });
+            }
+
+            const { error: updateError } = await supabaseAdmin
+                .from('order_accounts')
+                .update({
+                    order_id: targetOrderId,
+                    order_number: finalOrderNumber,
+                    tidal_password: tidal_password || existing.tidal_password,
+                    tidal_id: tidal_id || existing.tidal_id,
+                    buyer_name: finalBuyerName || existing.buyer_name,
+                    buyer_phone: finalBuyerPhone || existing.buyer_phone,
+                    buyer_email: finalBuyerEmail || existing.buyer_email,
+                    start_date: finalStartDate,
+                    end_date: end_date || finalEndDate
+                })
+                .eq('id', existing.id);
+
+            if (updateError) throw updateError;
+        } else {
+            const { error: insertError } = await supabaseAdmin
+                .from('order_accounts')
+                .insert([{
+                    order_id: targetOrderId,
+                    order_number: finalOrderNumber,
+                    account_id: account_id,
+                    slot_number: slot_number,
+                    tidal_password: tidal_password,
+                    tidal_id: tidal_id || null,
+                    type: type || (slot_number === 0 ? 'master' : 'user'),
+                    buyer_name: finalBuyerName || null,
+                    buyer_phone: finalBuyerPhone || null,
+                    buyer_email: finalBuyerEmail || null,
+                    start_date: finalStartDate,
+                    end_date: finalEndDate
+                }]);
+
+            if (insertError) throw insertError;
         }
 
-        // 3. Create Assignment
-        const { error: insertError } = await supabaseAdmin
-            .from('order_accounts')
-            .insert({
-                order_id: targetOrderId,
-                order_number: finalOrderNumber,
-                account_id: account_id,
-                slot_number: slot_number,
-                tidal_password: tidal_password,
-                tidal_id: tidal_id || null,
-                type: type || (slot_number === 0 ? 'master' : 'user'),
-                buyer_name: finalBuyerName || null,
-                buyer_phone: finalBuyerPhone || null,
-                buyer_email: finalBuyerEmail || null
-            });
-
-        if (insertError) throw insertError;
-
-        // 4. Update Account Used Slots (Robust Sync)
+        // Sync Used Slots
         const { count: actualCount } = await supabaseAdmin
             .from('order_accounts')
             .select('*', { count: 'exact', head: true })
@@ -171,7 +177,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         await supabaseAdmin.from('accounts').update({ used_slots: actualCount || 0 }).eq('id', account_id);
 
-        // 5. Update Order Status
+        // Update Order Status (But NOT start_date/end_date on order table)
         await supabaseAdmin
             .from('orders')
             .update({
@@ -182,12 +188,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         return NextResponse.json({ success: true });
 
-    } catch (error) {
-        const e = error as { code?: string; message: string };
-        console.error('Assign Error:', e);
-        if (e.code === '23505') {
-            return NextResponse.json({ error: '이미 사용 중인 Tidal ID입니다. 다른 ID를 입력해주세요.' }, { status: 409 });
+    } catch (error: any) {
+        console.error('Assign Error:', error);
+        if (error.code === '23505') {
+            return NextResponse.json({ error: '이미 사용 중인 Tidal ID입니다.' }, { status: 409 });
         }
-        return NextResponse.json({ error: e.message }, { status: 500 });
+        return NextResponse.json({ error: error.message || '알 수 없는 오류가 발생했습니다.' }, { status: 500 });
     }
 }

@@ -10,7 +10,10 @@ export async function POST(req: NextRequest) {
         // 1. Insert order into Supabase
         const { data: order, error: insertError } = await supabaseAdmin
             .from('orders')
-            .insert([orderData])
+            .insert([{
+                ...orderData,
+                order_type: orderData.order_type || 'NEW'
+            }])
             .select()
             .single();
 
