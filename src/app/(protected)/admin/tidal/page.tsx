@@ -325,29 +325,6 @@ function TidalAccountsContent() {
         }
     };
 
-    const getMasterInfo = (acc: Account) => {
-        const masterSlot = acc.order_accounts?.find(oa => oa.type === 'master');
-        if (!masterSlot || !masterSlot.orders) {
-            return 'master 계정없음';
-        }
-
-        const tidalId = masterSlot.tidal_id || '';
-        const endDate = masterSlot.end_date || '';
-        let duration = '';
-
-        if (masterSlot.start_date) {
-            try {
-                const startDate = parseISO(masterSlot.start_date);
-                const now = new Date();
-                const months = differenceInMonths(now, startDate);
-                duration = `${months}개월`;
-            } catch {
-                duration = '-';
-            }
-        }
-
-        return `${tidalId}/${endDate}/${duration}`;
-    };
 
     const toggleRow = (id: string) => {
         const newSet = new Set(expandedRows);
@@ -1347,10 +1324,12 @@ function TidalAccountsContent() {
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-sm">
                             <div className="col-span-1">No.</div>
-                            <div className="col-span-3">결제계좌</div>
+                            <div className="col-span-2">결제계좌</div>
                             <div className="col-span-1 text-center">결제일</div>
-                            <div className="col-span-2 text-left">메모</div>
-                            <div className="col-span-3 text-left">마스터정보</div>
+                            <div className="col-span-1 text-left">메모</div>
+                            <div className="col-span-2 text-left">마스터계정</div>
+                            <div className="col-span-2 text-left text-orange-600">종료예정일</div>
+                            <div className="col-span-1 text-left">지속개월</div>
                             <div className="col-span-1 text-center">슬롯</div>
                             <div className="col-span-1 text-center">관리</div>
                             <div className="col-span-1 text-center">상세</div>
@@ -1400,22 +1379,45 @@ function TidalAccountsContent() {
                                             <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 {String(idx + 1).padStart(3, '0')}
                                             </div>
-                                            <div className="col-span-3 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
-                                                <div className="font-medium text-xs">
-                                                    <span className="text-gray-700">{acc.login_id}</span>
-                                                    <span className="text-gray-400 mx-1">-</span>
-                                                    <span className="text-blue-600">{acc.payment_email}</span>
+                                            <div className="col-span-2 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
+                                                <div className="font-medium text-[10px] leading-tight">
+                                                    <div className="text-gray-700 truncate">{acc.login_id}</div>
+                                                    <div className="text-blue-600 truncate">{acc.payment_email}</div>
                                                 </div>
                                             </div>
                                             <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 {acc.payment_day}일
                                             </div>
-                                            <div className="col-span-2 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
-                                                {acc.memo?.length > 15 ? acc.memo.substring(0, 15) + '...' : acc.memo}
+                                            <div className="col-span-1 text-gray-500 text-[10px] text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
+                                                {acc.memo}
                                             </div>
-                                            <div className="col-span-3 text-gray-500 text-xs text-left truncate cursor-pointer" title={getMasterInfo(acc)} onClick={() => toggleRow(acc.id)}>
-                                                {getMasterInfo(acc)}
-                                            </div>
+                                            {(() => {
+                                                const masterSlot = acc.order_accounts?.find(oa => oa.type === 'master');
+                                                const tidalId = masterSlot?.tidal_id || '-';
+                                                const endDate = masterSlot?.end_date || '-';
+                                                let duration = '-';
+                                                if (masterSlot?.start_date) {
+                                                    try {
+                                                        const start = parseISO(masterSlot.start_date);
+                                                        const now = new Date();
+                                                        const diff = differenceInMonths(now, start);
+                                                        duration = `${diff}개월`;
+                                                    } catch { }
+                                                }
+                                                return (
+                                                    <>
+                                                        <div className="col-span-2 text-gray-700 text-xs truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>
+                                                            {tidalId}
+                                                        </div>
+                                                        <div className="col-span-2 text-orange-600 font-mono text-xs cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                            {endDate}
+                                                        </div>
+                                                        <div className="col-span-1 text-gray-500 font-mono text-xs cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                            {duration}
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                             <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                                     {acc.order_accounts?.length || 0}/6
