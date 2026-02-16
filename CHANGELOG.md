@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.97 - 2026-02-16
+
+### 🔧 타입 안전성 및 빌드 안정화
+
+#### 개선 사항 (Improvements)
+1. **Admin 페이지 타입 안전성 강화**:
+    - 12개 Admin 페이지 및 7개 API 라우트에서 `any` 타입을 `unknown`으로 교체
+    - ESLint `no-explicit-any`, `no-unused-vars` 에러 전량 수정
+    - catch 블록의 에러 처리를 `instanceof Error` 패턴으로 통일
+
+2. **Vercel 빌드 안정화**:
+    - ESLint 에러로 인한 빌드 실패 문제 해결
+    - 미사용 import 및 변수 정리
+
 ## v2.9 - 2026-02-15
 
 ### 🚀 Grid View 도입 및 데이터 구조/UX 개선
