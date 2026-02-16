@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -142,6 +142,9 @@ function TidalAccountsContent() {
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
 
+    // Filter State
+    const [showExpiredOnly, setShowExpiredOnly] = useState(false);
+
     // Forms
     const [newAccount, setNewAccount] = useState({
         login_id: '',
@@ -220,6 +223,26 @@ function TidalAccountsContent() {
             setTimeout(scrollToAndHighlight, 500);
         }
     }, [searchParams, accounts]);
+
+    // Filter Effect: Auto-expand when filter is enabled
+    useEffect(() => {
+        if (showExpiredOnly) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const newExpanded = new Set<string>();
+
+            accounts.forEach(acc => {
+                const hasExpired = acc.order_accounts?.some(oa => {
+                    if (!oa.end_date) return false;
+                    return parseISO(oa.end_date) < today;
+                });
+                if (hasExpired) {
+                    newExpanded.add(acc.id);
+                }
+            });
+            setExpandedRows(newExpanded);
+        }
+    }, [showExpiredOnly, accounts]);
 
     const fetchAccounts = async () => {
 
@@ -420,6 +443,28 @@ function TidalAccountsContent() {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.';
             alert('삭제 실패: ' + message);
+        }
+    };
+
+    const handleDeactivate = async (assignmentId: string) => {
+        if (!confirm('해당 배정을 종료(비활성화)하시겠습니까?\n비활성화된 배정은 "지난 내역" 메뉴에서 확인할 수 있습니다.')) return;
+        try {
+            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: false })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Deactivation failed');
+            }
+
+            alert('비활성화 되었습니다.');
+            fetchAccounts();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '오류가 발생했습니다.';
+            alert('비활성화 실패: ' + message);
         }
     };
 
@@ -841,6 +886,18 @@ function TidalAccountsContent() {
                                 엑셀 임포트
                             </Button>
                         </div>
+                        <Button
+                            variant={showExpiredOnly ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                            className={showExpiredOnly ? "bg-red-600 hover:bg-red-700 text-white" : "text-gray-600"}
+                        >
+                            <Filter size={16} className="mr-2" />
+                            만료된 배정만 보기
+                        </Button>
+                        <Button onClick={() => router.push('/admin/tidal/inactive')} variant="outline" className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50">
+                            <History size={16} /> 지난 내역
+                        </Button>
                         <Button onClick={exportToExcel} variant="outline" className="gap-2">
                             <Download size={16} /> 엑셀 다운로드
                         </Button>
@@ -876,7 +933,22 @@ function TidalAccountsContent() {
                                 {accounts.map((acc, accIndex) => {
                                     const masterAssignment = acc.order_accounts?.find(oa => oa.type === 'master');
                                     const masterId = masterAssignment?.tidal_id || '';
-                                    const sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => a.slot_number - b.slot_number);
+                                    let sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => a.slot_number - b.slot_number);
+
+                                    // --- Expired Filter Functionality ---
+                                    if (showExpiredOnly) {
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        sortedAssignments = sortedAssignments.filter(assignment => {
+                                            if (!assignment.end_date) return false;
+                                            const end = parseISO(assignment.end_date);
+                                            return end < today;
+                                        });
+
+                                        // If no expired assignments in this account, hide the account row
+                                        if (sortedAssignments.length === 0) return null;
+                                    }
+                                    // ------------------------------------
 
                                     return sortedAssignments.map((assignment, idx) => {
                                         let period = '-';
@@ -938,7 +1010,23 @@ function TidalAccountsContent() {
 
                         {accounts.map((acc, idx) => {
                             const isExpanded = expandedRows.has(acc.id);
-                            const sortedAssignments = getSortedAssignments(acc);
+                            let sortedAssignments = getSortedAssignments(acc);
+
+                            // --- Expired Filter Functionality ---
+                            if (showExpiredOnly) {
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                sortedAssignments = sortedAssignments.filter(assignment => {
+                                    if (!assignment.end_date) return false;
+                                    const end = parseISO(assignment.end_date);
+                                    return end < today;
+                                });
+
+                                // If no expired assignments in this account, hide the account row
+                                if (sortedAssignments.length === 0) return null;
+                            }
+                            // ------------------------------------
+
                             const availableSlots = getAvailableSlots(acc.id);
                             const availableSlotNum = availableSlots.length > 0 ? availableSlots[0] : -1;
 
@@ -1010,12 +1098,18 @@ function TidalAccountsContent() {
 
                                                         // Period Calc for display
                                                         let period = '-';
+                                                        let isExpired = false;
                                                         if (val.start_date && val.end_date) {
                                                             try {
                                                                 const start = parseISO(val.start_date);
                                                                 const end = parseISO(val.end_date);
                                                                 const diff = differenceInMonths(end, start);
                                                                 if (diff > 0) period = `${diff}개월`;
+
+                                                                // Check expiry
+                                                                const today = new Date();
+                                                                today.setHours(0, 0, 0, 0);
+                                                                if (end < today) isExpired = true;
                                                             } catch { }
                                                         }
 
@@ -1080,7 +1174,12 @@ function TidalAccountsContent() {
                                                                         <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
                                                                         <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
                                                                         <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
-                                                                        <td className="px-2 text-gray-500 font-mono">{val.end_date || '-'}</td>
+                                                                        <td className="px-2 font-mono">
+                                                                            <span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>
+                                                                                {val.end_date || '-'}
+                                                                                {isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}
+                                                                            </span>
+                                                                        </td>
                                                                     </>
                                                                 )}
 
@@ -1106,7 +1205,7 @@ function TidalAccountsContent() {
                                                                         <span>-</span>
                                                                     )}
                                                                 </td>
-                                                                <td className="text-center">
+                                                                <td>
                                                                     <div className="flex justify-center gap-1 items-center">
                                                                         {isEditing ? (
                                                                             <>
@@ -1126,7 +1225,13 @@ function TidalAccountsContent() {
                                                                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
                                                                                     <ArrowRightLeft size={14} />
                                                                                 </Button>
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="해제" onClick={() => handleDelete(assignment.id)}>
+
+                                                                                {/* Deactivate Button for Expired/Active Accounts */}
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
+                                                                                    <PowerOff size={14} />
+                                                                                </Button>
+
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
                                                                                     <Trash2 size={14} />
                                                                                 </Button>
                                                                             </>

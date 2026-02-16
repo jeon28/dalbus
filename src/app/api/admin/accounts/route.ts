@@ -11,7 +11,7 @@ export async function GET() {
             .select(`
                 *,
                 products ( name ),
-                order_accounts (
+                order_accounts(
                     id,
                     assigned_at,
                     slot_number,
@@ -24,7 +24,8 @@ export async function GET() {
                     order_number,
                     start_date,
                     end_date,
-                    orders (
+                    is_active,
+                    orders(
                         id,
                         order_number,
                         created_at,
@@ -32,8 +33,8 @@ export async function GET() {
                         payment_status,
                         assignment_status,
                         user_id,
-                        profiles ( name, phone, email ),
-                        products ( name )
+                        profiles(name, phone, email),
+                        products(name)
                     )
                 )
             `)
@@ -41,17 +42,13 @@ export async function GET() {
 
         if (error) throw error;
 
-        // Also fetch order_accounts to see current assignments if needed, 
-        // but for now simpler to just fetch accounts and let frontend query details or we join here.
-        // Actually, let's fetch orders assigned to these accounts.
+        // Filter out inactive assignments from the response
+        const filteredData = data?.map(account => ({
+            ...account,
+            order_accounts: account.order_accounts.filter((oa: any) => oa.is_active !== false) // default to true if null/undefined, or strictly check true if nullable
+        }));
 
-        // Better strategy: Fetch accounts, then for each account, fetch active assignments.
-        // Or RLS policy might be enough? Admin has full access.
-
-        // Let's rely on client fetching or a joined query if Supabase supports it well.
-        // For simpler UI, we can just return accounts first.
-
-        return NextResponse.json(data);
+        return NextResponse.json(filteredData);
     } catch (error) {
         const e = error as Error;
         return NextResponse.json({ error: e.message }, { status: 500 });

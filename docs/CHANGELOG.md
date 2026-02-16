@@ -4,6 +4,26 @@ Dalbus 프로젝트의 주요 업데이트 및 변경 사항을 기록합니다.
 
 ---
 
+## [v2.3] 만료 계정 관리 시스템 (2026.02.16)
+
+### 🕒 만료 계정 관리 (Expired Account Management)
+- **만료 상태 시각화**:
+    - `TidalAccounts` 목록에서 종료일(`end_date`)이 지난 배정에 대해 빨간색 "만료" 배지 표시.
+- **배정 비활성화 (Deactivation)**:
+    - 만료된 배정을 즉시 "종료(비활성화)" 처리하여 슬롯을 회수할 수 있는 기능 추가.
+    - 비활성화 시 `order_accounts`의 `is_active` 상태가 `false`로 변경되며 목록에서 즉시 숨김 처리.
+- **지난 내역 조회 (Inactive History)**:
+    - 비활성화된 배정 이력을 별도로 조회할 수 있는 `/admin/tidal/inactive` 페이지 신설.
+    - 영구 삭제(Hard Delete) 기능 지원.
+- **만료 필터 (Expired Filter)**:
+    - 관리자 목록에서 만료된 배정이 포함된 계정만 빠르게 필터링하여 볼 수 있는 토글 기능 추가.
+
+### 💾 데이터베이스 변경 (Database Changes)
+- **Schema Update**: `order_accounts` 테이블에 `is_active` (boolean, default true) 컬럼 추가.
+- **Index Optimization**: `tidal_id` 유니크 제약 조건을 `CHECK (is_active = true)` 조건부 인덱스로 변경하여, 비활성화된 계정의 ID 재사용 지원.
+
+---
+
 ## [v2.2] 주문 자동화 및 운영 도구 고도화 (2026.02.16)
 
 ### 🚀 주문 매칭 및 자동화 (Order Assignment & Automation)

@@ -100,6 +100,7 @@ erDiagram
         string order_number
         date start_date "Added in v2.9"
         date end_date "Added in v2.9"
+        boolean is_active "Added in v3.0 (Default true)"
     }
     
     qna {
@@ -174,8 +175,9 @@ erDiagram
 ### `order_accounts` (슬롯 배정)
 - `type`: `master` (마스터 계정 정보), `user` (일반 사용자)
 - `slot_number`: 0~5 번호 부여
-- `tidal_id`: 슬롯별 개별 소속 ID (독립 계정 방식), UNIQUE 제약 조건 적용
+- `tidal_id`: 슬롯별 개별 소속 ID (독립 계정 방식), `is_active=true`인 경우만 UNIQUE 제약 적용 (Partial Index)
 - `order_number`: 주문번호 중복 저장 (추적성 강화)
+- `is_active`: 배정 활성화 여부 (기본값 true). 만료/종료 시 false로 업데이트하여 슬롯 확보.
 
 ### `site_settings` (운영 설정)
 - `admin_login_id`: 관리자 로그인 ID

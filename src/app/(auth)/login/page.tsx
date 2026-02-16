@@ -51,12 +51,20 @@ export default function LoginPage() {
 
         // 2. Email exists, try to login
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: id,
-                password: password,
-            });
+            // Helper to add timeout to promise
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timed out')), 15000) // 15s timeout
+            );
 
-            console.log('signInWithPassword result:', data.user ? 'Success' : 'Fail', error ? error.message : '');
+            const { data, error } = await Promise.race([
+                supabase.auth.signInWithPassword({
+                    email: id,
+                    password: password,
+                }),
+                timeoutPromise
+            ]) as any;
+
+            console.log('signInWithPassword result:', data?.user ? 'Success' : 'Fail', error ? error.message : '');
 
             if (error) {
                 // Email exists but password is wrong or other error
