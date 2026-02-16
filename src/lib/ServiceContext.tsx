@@ -192,9 +192,10 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     localStorage.removeItem('dalbus-user');
                     localStorage.removeItem('dalbus-isAdmin');
                 }
-            } catch (error: any) {
+            } catch (error) {
                 // AbortError silent catch
-                if (error?.name !== 'AbortError' && !error?.message?.includes('aborted')) {
+                const err = error as { name?: string; message?: string };
+                if (err?.name !== 'AbortError' && !err?.message?.includes('aborted')) {
                     console.error('Unexpected error in onAuthStateChange:', error);
                 }
             }

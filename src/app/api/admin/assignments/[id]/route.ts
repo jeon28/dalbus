@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { addMonths, format, parseISO } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +17,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             buyer_email,
             start_date,
             end_date,
-            type,
-            order_id // Needed to update order dates if present
+            type
         } = body;
 
         // 1. Update order_accounts (all editable fields including buyer info and dates)

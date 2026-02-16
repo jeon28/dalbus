@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -15,9 +14,29 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const resolvedParams = React.use(params);
     const serviceId = resolvedParams.id;
     const { services, user } = useServices();
+
     /* We need to fetch the full product details including 'detail_content' which might not be in context */
-    const [serviceDetail, setServiceDetail] = useState<Record<string, any> | null>(null);
-    const [plans, setPlans] = useState<Record<string, any>[]>([]);
+    interface ServiceProduct {
+        id: string;
+        name: string;
+        image_url?: string;
+        description?: string;
+        detail_content?: string;
+        original_price: number;
+    }
+
+    interface ProductPlan {
+        id: string;
+        duration_months: number;
+        price: number;
+        discount_rate: number;
+        is_active: boolean;
+    }
+
+    const [serviceDetail, setServiceDetail] = useState<ServiceProduct | null>(null);
+    const [plans, setPlans] = useState<ProductPlan[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
 
     useEffect(() => {
         let isMounted = true;
@@ -33,7 +52,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     .eq('id', serviceId)
                     .single();
 
-                // Ignore AbortError (normal cleanup behavior)
                 if (productError) {
                     if (productError.message?.includes('AbortError') || productError.message?.includes('aborted') || productError.message?.includes('signal is aborted') || productError.code === 'PGRST301') {
                         return;
@@ -54,7 +72,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     .eq('is_active', true)
                     .order('duration_months', { ascending: true });
 
-                // Ignore AbortError
                 if (plansError) {
                     if (plansError.message?.includes('AbortError') || plansError.message?.includes('aborted') || plansError.message?.includes('signal is aborted') || plansError.code === 'PGRST301') {
                         return;
@@ -71,11 +88,11 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                         setSelectedPeriod(plansData[0].duration_months);
                     }
                 }
-            } catch (error) {
-                // Ignore AbortError (occurs during component unmount or cleanup)
-                const err = error as Error;
-                if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
-                    return;
+            } catch (error: unknown) {
+                if (error instanceof Error) {
+                    if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('signal is aborted')) {
+                        return;
+                    }
                 }
                 if (isMounted) {
                     console.error('Unexpected error in fetchDetail:', error);
@@ -90,22 +107,38 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         };
     }, [serviceId]);
 
-    // Fallback to context if detail fetch is pending or failed (though detail has more fields)
+    // Fallback to context if detail fetch is pending or failed
     const basicService = services.find(s => s.id === serviceId);
-    const product = serviceDetail || (basicService ? { ...basicService, detail_content: null, original_price: parseInt(basicService.price.replace(/,/g, '')) } : null);
-
-    const [loading, setLoading] = useState(false);
-    const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+    const product: ServiceProduct | null = serviceDetail || (basicService ? {
+        ...basicService,
+        image_url: basicService.icon,
+        detail_content: undefined,
+        original_price: parseInt(basicService.price.toString().replace(/,/g, ''))
+    } : null);
 
     // Bank Accounts State
-    const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+    interface BankAccount {
+        id: string;
+        bank_name: string;
+        account_number: string;
+        account_holder: string;
+        is_active: boolean;
+    }
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [selectedBankId, setSelectedBankId] = useState<string>('');
 
     // Extension Flow State
+    interface ExtensionOrder {
+        id: string;
+        order_number: string;
+        products?: { name: string };
+        end_date?: string;
+        buyer_email?: string;
+    }
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
     const [lookupLoading, setLookupLoading] = useState(false);
-    const [lookupResults, setLookupResults] = useState<any[]>([]);
-    const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+    const [lookupResults, setLookupResults] = useState<ExtensionOrder[]>([]);
+    const [selectedOrder, setSelectedOrder] = useState<ExtensionOrder | null>(null);
     const [lookupMessage, setLookupMessage] = useState('');
 
     useEffect(() => {
@@ -114,7 +147,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 const res = await fetch('/api/admin/bank-accounts');
                 if (res.ok) {
                     const data = await res.json();
-                    const activeBanks = data.filter((b: any) => b.is_active);
+                    const activeBanks = data.filter((b: BankAccount) => b.is_active);
                     setBankAccounts(activeBanks);
                     if (activeBanks.length > 0) setSelectedBankId(activeBanks[0].id);
                 }
@@ -128,7 +161,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         fetchBanks();
     }, []);
 
-    // Guest Form State
     const [guestInfo, setGuestInfo] = useState({
         name: '',
         phone: '',
@@ -141,7 +173,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         terms: false
     });
 
-    // Sync User Info to Form State
     useEffect(() => {
         if (user) {
             setGuestInfo(prev => ({
@@ -149,7 +180,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 name: user.name || '',
                 email: user.email || '',
                 phone: user.phone || '',
-                depositor: prev.depositor || user.name || '' // Default to user name if empty
+                depositor: prev.depositor || user.name || ''
             }));
         }
     }, [user]);
@@ -163,7 +194,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const handleSubscribe = async () => {
         if (!product) return;
 
-        // Validation
         if (!guestInfo.name || !guestInfo.phone || !guestInfo.email || !guestInfo.depositor) {
             alert('주문 정보를 모두 입력해주세요.');
             return;
@@ -183,7 +213,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
         const amount = selectedPlan.price;
 
-        const orderData: Record<string, any> = {
+        const orderData: Record<string, string | number | boolean | null> = {
             product_id: product.id,
             plan_id: selectedPlan.id,
             amount: amount,
@@ -241,8 +271,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     };
 
-
-
     if (!product) return <div className="container py-20 text-center">Loading...</div>;
 
     const handleLookup = async () => {
@@ -265,8 +293,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             const data = await res.json();
 
             if (res.ok) {
-                // Filter orders for the current product
-                const filtered = (data.orders || []).filter((o: any) => o.products?.name === product.name);
+                const filtered = (data.orders || []).filter((o: ExtensionOrder) => o.products?.name === product.name);
                 setLookupResults(filtered);
                 if (filtered.length === 0) {
                     setLookupMessage('연장 가능한 주문 내역이 없습니다.');
@@ -282,15 +309,13 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     };
 
-    const handleSelectOrderForExtension = (order: any) => {
+    const handleSelectOrderForExtension = (order: ExtensionOrder) => {
         setSelectedOrder(order);
-        // Pre-fill email if available
         if (order.buyer_email) {
-            setGuestInfo(prev => ({ ...prev, email: order.buyer_email }));
+            setGuestInfo(prev => ({ ...prev, email: order.buyer_email || '' }));
         }
     };
 
-    // Use selected plan price for display
     const currentPlan = plans.find(p => p.duration_months === selectedPeriod);
     const calculatedPrice = currentPlan
         ? currentPlan.price.toLocaleString()
@@ -315,7 +340,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             </header>
 
             <div className={`${styles.content} container max-w-2xl mx-auto py-8`}>
-                {/* Product Detailed Content */}
                 {(product.detail_content || product.description) && (
                     <div
                         className="glass p-6 rounded-xl mb-8 animate-fade-in text-sm leading-relaxed"
@@ -336,7 +360,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     </ul>
                 </div>
 
-                {/* Period Selection - Dynamic */}
                 <section className={styles.options}>
                     <h3 className="text-lg font-bold mb-3">이용 기간 선택</h3>
                     <div className={styles.optionList}>
@@ -366,7 +389,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     </div>
                 </section>
 
-                {/* Checkout Form (Unified for Guest and User) */}
                 <div className="mt-8 space-y-6 animate-fade-in">
                     <div className="flex border-b border-input mb-6">
                         <button
@@ -420,7 +442,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             {lookupResults.length > 0 && (
                                 <div className="mt-4 space-y-2">
                                     <p className="text-xs font-bold text-muted-foreground mb-2">연장 가능한 내역 ({lookupResults.length})</p>
-                                    {lookupResults.map((o: any) => (
+                                    {lookupResults.map((o) => (
                                         <div
                                             key={o.id}
                                             className="p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -43,7 +42,14 @@ export default function MyPage() {
         if (error) {
             console.error('Error fetching subscriptions:', error);
         } else if (data) {
-            const mapped: UserSubscription[] = data.map((item: any) => {
+            interface QueryResult {
+                assignment_status: string;
+                products: { name: string } | null;
+                product_plans: { duration_months: number } | null;
+                order_number: string;
+                order_accounts: { end_date: string }[] | null;
+            }
+            const mapped: UserSubscription[] = (data as unknown as QueryResult[]).map((item) => {
                 const duration = item.product_plans?.duration_months || 0;
                 return {
                     service_name: item.products?.name || 'Service',

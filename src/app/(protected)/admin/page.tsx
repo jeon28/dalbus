@@ -24,7 +24,7 @@ interface BankAccount {
 }
 
 export default function AdminPage() {
-    const { user, isAdmin, loginAdmin, isHydrated } = useServices();
+    const { isAdmin, loginAdmin, isHydrated } = useServices();
 
     // Auth Form State
     const [loginId, setLoginId] = useState('');
@@ -47,7 +47,7 @@ export default function AdminPage() {
             if (!response.ok) throw new Error('Failed to fetch orders');
             const data = await response.json();
             setOrders(data);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Error fetching stats:', error);
         }
     };
@@ -87,8 +87,9 @@ export default function AdminPage() {
             } else {
                 alert('아이디 또는 비밀번호가 올바르지 않습니다.');
             }
-        } catch {
-            alert('로그인 처리 중 오류가 발생했습니다.');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`로그인 처리 중 오류가 발생했습니다: ${message}`);
         }
     };
 

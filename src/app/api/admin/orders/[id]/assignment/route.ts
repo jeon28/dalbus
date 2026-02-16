@@ -71,8 +71,9 @@ export async function GET(
         }
 
         return NextResponse.json({ assignment: data });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Assignment lookup error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const err = error as { message: string };
+        return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }

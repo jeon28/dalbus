@@ -64,6 +64,8 @@ interface Order {
     payment_status?: string;
     assignment_status?: string;
     created_at: string;
+    start_date?: string;
+    end_date?: string;
     user_id?: string;
     products?: {
         name: string;
@@ -75,14 +77,18 @@ interface Order {
     };
 }
 interface GridValue {
-    login_id?: string;
-    login_pw?: string;
-    order_number?: string;
-    buyer_name?: string;
-    start_date?: string;
-    end_date?: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
+    assignment_id?: string;
+    tidal_id: string | null;
+    tidal_password: string;
+    buyer_name: string;
+    buyer_phone: string;
+    buyer_email: string;
+    start_date: string;
+    end_date: string;
+    order_number: string;
+    type: 'master' | 'user';
+    order_id?: string;
+    full_order?: Order;
 }
 
 function TidalAccountsContent() {
@@ -393,8 +399,8 @@ function TidalAccountsContent() {
             alert('저장되었습니다.');
             setEditingSlots(prev => ({ ...prev, [key]: false })); // Exit edit mode
             fetchAccounts();
-        } catch (e) {
-            const errorMsg = (e as { message?: string }).message || String(e);
+        } catch (e: unknown) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
             if (!errorMsg.includes('이미 사용 중인 Tidal ID')) {
                 console.error('Save row error:', e);
             }
@@ -411,8 +417,9 @@ function TidalAccountsContent() {
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             fetchPendingOrders();
-        } catch {
-            alert('삭제 실패');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.';
+            alert('삭제 실패: ' + message);
         }
     };
 
@@ -462,8 +469,9 @@ function TidalAccountsContent() {
             setIsAddModalOpen(false);
             fetchAccounts();
             setNewAccount({ login_id: '', login_pw: '', payment_email: '', payment_day: 1, memo: '', product_id: '', max_slots: 6 });
-        } catch {
-            alert('❌ 그룹 생성 실패');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '그룹 생성 중 오류가 발생했습니다.';
+            alert('❌ 그룹 생성 실패: ' + message);
         }
     };
 
@@ -552,8 +560,22 @@ function TidalAccountsContent() {
     };
 
     const exportToExcel = () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const excelData: any[] = [];
+        interface ExcelRow {
+            'No.': string | number;
+            '그룹 ID': string;
+            '결제 계정': string;
+            '결제일': string;
+            '메모': string;
+            'Slot': string;
+            '고객명': string;
+            '전화번호': string;
+            '주문번호': string;
+            '소속 ID': string;
+            '소속 PW': string;
+            '시작일': string;
+            '종료일': string;
+        }
+        const excelData: ExcelRow[] = [];
 
         accounts.forEach((acc, accIdx) => {
             // Master account row
@@ -616,8 +638,14 @@ function TidalAccountsContent() {
             const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+            interface ImportRow {
+                '그룹 ID': string;
+                '결제 계정': string;
+                '결제일': number | string;
+                '메모': string;
+                [key: string]: string | number | undefined;
+            }
+            const jsonData = XLSX.utils.sheet_to_json<ImportRow>(worksheet);
 
             // Validation: Check headers
             const requiredHeaders = ['그룹 ID', '결제 계정', '결제일', '메모'];
@@ -686,8 +714,8 @@ function TidalAccountsContent() {
                 buyer_name: order.buyer_name || order.profiles?.name || '',
                 buyer_email: order.buyer_email || '',
                 buyer_phone: order.buyer_phone || order.profiles?.phone || '',
-                start_date: (order as any).start_date || '',
-                end_date: (order as any).end_date || '',
+                start_date: order.start_date || '',
+                end_date: order.end_date || '',
                 order_number: order.order_number || '',
                 tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : null,
                 tidal_password: slotPasswordModal || '',
@@ -1046,11 +1074,11 @@ function TidalAccountsContent() {
                                                                                 {val.type === 'master' ? 'Master' : 'User'}
                                                                             </span>
                                                                         </td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id}>{val.tidal_id || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password}>{val.tidal_password || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name}>{val.buyer_name || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email}>{val.buyer_email || '-'}</td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone}>{val.buyer_phone || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>{val.tidal_id || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password || undefined}>{val.tidal_password || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>{val.buyer_name || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
                                                                         <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
                                                                         <td className="px-2 text-gray-500 font-mono">{val.end_date || '-'}</td>
                                                                     </>
@@ -1309,9 +1337,9 @@ function TidalAccountsContent() {
                                 <span className="font-bold text-gray-500">서비스 (기간)</span>
                                 <span className="col-span-2">
                                     {viewOrder.products?.name}
-                                    {(viewOrder as any).start_date && (viewOrder as any).end_date && (
+                                    {viewOrder.start_date && viewOrder.end_date && (
                                         <span className="ml-1 text-blue-600">
-                                            ({differenceInMonths(parseISO((viewOrder as any).end_date), parseISO((viewOrder as any).start_date))}개월)
+                                            ({differenceInMonths(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date))}개월)
                                         </span>
                                     )}
                                 </span>

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -8,10 +7,21 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Lock } from 'lucide-react';
 
+interface Question {
+    id: string;
+    title: string;
+    content: string;
+    guest_name: string | null;
+    is_secret: boolean;
+    status: 'pending' | 'answered';
+    answer_content: string | null;
+    created_at: string;
+}
+
 export default function AdminQnAPage() {
     const { isAdmin } = useServices();
     const router = useRouter();
-    const [qnas, setQnas] = useState<any[]>([]);
+    const [qnas, setQnas] = useState<Question[]>([]);
     const [loading, setLoading] = useState(true);
     const [answeringId, setAnsweringId] = useState<string | null>(null);
     const [answerContent, setAnswerContent] = useState('');
@@ -33,10 +43,11 @@ export default function AdminQnAPage() {
                 const data = await res.json();
                 setQnas(data);
             }
-        } catch (e) {
-            console.error(e);
+        } catch (error: unknown) {
+            console.error('Error fetching QnA data:', error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleAnswerSubmit = async (id: string) => {
@@ -55,11 +66,11 @@ export default function AdminQnAPage() {
                 setAnswerContent('');
                 fetchQnas(); // Refresh
             } else {
-                alert('답변 등록 실패');
+                throw new Error('답변 등록 실패');
             }
-        } catch (e) {
-            console.error(e);
-            alert('오류 발생');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류: ${message}`);
         }
     };
 

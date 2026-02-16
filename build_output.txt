@@ -6,33 +6,81 @@
    - Environments: .env.local
 
    Creating an optimized production build ...
- ??Compiled successfully in 4.3s
+ ??Compiled successfully in 15.8s
    Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/27) ...
+   Generating static pages (6/27) 
+   Generating static pages (13/27) 
+   Generating static pages (20/27) 
+ ??Generating static pages (27/27)
+   Finalizing page optimization ...
+   Collecting build traces ...
 
-Failed to compile.
+Route (app)                                 Size  First Load JS
+????/                                      222 B         102 kB
+????/_not-found                            998 B         103 kB
+????/admin                               6.69 kB         168 kB
+????/admin/faqs                           3.3 kB         169 kB
+????/admin/members                       5.24 kB         166 kB
+????/admin/notices                       3.62 kB         169 kB
+????/admin/orders                        17.8 kB         362 kB
+????/admin/qna                           5.58 kB         167 kB
+????/admin/services                      4.81 kB         175 kB
+??? /admin/services/[id]                 3.43 kB         172 kB
+????/admin/services/new                  6.13 kB         171 kB
+????/admin/tidal                         9.78 kB         354 kB
+??? /api/admin/accounts                    222 B         102 kB
+??? /api/admin/accounts/[id]               222 B         102 kB
+??? /api/admin/accounts/[id]/assign        222 B         102 kB
+??? /api/admin/accounts/import             222 B         102 kB
+??? /api/admin/accounts/move               222 B         102 kB
+??? /api/admin/assignments/[id]            222 B         102 kB
+??? /api/admin/bank-accounts               222 B         102 kB
+??? /api/admin/bank-accounts/[id]          222 B         102 kB
+??? /api/admin/faq-categories              222 B         102 kB
+??? /api/admin/faq-categories/[id]         222 B         102 kB
+??? /api/admin/faqs                        222 B         102 kB
+??? /api/admin/faqs/[id]                   222 B         102 kB
+??? /api/admin/members                     222 B         102 kB
+??? /api/admin/notice-categories           222 B         102 kB
+??? /api/admin/notice-categories/[id]      222 B         102 kB
+??? /api/admin/notices                     222 B         102 kB
+??? /api/admin/notices/[id]                222 B         102 kB
+??? /api/admin/orders                      222 B         102 kB
+??? /api/admin/orders/[id]                 222 B         102 kB
+??? /api/admin/orders/[id]/assignment      222 B         102 kB
+??? /api/admin/orders/[id]/status          222 B         102 kB
+??? /api/admin/plans                       222 B         102 kB
+??? /api/admin/plans/[id]                  222 B         102 kB
+??? /api/admin/products                    222 B         102 kB
+??? /api/admin/products/[id]               222 B         102 kB
+??? /api/admin/qna/[id]/answer             222 B         102 kB
+??? /api/admin/settings                    222 B         102 kB
+??? /api/auth/check-email                  222 B         102 kB
+??? /api/auth/check-user                   222 B         102 kB
+??? /api/orders                            222 B         102 kB
+??? /api/orders/lookup                     222 B         102 kB
+??? /api/qna                               222 B         102 kB
+??? /api/qna/[id]                          222 B         102 kB
+??? /api/qna/[id]/verify                   222 B         102 kB
+????/login                               3.67 kB         160 kB
+????/mypage                              3.51 kB         160 kB
+????/public                                222 B         102 kB
+????/public/checkout/success             3.37 kB         114 kB
+????/public/faq                          2.21 kB         163 kB
+????/public/notices                      2.15 kB         163 kB
+????/public/products                     3.76 kB         174 kB
+????/public/qna                          5.49 kB         170 kB
+????/public/qna/write                    5.17 kB         170 kB
+??? /service/[id]                        11.2 kB         184 kB
+????/signup                              4.84 kB         161 kB
++ First Load JS shared by all             102 kB
+  ??chunks/1255-186e651176ba28b9.js        46 kB
+  ??chunks/4bd1b696-f785427dddbba9fb.js  54.2 kB
+  ??other shared chunks (total)          2.03 kB
 
-./src/app/(protected)/admin/orders/page.tsx
-24:8  Warning: React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
 
-./src/app/(protected)/admin/services/page.tsx
-102:53  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+?? (Static)   prerendered as static content
+?  (Dynamic)  server-rendered on demand
 
-./src/app/(protected)/admin/services/[id]/page.tsx
-40:8  Warning: React Hook useEffect has a missing dependency: 'fetchProduct'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-
-./src/app/(protected)/mypage/page.tsx
-31:8  Warning: React Hook useEffect has a missing dependency: 'fetchUserSubscriptions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-
-./src/app/api/admin/members/route.ts
-1:10  Error: 'NextRequest' is defined but never used.  @typescript-eslint/no-unused-vars
-
-./src/app/public/products/page.tsx
-37:41  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
-
-./src/app/public/qna/page.tsx
-35:8  Warning: React Hook useEffect has a missing dependency: 'fetchQnas'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-
-./src/app/service/[id]/page.tsx
-145:46  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
-
-info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

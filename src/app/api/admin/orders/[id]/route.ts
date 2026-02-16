@@ -3,9 +3,9 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const orderId = params.id;
+    const { id: orderId } = await params;
 
     try {
         // 1. Check if the order has any assignments
@@ -32,8 +32,9 @@ export async function DELETE(
         if (deleteError) throw deleteError;
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error deleting order:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const err = error as { message: string };
+        return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }

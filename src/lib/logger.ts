@@ -13,22 +13,22 @@ const getLevel = (): number => {
 };
 
 export const logger = {
-    debug: (...args: any[]) => {
+    debug: (...args: unknown[]) => {
         if (getLevel() <= LOG_LEVELS.debug) {
             console.log('🔍 [DEBUG]', ...args);
         }
     },
-    info: (...args: any[]) => {
+    info: (...args: unknown[]) => {
         if (getLevel() <= LOG_LEVELS.info) {
             console.info('ℹ️ [INFO]', ...args);
         }
     },
-    warn: (...args: any[]) => {
+    warn: (...args: unknown[]) => {
         if (getLevel() <= LOG_LEVELS.warn) {
             console.warn('⚠️ [WARN]', ...args);
         }
     },
-    error: (...args: any[]) => {
+    error: (...args: unknown[]) => {
         if (getLevel() <= LOG_LEVELS.error) {
             console.error('❌ [ERROR]', ...args);
         }

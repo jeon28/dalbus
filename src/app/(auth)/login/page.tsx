@@ -97,17 +97,19 @@ export default function LoginPage() {
                         console.log('User is regular user, navigating to /');
                         router.push('/');
                     }
-                } catch (profileCatchErr: any) {
+                } catch (profileCatchErr) {
                     // If navigation already triggered and fetch aborted
-                    if (!profileCatchErr?.message?.includes('aborted')) {
+                    const err = profileCatchErr as { message?: string };
+                    if (!err.message?.includes('aborted')) {
                         router.push('/');
                     }
                 }
             } else {
                 router.push('/');
             }
-        } catch (loginError: any) {
-            if (!loginError?.message?.includes('aborted')) {
+        } catch (loginError) {
+            const err = loginError as { message?: string };
+            if (!err.message?.includes('aborted')) {
                 console.error('Unhandled login error:', loginError);
                 alert('로그인 처리 중 예기치 못한 오류가 발생했습니다.');
             }

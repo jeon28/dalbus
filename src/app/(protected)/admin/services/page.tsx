@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -10,9 +9,20 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Trash2, Edit } from 'lucide-react';
 
+interface Product {
+    id: string;
+    name: string;
+    slug: string;
+    image_url?: string;
+    original_price: number;
+    is_active: boolean;
+    sort_order: number;
+    product_plans?: { id: string }[];
+}
+
 export default function ServiceListPage() {
     const { isAdmin } = useServices();
-    const [products, setProducts] = useState<any[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -31,7 +41,7 @@ export default function ServiceListPage() {
             if (!response.ok) throw new Error('Failed to fetch products');
             const data = await response.json();
             setProducts(data);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Error fetching products:', error);
         }
         setLoading(false);
@@ -50,9 +60,10 @@ export default function ServiceListPage() {
             } else {
                 alert('삭제 실패');
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Error deleting product:', error);
-            alert('오류가 발생했습니다.');
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류 발생: ${message}`);
         }
     };
 

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState } from 'react';
@@ -63,9 +62,10 @@ export default function NewServicePage() {
 
             alert('서비스가 생성되었습니다.');
             router.push('/admin/services');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating product:', error);
-            alert(`오류 발생: ${error.message}`);
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류 발생: ${message}`);
         }
         setLoading(false);
     };

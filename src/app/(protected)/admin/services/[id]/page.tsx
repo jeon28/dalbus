@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../../admin.module.css';
-import { useRouter, useParams } from 'next/navigation'; // Use useParams
+import { useRouter, useParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,8 +20,29 @@ export default function EditServicePage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
+    interface AdminPlan {
+        id: string;
+        duration_months: number;
+        price: number;
+        discount_rate: number;
+        is_active: boolean;
+    }
+
+    interface AdminService {
+        id: string;
+        name: string;
+        slug: string;
+        original_price: number;
+        sort_order: number;
+        description: string | null;
+        detail_content: string | null;
+        image_url: string | null;
+        is_active: boolean;
+        product_plans: AdminPlan[];
+    }
+
     // Product State
-    const [product, setProduct] = useState<any>(null);
+    const [product, setProduct] = useState<AdminService | null>(null);
 
     // Plan Form State (for adding new plan)
     const [newPlan, setNewPlan] = useState({
@@ -39,9 +59,10 @@ export default function EditServicePage() {
             if (!response.ok) throw new Error('Failed to fetch product');
             const data = await response.json();
             setProduct(data);
-        } catch (error) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             console.error('Error fetching product:', error);
-            alert('서비스 정보를 불러오는데 실패했습니다.');
+            alert(`서비스 정보를 불러오는데 실패했습니다: ${message}`);
             router.push('/admin/services');
         }
         setLoading(false);
@@ -58,32 +79,38 @@ export default function EditServicePage() {
     const handleProductChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const checked = (e.target as HTMLInputElement).checked;
-        setProduct((prev: any) => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
+        setProduct((prev: AdminService | null) => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                [name]: type === 'checkbox' ? checked : value
+            } as AdminService;
+        });
     };
 
     const handleProductSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
         try {
+            if (!product) return;
             const response = await fetch(`/api/admin/products/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...product,
-                    original_price: parseInt(product.original_price),
-                    sort_order: parseInt(product.sort_order),
+                    original_price: parseInt(product.original_price.toString()),
+                    sort_order: parseInt(product.sort_order.toString()),
                 })
             });
 
             if (!response.ok) throw new Error('Failed to update product');
             alert('서비스 정보가 수정되었습니다.');
-        } catch (error: any) {
-            alert(`오류 발생: ${error.message}`);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류 발생: ${message}`);
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
     };
 
     const handleNewPlanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,12 +143,13 @@ export default function EditServicePage() {
             alert('요금제가 추가되었습니다.');
             setNewPlan({ duration_months: 1, price: 0, discount_rate: 0, is_active: true }); // Reset form
             fetchProduct(); // Refresh list
-        } catch (error: any) {
-            alert(`오류 발생: ${error.message}`);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류 발생: ${message}`);
         }
     };
 
-    const handleTogglePlan = async (plan: any) => {
+    const handleTogglePlan = async (plan: AdminPlan) => {
         try {
             const response = await fetch(`/api/admin/plans/${plan.id}`, {
                 method: 'PUT',
@@ -132,8 +160,9 @@ export default function EditServicePage() {
             });
             if (!response.ok) throw new Error('Failed to update plan status');
             fetchProduct();
-        } catch (error: any) {
-            alert(`오류 발생: ${error.message}`);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류 발생: ${message}`);
         }
     };
 
@@ -149,9 +178,10 @@ export default function EditServicePage() {
                 const errorData = await response.json();
                 alert(`삭제 실패: ${errorData.error || '알 수 없는 오류'}`);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error deleting plan:', error);
-            alert(`삭제 실패: ${error.message}`);
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`삭제 실패: ${message}`);
         }
     };
 
@@ -247,7 +277,7 @@ export default function EditServicePage() {
                         {product.product_plans?.length === 0 ? (
                             <p className="text-gray-500 text-sm">등록된 요금제가 없습니다.</p>
                         ) : (
-                            product.product_plans?.sort((a: any, b: any) => a.duration_months - b.duration_months).map((plan: any) => (
+                            [...product.product_plans].sort((a, b) => a.duration_months - b.duration_months).map((plan) => (
                                 <div key={plan.id} className="flex items-center justify-between p-4 bg-white rounded-lg border shadow-sm">
                                     <div>
                                         <div className="font-semibold">{plan.duration_months}개월권</div>

@@ -45,19 +45,24 @@ export default function NoticeAdminPage() {
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
-        const [noticeRes, catRes] = await Promise.all([
-            fetch('/api/admin/notices'),
-            fetch('/api/admin/notice-categories')
-        ]);
-        if (noticeRes.ok) setNotices(await noticeRes.json());
-        if (catRes.ok) {
-            const catData = await catRes.json();
-            setCategories(catData);
-            if (catData.length > 0 && !formData.category) {
-                setFormData(prev => ({ ...prev, category: catData[0].name }));
+        try {
+            const [noticeRes, catRes] = await Promise.all([
+                fetch('/api/admin/notices'),
+                fetch('/api/admin/notice-categories')
+            ]);
+            if (noticeRes.ok) setNotices(await noticeRes.json());
+            if (catRes.ok) {
+                const catData = await catRes.json();
+                setCategories(catData);
+                if (catData.length > 0 && !formData.category) {
+                    setFormData(prev => ({ ...prev, category: catData[0].name }));
+                }
             }
+        } catch (error: unknown) {
+            console.error('Error fetching notice data:', error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [formData.category]);
 
     useEffect(() => {
@@ -71,17 +76,25 @@ export default function NoticeAdminPage() {
         const url = isEditing ? `/api/admin/notices/${isEditing}` : '/api/admin/notices';
         const method = isEditing ? 'PUT' : 'POST';
 
-        const res = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData)
-        });
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
 
-        if (res.ok) {
-            alert(isEditing ? '수정되었습니다.' : '등록되었습니다.');
-            setIsEditing(null);
-            setFormData({ title: '', content: '', category: categories[0]?.name || '', is_published: true, is_pinned: false });
-            fetchData();
+            if (res.ok) {
+                alert(isEditing ? '수정되었습니다.' : '등록되었습니다.');
+                setIsEditing(null);
+                setFormData({ title: '', content: '', category: categories[0]?.name || '', is_published: true, is_pinned: false });
+                fetchData();
+            } else {
+                const errorData = await res.json();
+                throw new Error(errorData.error || '처리 중 오류가 발생했습니다.');
+            }
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류: ${message}`);
         }
     };
 
@@ -99,8 +112,17 @@ export default function NoticeAdminPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm('정말 삭제하시겠습니까?')) return;
-        const res = await fetch(`/api/admin/notices/${id}`, { method: 'DELETE' });
-        if (res.ok) fetchData();
+        try {
+            const res = await fetch(`/api/admin/notices/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                fetchData();
+            } else {
+                throw new Error('삭제 실패');
+            }
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(message);
+        }
     };
 
     const handleTogglePin = async (notice: Notice) => {

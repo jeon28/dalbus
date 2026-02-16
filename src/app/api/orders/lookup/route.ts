@@ -41,7 +41,17 @@ export async function POST(req: NextRequest) {
         }
 
         // Map to ensure end_date is at the top level for frontend compatibility
-        const orders = rawOrders?.map((o: any) => ({
+        interface RawOrder {
+            id: string;
+            order_number: string;
+            created_at: string;
+            payment_status: string;
+            products: { name: string } | null;
+            product_plans: { duration_months: number } | null;
+            order_accounts: { end_date: string }[] | null;
+        }
+
+        const orders = (rawOrders as unknown as RawOrder[])?.map((o) => ({
             ...o,
             end_date: o.order_accounts?.[0]?.end_date || null
         }));

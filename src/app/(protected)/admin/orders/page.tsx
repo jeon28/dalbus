@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -29,10 +28,65 @@ import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
 import { addMonths, differenceInMonths, format, parseISO } from 'date-fns';
 
+interface Profile {
+    name?: string;
+    email?: string;
+    phone?: string;
+}
+
+interface Product {
+    name: string;
+}
+
+interface ProductPlan {
+    duration_months: number;
+}
+
+interface Order {
+    id: string;
+    created_at: string;
+    order_number: string;
+    order_type?: 'NEW' | 'EXT';
+    amount: number;
+    is_guest: boolean;
+    buyer_name?: string;
+    buyer_phone?: string;
+    buyer_email?: string;
+    profiles?: Profile;
+    products?: Product;
+    product_plans?: ProductPlan;
+    assignment_status?: string;
+    payment_status?: string;
+    order_accounts?: OrderAccount[];
+    related_order_id?: string;
+    end_date?: string;
+}
+
+interface OrderAccount {
+    id: string;
+    account_id: string;
+    order_id: string;
+    slot_number: number;
+    tidal_id?: string;
+    start_date?: string;
+    end_date?: string;
+    type?: 'master' | 'member';
+    accounts?: Account;
+    orders?: Order;
+}
+
+interface Account {
+    id: string;
+    login_id: string;
+    memo?: string;
+    max_slots: number;
+    used_slots: number;
+    order_accounts?: OrderAccount[];
+}
 
 export default function OrderHistoryPage() {
     const { isAdmin, isHydrated } = useServices();
-    const [orders, setOrders] = useState<Record<string, any>[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [selectedOrderTypes, setSelectedOrderTypes] = useState<string[]>([]);
     const [phoneSearch, setPhoneSearch] = useState<string>('');
@@ -75,12 +129,12 @@ export default function OrderHistoryPage() {
 
     // Matching Modal State
     const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
-    const [selectedOrder, setSelectedOrder] = useState<any>(null);
-    const [availableAccounts, setAvailableAccounts] = useState<any[]>([]);
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [availableAccounts, setAvailableAccounts] = useState<Account[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
-    const [previousAssignment, setPreviousAssignment] = useState<any>(null);
+    const [previousAssignment, setPreviousAssignment] = useState<OrderAccount | null>(null);
     const [extDuration, setExtDuration] = useState<number>(7);
     const [extEndDate, setExtEndDate] = useState<string>('');
 
@@ -112,7 +166,7 @@ export default function OrderHistoryPage() {
         }
     };
 
-    const getOrderStatus = (order: any) => {
+    const getOrderStatus = (order: Order) => {
         if (order.assignment_status === 'completed') return '작업완료';
         if (order.assignment_status === 'assigned') return '배정완료'; // Linked
         if (order.payment_status === 'paid') return '입금확인';
@@ -164,7 +218,7 @@ export default function OrderHistoryPage() {
         XLSX.writeFile(wb, fileName);
     };
 
-    const handleOpenMatchModal = async (order: any) => {
+    const handleOpenMatchModal = async (order: Order) => {
         setSelectedOrder(order);
         setSelectedAccount('');
         setSelectedSlot(null);
@@ -209,12 +263,12 @@ export default function OrderHistoryPage() {
 
                 // Filter accounts with available slots
                 // Note: For extensions, the account of the previous assignment should be included even if it's full (since we'll be re-using a slot)
-                let available = data.filter((acc: any) => acc.used_slots < acc.max_slots);
+                let available = data.filter((acc: Account) => acc.used_slots < acc.max_slots);
 
                 if (prev) {
-                    const alreadyIn = available.some((acc: any) => acc.id === prev.account_id);
+                    const alreadyIn = available.some((acc: Account) => acc.id === prev.account_id);
                     if (!alreadyIn) {
-                        const prevAcc = data.find((acc: any) => acc.id === prev.account_id);
+                        const prevAcc = data.find((acc: Account) => acc.id === prev.account_id);
                         if (prevAcc) {
                             available = [prevAcc, ...available];
                         }
@@ -222,9 +276,9 @@ export default function OrderHistoryPage() {
                 }
 
                 // Sort by master account expiry date (end_date)
-                available.sort((a: any, b: any) => {
-                    const getExpiry = (acc: any) => {
-                        const masterSlot = acc.order_accounts?.find((oa: any) => oa.type === 'master');
+                available.sort((a: Account, b: Account) => {
+                    const getExpiry = (acc: Account) => {
+                        const masterSlot = acc.order_accounts?.find((oa: OrderAccount) => oa.type === 'master');
                         return masterSlot?.end_date || '9999-12-31';
                     };
                     return getExpiry(b).localeCompare(getExpiry(a));
@@ -278,8 +332,8 @@ export default function OrderHistoryPage() {
 
                         // Check for duplicates across ALL accounts' slots
                         const allTakenIds = new Set<string>();
-                        data.forEach((acc: any) => {
-                            acc.order_accounts?.forEach((oa: any) => {
+                        data.forEach((acc: Account) => {
+                            acc.order_accounts?.forEach((oa: OrderAccount) => {
                                 if (oa.tidal_id) allTakenIds.add(oa.tidal_id.toLowerCase());
                             });
                         });
@@ -301,8 +355,8 @@ export default function OrderHistoryPage() {
         }
     };
 
-    const getMasterInfo = (acc: any) => {
-        const masterSlot = acc.order_accounts?.find((oa: any) => oa.type === 'master');
+    const getMasterInfo = (acc: Account) => {
+        const masterSlot = acc.order_accounts?.find((oa: OrderAccount) => oa.type === 'master');
         if (!masterSlot || !masterSlot.orders) {
             return 'master 계정없음';
         }
@@ -330,7 +384,7 @@ export default function OrderHistoryPage() {
         if (!acc) return [];
         const takenSlots = new Set<number>();
         if (acc.order_accounts) {
-            acc.order_accounts.forEach((oa: any) => takenSlots.add(oa.slot_number));
+            acc.order_accounts.forEach((oa: OrderAccount) => takenSlots.add(oa.slot_number));
         }
         const available = [];
         for (let i = 0; i < acc.max_slots; i++) {
@@ -382,8 +436,9 @@ export default function OrderHistoryPage() {
 
             // 주문 목록 새로고침
             fetchOrders();
-        } catch (error: any) {
-            alert(error.message || '배정 실패');
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(message);
         }
     };
 
@@ -417,7 +472,7 @@ export default function OrderHistoryPage() {
         }
     };
 
-    const handleUnassign = async (order: any) => {
+    const handleUnassign = async (order: Order) => {
         const assignmentId = order.order_accounts?.[0]?.id;
         if (!assignmentId) {
             alert('배정 정보가 없습니다.');
@@ -453,7 +508,7 @@ export default function OrderHistoryPage() {
         }
     };
 
-    const handleDeleteOrder = async (order: any) => {
+    const handleDeleteOrder = async (order: Order) => {
         if (order.order_accounts && order.order_accounts.length > 0) {
             alert('배정된 계정이 있는 주문은 삭제할 수 없습니다. 먼저 배정 취소를 해주세요.');
             return;
@@ -475,8 +530,9 @@ export default function OrderHistoryPage() {
 
             alert('삭제되었습니다.');
             fetchOrders();
-        } catch (error: any) {
-            alert(error.message);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(message);
         }
     };
 
@@ -497,7 +553,7 @@ export default function OrderHistoryPage() {
 
     if (!isAdmin) return null;
 
-    const renderTable = (list: any[]) => (
+    const renderTable = (list: Order[]) => (
         <div className={styles.tableWrapper}>
             <table className={styles.table}>
                 <thead>
@@ -613,8 +669,8 @@ export default function OrderHistoryPage() {
     }).sort((a, b) => {
         if (!sortConfig.direction || !sortConfig.key) return 0;
 
-        let aValue: any;
-        let bValue: any;
+        let aValue: string | number = '';
+        let bValue: string | number = '';
 
         if (sortConfig.key === 'created_at') {
             aValue = new Date(a.created_at).getTime();

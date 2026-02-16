@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -8,9 +7,17 @@ import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+export interface Member {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    created_at: string;
+}
+
 export default function MemberListPage() {
     const { isAdmin } = useServices();
-    const [members, setMembers] = useState<any[]>([]);
+    const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -29,13 +36,13 @@ export default function MemberListPage() {
             if (!response.ok) throw new Error('Failed to fetch members');
             const data = await response.json();
             setMembers(data);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Error fetching members:', error);
         }
         setLoading(false);
     };
 
-    const handleDeleteMember = async (member: any) => {
+    const handleDeleteMember = async (member: Member) => {
         if (!confirm(`'${member.name}' (${member.email}) 회원을 삭제하시겠습니까?\n\n주의: 이 작업은 되돌릴 수 없습니다.`)) {
             return;
         }
@@ -53,9 +60,9 @@ export default function MemberListPage() {
 
             alert('✅ ' + result.message);
             fetchMembers(); // Refresh the list
-        } catch (error) {
-            const e = error as Error;
-            alert('❌ ' + e.message);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert('❌ ' + message);
         }
     };
 

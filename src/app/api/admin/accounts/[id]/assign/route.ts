@@ -101,7 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             const orderDate = ord.created_at ? new Date(ord.created_at) : new Date();
             finalStartDate = finalStartDate || format(orderDate, 'yyyy-MM-dd');
-            const durationMonths = (ord.product_plans as any)?.duration_months || 1;
+            const durationMonths = (ord.product_plans as { duration_months?: number } | null)?.duration_months || 1;
             finalEndDate = finalEndDate || format(addMonths(parseISO(finalStartDate), durationMonths), 'yyyy-MM-dd');
         }
 
@@ -188,11 +188,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         return NextResponse.json({ success: true });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error('Assign Error:', error);
-        if (error.code === '23505') {
+        const err = error as { code?: string; message: string };
+        if (err.code === '23505') {
             return NextResponse.json({ error: '이미 사용 중인 Tidal ID입니다.' }, { status: 409 });
         }
-        return NextResponse.json({ error: error.message || '알 수 없는 오류가 발생했습니다.' }, { status: 500 });
+        return NextResponse.json({ error: err.message || '알 수 없는 오류가 발생했습니다.' }, { status: 500 });
     }
 }
