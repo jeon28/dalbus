@@ -9,8 +9,8 @@ import ErrorHandler from "@/components/ErrorHandler";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: "달버스 (Dalbus) - 프리미엄 구독 공유 플랫폼",
-    description: "Tidal, Netflix, Youtube Premium 등 프리미엄 서비스를 최대 70% 할인된 가격으로 이용하세요.",
+    title: "달버스 (Dalbus) | 음악에만 집중하세요, 나머지는 달버스가 책임집니다.",
+    description: "타이달(Tidal) 프리미엄 구독 공유 플랫폼. 음악에만 집중하세요, 나머지는 달버스가 책임집니다.",
 };
 
 export default function RootLayout({

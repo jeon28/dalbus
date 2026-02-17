@@ -20,12 +20,12 @@ export default function PriceComparison() {
                                 <X className="h-6 w-6 text-muted-foreground" />
                             </div>
                             <CardTitle className="text-xl font-bold">개별 구독 (정가)</CardTitle>
-                            <div className="text-4xl font-bold">₩10,990<span className="text-sm font-normal text-muted-foreground">/월</span></div>
+                            <div className="text-4xl font-bold">₩16,000<span className="text-sm font-normal text-muted-foreground">/월</span></div>
                         </CardHeader>
                         <CardContent className="grid gap-4 p-6 place-items-center">
                             <ul className="grid gap-2 text-sm text-center">
                                 <li className="flex items-center gap-2"><X className="h-4 w-4 text-red-500" /> 높은 비용 부담</li>
-                                <li className="flex items-center gap-2"><X className="h-4 w-4 text-red-500" /> 복잡한 해지 절차</li>
+                                <li className="flex items-center gap-2"><X className="h-4 w-4 text-red-500" /> 복잡한 가입 및 결제 절차</li>
                                 <li className="flex items-center gap-2"><X className="h-4 w-4 text-red-500" /> 환율 변동 영향</li>
                             </ul>
                         </CardContent>
@@ -39,8 +39,8 @@ export default function PriceComparison() {
                                 <Check className="h-6 w-6 text-primary-foreground" />
                             </div>
                             <CardTitle className="text-xl font-bold text-primary">달버스 (Dalbus)</CardTitle>
-                            <div className="text-4xl font-bold text-primary">₩30,000</div>
-                            <p className="text-xs text-muted-foreground">6개월권 기준</p>
+                            <div className="text-4xl font-bold text-primary">₩4,900<span className="text-sm font-normal text-primary/70">/월</span></div>
+                            <p className="text-xs text-muted-foreground">6개월권 약 ₩30,000</p>
                         </CardHeader>
                         <CardContent className="grid gap-4 p-6 place-items-center">
                             <ul className="grid gap-2 text-sm text-center">

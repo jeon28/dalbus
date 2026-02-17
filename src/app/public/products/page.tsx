@@ -27,6 +27,36 @@ export default function ProductsPage() {
                 </p>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+                <Card className="flex flex-col items-center text-center p-6 bg-primary/5 border-none shadow-sm hover:translate-y-[-4px] transition-transform duration-300">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                        <span className="text-2xl">🆔</span>
+                    </div>
+                    <CardTitle className="text-lg mb-2">고정 아이디 부여</CardTitle>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        몇 달마다 바뀌는 일회용 계정은 이제 그만.{"\n"}본인만의 고정 아이디로 끊김 없는 음악 여정을 지원합니다.
+                    </p>
+                </Card>
+                <Card className="flex flex-col items-center text-center p-6 bg-primary/5 border-none shadow-sm hover:translate-y-[-4px] transition-transform duration-300">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                        <span className="text-2xl">🛡️</span>
+                    </div>
+                    <CardTitle className="text-lg mb-2">안심 구독 서비스</CardTitle>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        불투명한 운영이 아닙니다.{"\n"}지속적인 피드백과 모니터링을 통해 안정적인 스트리밍을 보장합니다.
+                    </p>
+                </Card>
+                <Card className="flex flex-col items-center text-center p-6 bg-primary/5 border-none shadow-sm hover:translate-y-[-4px] transition-transform duration-300">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                        <span className="text-2xl">🎵</span>
+                    </div>
+                    <CardTitle className="text-lg mb-2">플레이리스트 이관</CardTitle>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        기존 계정에서 듣던 노래들, 일일이 찾지 마세요.{"\n"}달버스가 플레이리스트를 그대로 옮겨드립니다.
+                    </p>
+                </Card>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {services.length > 0 ? (
                     services.map((product) => (
