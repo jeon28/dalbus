@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import {
@@ -89,6 +88,7 @@ export default function OrderHistoryPage() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [selectedOrderTypes, setSelectedOrderTypes] = useState<string[]>([]);
+    const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([]);
     const [phoneSearch, setPhoneSearch] = useState<string>('');
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: 'created_at', direction: 'desc' });
     const router = useRouter();
@@ -124,6 +124,17 @@ export default function OrderHistoryPage() {
         {
             value: "EXT",
             label: "연장",
+        },
+    ]
+
+    const guestTypes = [
+        {
+            value: "member",
+            label: "회원",
+        },
+        {
+            value: "guest",
+            label: "비회원",
         },
     ]
 
@@ -174,44 +185,24 @@ export default function OrderHistoryPage() {
     };
 
     const exportToExcel = () => {
-        // Prepare data for member orders
-        const memberData = memberOrders.map(order => ({
+        const data = filteredOrders.map(order => ({
             '날짜': new Date(order.created_at).toLocaleDateString(),
             '주문번호': order.order_number,
             '구분': order.order_type === 'NEW' ? '신규' : '연장',
+            '회원여부': order.is_guest ? '비회원' : '회원',
             '고객명': order.profiles?.name || order.buyer_name || 'Unknown',
             '이메일': order.profiles?.email || order.buyer_email || '-',
             '연락처': order.profiles?.phone || order.buyer_phone || '-',
             '서비스': order.products?.name || 'Product',
-            '이용기간': order.product_plans?.duration_months ? `${order.product_plans.duration_months}개월` : '-',
-            '금액': order.amount?.toLocaleString() + '원',
-            '상태': getOrderStatus(order)
-        }));
-
-        // Prepare data for guest orders
-        const guestData = guestOrders.map(order => ({
-            '날짜': new Date(order.created_at).toLocaleDateString(),
-            '주문번호': order.order_number,
-            '구분': order.order_type === 'NEW' ? '신규' : '연장',
-            '고객명': order.profiles?.name || order.buyer_name || 'Unknown',
-            '이메일': order.profiles?.email || order.buyer_email || '-',
-            '연락처': order.profiles?.phone || order.buyer_phone || '-',
-            '서비스': order.products?.name || 'Product',
-            '이용기간': order.product_plans?.duration_months ? `${order.product_plans.duration_months}개월` : '-',
+            '이용기간': order.product_plans?.duration_months || 0,
             '금액': order.amount?.toLocaleString() + '원',
             '상태': getOrderStatus(order)
         }));
 
         // Create workbook
         const wb = XLSX.utils.book_new();
-
-        // Create worksheets
-        const wsMember = XLSX.utils.json_to_sheet(memberData);
-        const wsGuest = XLSX.utils.json_to_sheet(guestData);
-
-        // Add worksheets to workbook
-        XLSX.utils.book_append_sheet(wb, wsMember, '회원 주문');
-        XLSX.utils.book_append_sheet(wb, wsGuest, '비회원 주문');
+        const ws = XLSX.utils.json_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, '주문 내역');
 
         // Generate file
         const fileName = `주문내역_${new Date().toLocaleDateString()}.xlsx`;
@@ -558,15 +549,17 @@ export default function OrderHistoryPage() {
             <table className={styles.table}>
                 <thead>
                     <tr>
-                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors">
+                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '140px' }}>
                             <div className="flex items-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
                         <th>구분</th>
+                        <th>회원여부</th>
                         <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors">
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
                         <th>연락처/이메일</th>
                         <th>서비스</th>
+                        <th>이용기간</th>
                         <th>금액</th>
                         <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors">
                             <div className="flex items-center">상태 {getSortIcon('status')}</div>
@@ -590,6 +583,12 @@ export default function OrderHistoryPage() {
                                     </span>
                                 </td>
                                 <td>
+                                    <span className={`px-2 py-1 rounded text-xs font-medium
+                                        ${o.is_guest ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
+                                        {o.is_guest ? '비회원' : '회원'}
+                                    </span>
+                                </td>
+                                <td>
                                     <div className="font-medium">{o.profiles?.name || o.buyer_name || 'Unknown'}</div>
                                 </td>
                                 <td>
@@ -598,11 +597,9 @@ export default function OrderHistoryPage() {
                                 </td>
                                 <td>
                                     <div>{o.products?.name || 'Product'}</div>
-                                    {o.product_plans?.duration_months && (
-                                        <div className="text-[10px] text-gray-400">
-                                            이용기간: {o.product_plans.duration_months}개월
-                                        </div>
-                                    )}
+                                </td>
+                                <td>
+                                    <div className="font-mono">{o.product_plans?.duration_months || '-'}</div>
                                 </td>
                                 <td>₩{o.amount?.toLocaleString()}</td>
                                 <td>
@@ -653,10 +650,14 @@ export default function OrderHistoryPage() {
 
         // Order Type filter
         if (selectedOrderTypes.length > 0) {
-            // If order_type is null/undefined (old data), treat as NEW or handle as needed. 
-            // For now, let's assume valid data or default 'NEW' from DB.
             const type = order.order_type || 'NEW';
             if (!selectedOrderTypes.includes(type)) return false;
+        }
+
+        // Guest filter
+        if (selectedGuestTypes.length > 0) {
+            const guestType = order.is_guest ? 'guest' : 'member';
+            if (!selectedGuestTypes.includes(guestType)) return false;
         }
 
         // Phone number filter
@@ -688,9 +689,6 @@ export default function OrderHistoryPage() {
         return 0;
     });
 
-    const memberOrders = filteredOrders.filter(o => !o.is_guest);
-    const guestOrders = filteredOrders.filter(o => o.is_guest);
-
     return (
         <main className={styles.main}>
             <header className={`${styles.header} glass`}>
@@ -719,21 +717,19 @@ export default function OrderHistoryPage() {
                             setFilter={setSelectedOrderTypes}
                         />
                         <DataTableFacetedFilter
+                            title="회원여부"
+                            options={guestTypes}
+                            selectedValues={selectedGuestTypes}
+                            setFilter={setSelectedGuestTypes}
+                        />
+                        <DataTableFacetedFilter
                             title="Status"
                             options={statuses}
                             selectedValues={selectedStatuses}
                             setFilter={setSelectedStatuses}
                         />
                     </div>
-                    <Tabs defaultValue="member" className="w-full">
-                        <TabsList className="mb-4">
-                            <TabsTrigger value="member">회원 주문 ({memberOrders.length})</TabsTrigger>
-                            <TabsTrigger value="guest">비회원 주문 ({guestOrders.length})</TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="member">{renderTable(memberOrders)}</TabsContent>
-                        <TabsContent value="guest">{renderTable(guestOrders)}</TabsContent>
-                    </Tabs>
+                    {renderTable(filteredOrders)}
                 </section>
             </div>
 

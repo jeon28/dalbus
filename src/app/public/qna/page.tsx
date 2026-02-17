@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
-import { supabase } from '@/lib/supabase';
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
@@ -34,36 +33,23 @@ export default function QnAPage() {
     const fetchQnas = useCallback(async () => {
         setLoading(true);
         try {
-            let query = supabase
-                .from('qna')
-                .select('*')
-                .order('created_at', { ascending: false });
+            const params = new URLSearchParams();
+            if (excludeSecret) params.append('exclude_secret', 'true');
 
-            if (excludeSecret) {
-                query = query.eq('is_secret', false);
-            }
+            const res = await fetch(`/api/qna?${params.toString()}`);
+            if (!res.ok) throw new Error('Failed to fetch Q&A');
 
-            const { data, error } = await query;
-
-            if (error) {
-                // Ignore AbortError
-                if (error.message?.includes('AbortError') || error.message?.includes('aborted') || error.message?.includes('signal is aborted') || error.code === 'PGRST301') {
-                    setLoading(false);
-                    return;
-                }
-                console.error('Error fetching Q&A:', error);
-            } else {
-                setQnas(data || []);
-            }
+            const data = await res.json();
+            setQnas(data || []);
         } catch (e) {
             const err = e as Error;
             if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
-                setLoading(false);
                 return;
             }
-            console.error(e);
+            console.error('Error fetching Q&A:', e);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [excludeSecret]);
 
     useEffect(() => {

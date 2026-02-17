@@ -35,33 +35,31 @@ interface ServiceContextType {
 
 const ServiceContext = createContext<ServiceContextType | undefined>(undefined);
 
+interface ProductResponse {
+    id: string;
+    name: string;
+    image_url: string | null;
+    original_price: number;
+    description: string | null;
+    tags: string[] | null;
+}
+
 export function ServiceProvider({ children }: { children: ReactNode }) {
     const [services, setServices] = useState<Service[]>([]);
     const [user, setUser] = useState<User | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isHydrated, setIsHydrated] = useState(false);
 
-    // Fetch services (products) from Supabase
+    // Fetch services (products) from Supabase via public API
     const fetchServices = async () => {
         try {
-            // Fetch products and their active plans
-            const { data: productsData, error: productsError } = await supabase
-                .from('products')
-                .select('*, product_plans(*)')
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true });
+            const response = await fetch('/api/public/products');
+            if (!response.ok) throw new Error('Failed to fetch services');
 
-            if (productsError) {
-                // Ignore AbortError (normal cleanup behavior)
-                if (productsError.message?.includes('AbortError') || productsError.code === 'PGRST301') {
-                    return;
-                }
-                console.error('Error fetching products:', JSON.stringify(productsError, null, 2));
-                return;
-            }
+            const productsData = await response.json() as ProductResponse[];
 
             if (productsData) {
-                const mappedServices: Service[] = productsData.map(p => {
+                const mappedServices: Service[] = productsData.map((p) => {
                     const displayPrice = p.original_price;
 
                     return {
@@ -232,19 +230,27 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = async () => {
+        // 즉각적인 상태 초기화 (사용자 경험 개선)
+        setUser(null);
+        setIsAdmin(false);
+        localStorage.removeItem('dalbus-user');
+        localStorage.removeItem('dalbus-isAdmin');
+
         try {
-            // Supabase 로그아웃
-            await supabase.auth.signOut();
+            // Supabase 로그아웃 시도 (실패해도 무관하도록 비동기 실행 및 타임아웃 고려)
+            const signOutPromise = supabase.auth.signOut();
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('SignOut Timeout')), 2000)
+            );
+
+            // 타임아웃 내에 처리하거나 실패해도 진행
+            await Promise.race([signOutPromise, timeoutPromise]).catch(err => {
+                console.warn('Supabase signOut deferred or failed:', err);
+            });
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
-            // 상태 초기화
-            setUser(null);
-            setIsAdmin(false);
-            localStorage.removeItem('dalbus-user');
-            localStorage.removeItem('dalbus-isAdmin');
-
-            // 로그인 페이지로 리다이렉트
+            // 무조건 로그인 페이지로 리다이렉트 (하드 리로드로 상태 완벽 초기화)
             window.location.href = '/login';
         }
     };

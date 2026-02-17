@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { Badge } from "@/components/ui/badge";
 
 interface FAQ {
@@ -30,43 +29,36 @@ export default function FAQPage() {
 
         const fetchData = async () => {
             try {
-                // Fetch FAQs
-                const faqRes = await supabase
-                    .from('faqs')
-                    .select('*')
-                    .eq('is_published', true)
-                    .order('sort_order', { ascending: true });
+                const [faqRes, catRes] = await Promise.all([
+                    fetch('/api/public/faqs'),
+                    fetch('/api/public/faq-categories')
+                ]);
 
-                // Fetch Categories
-                const catRes = await supabase
-                    .from('faq_categories')
-                    .select('*')
-                    .order('sort_order', { ascending: true });
+                if (!faqRes.ok || !catRes.ok) {
+                    throw new Error('Failed to fetch data');
+                }
 
-                // Ignore AbortError
-                if (faqRes.error) {
-                    if (faqRes.error.message?.includes('AbortError') || faqRes.error.message?.includes('aborted') || faqRes.error.message?.includes('signal is aborted') || faqRes.error.code === 'PGRST301') {
-                        return;
-                    }
-                }
-                if (catRes.error) {
-                    if (catRes.error.message?.includes('AbortError') || catRes.error.message?.includes('aborted') || catRes.error.message?.includes('signal is aborted') || catRes.error.code === 'PGRST301') {
-                        return;
-                    }
-                }
+                const [faqData, catData] = await Promise.all([
+                    faqRes.json(),
+                    catRes.json()
+                ]);
 
                 if (isMounted) {
-                    if (faqRes.data) setFaqs(faqRes.data);
-                    if (catRes.data) setCategories(catRes.data);
-                    setLoading(false);
+                    setFaqs(faqData);
+                    setCategories(catData);
                 }
             } catch (error) {
                 const err = error as Error;
+                // Ignore AbortError
                 if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
                     return;
                 }
+
                 if (isMounted) {
-                    console.error('Unexpected error:', error);
+                    console.error('Error fetching FAQs:', error);
+                }
+            } finally {
+                if (isMounted) {
                     setLoading(false);
                 }
             }

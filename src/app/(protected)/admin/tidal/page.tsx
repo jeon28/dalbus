@@ -99,7 +99,7 @@ function TidalAccountsContent() {
     const searchParams = useSearchParams();
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-    const [isGridView, setIsGridView] = useState(false);
+    const [isGridView, setIsGridView] = useState(true);
 
     // Grid State: Store edits locally before save
     const [gridValues, setGridValues] = useState<Record<string, GridValue>>({});
@@ -1082,7 +1082,11 @@ function TidalAccountsContent() {
                         <table className="w-full text-xs min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100 border-b">
-                                    <th className="p-2 text-center border-r w-10">No</th>
+                                    <th className="w-[100px] text-center text-[10px] font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('login_id')}>
+                                        <div className="flex items-center justify-center gap-1">
+                                            GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                    </th>
                                     <th className="p-2 text-left border-r w-32">Tidal ID</th>
                                     <th className="p-2 text-left border-r w-24">PW</th>
                                     <th className="p-2 text-left border-r w-20">고객명</th>
@@ -1194,6 +1198,10 @@ function TidalAccountsContent() {
                                                     aVal = a.account.payment_day;
                                                     bVal = b.account.payment_day;
                                                     break;
+                                                case 'login_id':
+                                                    aVal = a.account.login_id;
+                                                    bVal = b.account.login_id;
+                                                    break;
                                                 default:
                                                     return 0;
                                             }
@@ -1208,7 +1216,7 @@ function TidalAccountsContent() {
                                     }
 
                                     // 3. Render
-                                    return flattened.map((item, idx) => {
+                                    return flattened.map((item) => {
                                         const assignment = item.assignment;
                                         const acc = item.account;
                                         const sIdx = assignment.slot_number;
@@ -1222,7 +1230,9 @@ function TidalAccountsContent() {
 
                                         return (
                                             <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''}`}>
-                                                <td className="p-2 text-center border-r font-mono text-gray-500">{idx + 1}</td>
+                                                <td className="text-center text-[10px] py-1 border-r border-gray-100 bg-gray-50/50 font-medium">
+                                                    {item.account.login_id}
+                                                </td>
                                                 {isEditing ? (
                                                     <>
                                                         <td className="p-1 border-r">
@@ -1797,15 +1807,15 @@ function TidalAccountsContent() {
                             </div>
                             <div className="grid grid-cols-3 border-b pb-2">
                                 <span className="font-bold text-gray-500">이름</span>
-                                <span className="col-span-2">{viewOrder.buyer_name}</span>
+                                <span className="col-span-2">{viewOrder.profiles?.name || viewOrder.buyer_name || '-'}</span>
                             </div>
                             <div className="grid grid-cols-3 border-b pb-2">
                                 <span className="font-bold text-gray-500">이메일</span>
-                                <span className="col-span-2">{viewOrder.buyer_email}</span>
+                                <span className="col-span-2">{viewOrder.profiles?.email || viewOrder.buyer_email || '-'}</span>
                             </div>
                             <div className="grid grid-cols-3 border-b pb-2">
                                 <span className="font-bold text-gray-500">연락처</span>
-                                <span className="col-span-2">{viewOrder.buyer_phone}</span>
+                                <span className="col-span-2">{viewOrder.profiles?.phone || viewOrder.buyer_phone || '-'}</span>
                             </div>
                             <div className="grid grid-cols-3 border-b pb-2">
                                 <span className="font-bold text-gray-500">회원 ID</span>

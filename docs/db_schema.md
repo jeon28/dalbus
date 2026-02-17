@@ -1,4 +1,4 @@
-# Dalbus Database Schema (v3.0)
+# Dalbus Database Schema (v3.1)
 
 이 문서는 달버스의 데이터베이스 구조와 관계를 정리한 문서입니다. Supabase (PostgreSQL) 환경을 기준으로 합니다.
 

@@ -7,31 +7,17 @@ export default function Footer() {
                 <div className="flex flex-col gap-2 md:gap-0">
                     <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
                         Built by{" "}
-                        <a
-                            href="#"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-medium underline underline-offset-4"
-                        >
+                        <span className="font-medium underline underline-offset-4">
                             Dalbus Team
-                        </a>
-                        . The source code is available on{" "}
-                        <a
-                            href="#"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-medium underline underline-offset-4"
-                        >
-                            GitHub
-                        </a>
-                        .
+                        </span>
+                        . All rights reserved.
                     </p>
                 </div>
                 <div className="flex gap-4">
-                    <Link href="/terms" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+                    <Link href="/public/terms" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
                         이용약관
                     </Link>
-                    <Link href="/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+                    <Link href="/public/privacy" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
                         개인정보처리방침
                     </Link>
                 </div>

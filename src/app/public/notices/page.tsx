@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,31 +22,23 @@ export default function NoticesPage() {
 
         const fetchData = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('notices')
-                    .select('*')
-                    .eq('is_published', true)
-                    .order('is_pinned', { ascending: false })
-                    .order('created_at', { ascending: false });
+                const response = await fetch('/api/public/notices');
+                if (!response.ok) throw new Error('Failed to fetch notices');
 
-                if (error) {
-                    // Ignore AbortError
-                    if (error.message?.includes('AbortError') || error.message?.includes('aborted') || error.message?.includes('signal is aborted') || error.code === 'PGRST301') {
-                        return;
-                    }
-                    if (isMounted) {
-                        console.error('Error fetching notices:', JSON.stringify(error, null, 2));
-                    }
-                } else if (isMounted) {
+                const data = await response.json();
+
+                if (isMounted) {
                     setNotices(data || []);
                 }
             } catch (error) {
                 const err = error as Error;
+                // Ignore AbortError
                 if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
                     return;
                 }
+
                 if (isMounted) {
-                    console.error('Unexpected error:', error);
+                    console.error('Error fetching notices:', error);
                 }
             } finally {
                 if (isMounted) {

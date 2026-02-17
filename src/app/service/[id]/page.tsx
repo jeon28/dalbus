@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
-import { supabase } from '@/lib/supabase';
 import styles from './service.module.css';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,46 +42,17 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
         const fetchDetail = async () => {
             if (!serviceId) return;
+            setLoading(true);
 
             try {
-                // Fetch product
-                const { data: productData, error: productError } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('id', serviceId)
-                    .single();
+                const response = await fetch(`/api/public/products/${serviceId}`);
+                if (!response.ok) throw new Error('Failed to fetch product detail');
 
-                if (productError) {
-                    if (productError.message?.includes('AbortError') || productError.message?.includes('aborted') || productError.message?.includes('signal is aborted') || productError.code === 'PGRST301') {
-                        return;
-                    }
-                    if (isMounted) {
-                        console.error('Error fetching product:', productError);
-                    }
-                    return;
-                }
+                const productData = await response.json();
 
-                if (productData && isMounted) setServiceDetail(productData);
-
-                // Fetch plans
-                const { data: plansData, error: plansError } = await supabase
-                    .from('product_plans')
-                    .select('*')
-                    .eq('product_id', serviceId)
-                    .eq('is_active', true)
-                    .order('duration_months', { ascending: true });
-
-                if (plansError) {
-                    if (plansError.message?.includes('AbortError') || plansError.message?.includes('aborted') || plansError.message?.includes('signal is aborted') || plansError.code === 'PGRST301') {
-                        return;
-                    }
-                    if (isMounted) {
-                        console.error('Error fetching plans:', plansError);
-                    }
-                    return;
-                }
-
-                if (plansData && isMounted) {
+                if (isMounted && productData) {
+                    setServiceDetail(productData);
+                    const plansData = productData.product_plans || [];
                     setPlans(plansData);
                     if (plansData.length > 0) {
                         setSelectedPeriod(plansData[0].duration_months);
@@ -96,6 +66,10 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 }
                 if (isMounted) {
                     console.error('Unexpected error in fetchDetail:', error);
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
                 }
             }
         };
@@ -165,7 +139,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         name: '',
         phone: '',
         email: '',
-        depositor: ''
+        depositor: '',
+        tidalId: ''
     });
     const [agreements, setAgreements] = useState({
         all: false,
@@ -274,8 +249,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     if (!product) return <div className="container py-20 text-center">Loading...</div>;
 
     const handleLookup = async () => {
-        if (!guestInfo.name || !guestInfo.phone) {
-            alert('이름과 전화번호를 입력해주세요.');
+        if (!guestInfo.tidalId) {
+            alert('Tidal ID를 입력해주세요.');
             return;
         }
 
@@ -288,7 +263,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             const res = await fetch('/api/orders/lookup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: guestInfo.name, phone: guestInfo.phone })
+                body: JSON.stringify({ tidalId: guestInfo.tidalId })
             });
             const data = await res.json();
 
@@ -418,15 +393,9 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
                             <div className="space-y-4">
                                 <Input
-                                    placeholder="구매 시 사용한 이름"
-                                    value={guestInfo.name}
-                                    onChange={(e) => setGuestInfo({ ...guestInfo, name: e.target.value })}
-                                />
-                                <Input
-                                    type="tel"
-                                    placeholder="구매 시 사용한 전화번호"
-                                    value={guestInfo.phone}
-                                    onChange={(e) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
+                                    placeholder="구매 시 사용한 Tidal ID"
+                                    value={guestInfo.tidalId}
+                                    onChange={(e) => setGuestInfo({ ...guestInfo, tidalId: e.target.value })}
                                 />
                                 <button
                                     className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"

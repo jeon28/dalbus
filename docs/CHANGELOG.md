@@ -1,6 +1,29 @@
-# Changelog - 2026.02.16 (Post-Verification)
+# Changelog - 2026.02.18 (Production Ready)
 
 Dalbus 프로젝트의 주요 업데이트 및 변경 사항을 기록합니다.
+
+---
+
+## [v2.5] 공용 페이지 로딩 안정화 및 인증 UX 개선 (2026.02.18)
+
+### 🚀 공용 페이지 데이터 로딩 안정화 (Public Page Stability)
+- **API 프록시 구현**: Supabase RLS 보안 정책으로 인해 비로그인 사용자의 데이터 접근이 제한되던 문제를 해결하기 위해 서버 사이드 API 프록시(`supabaseAdmin` 활용) 전면 도입.
+    - 대상 페이지: 공지사항(`/public/notices`), FAQ(`/public/faq`), Q&A(`/public/qna`), 서비스 상세(`/service/[id]`)
+- **무한 로딩 및 에러 핸들링 개선**: 
+    - 네트워크 중단(`AbortError`) 발생 시에도 로딩 상태가 해제되도록 `finally` 블록 로직 강화.
+    - `AbortError` 및 Next.js 내부 리다이렉트 발생 시 콘솔 에러가 발생하지 않도록 조용히 무시 처리.
+
+### 🛒 상품 및 요금제 노출 정책 강화 (Product & Plan Management)
+- **비정상/비활성 요금제 필터링**: 공용 상품 조회 API에서 `is_active: false`인 요금제를 원천적으로 필터링하여 사용자에게 혼선을 주지 않도록 개선.
+- **ServiceContext 최적화**: direct DB 쿼리에서 API 기반 조회 방식으로 전환하여 프론트엔드와 백엔드 간 결합도 해제.
+
+### 🔐 인증 UX 및 로그아웃 견고화 (Auth UX & Logout Robustness)
+- **로그아웃 즉각 반응 구현**: Supabase `signOut` 호출 결과와 관계없이 로컬 상태(LocalStorage, State)를 선제적으로 초기화.
+- **로그아웃 타임아웃 방지**: `Promise.race`를 도입하여 인증 서버 지연 시에도 2초 내에 강제로 로그인 페이지로 리다이렉트되도록 구현.
+
+### 🛠️ 빌드 및 코드 품질 (Build & Code Quality)
+- **TS 타입 안정성 확보**: `ServiceContext.tsx` 내 `any` 타입을 `ProductResponse` 인터페이스로 대체하여 `npm run build` 실패 문제 해결.
+- **Next.js 15 호환성**: 최신 버전에서의 `next lint` 기능 확인 및 빌드 최적화 완료.
 
 ---
 

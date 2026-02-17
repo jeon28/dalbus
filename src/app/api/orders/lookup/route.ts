@@ -5,18 +5,15 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     try {
-        const { name, phone } = await req.json();
+        const { tidalId: rawTidalId } = await req.json();
+        const tidalId = rawTidalId?.trim();
 
-        if (!name || !phone) {
-            return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 });
+        if (!tidalId) {
+            return NextResponse.json({ error: 'Tidal ID is required' }, { status: 400 });
         }
 
-        // Find orders matching name and phone
-        // We look for orders that are EITHER:
-        // 1. assigned (currently active)
-        // 2. completed (expired but record exists)
-        // And NOT failed/cancelled/refunded (payment_status check)
-
+        // Find orders matching Tidal ID
+        // We look for orders via order_accounts join
         const { data: rawOrders, error } = await supabaseAdmin
             .from('orders')
             .select(`
@@ -26,10 +23,9 @@ export async function POST(req: NextRequest) {
                 payment_status,
                 products ( name ),
                 product_plans ( duration_months ),
-                order_accounts ( end_date )
+                order_accounts!inner ( tidal_id, end_date )
             `)
-            .eq('buyer_name', name)
-            .eq('buyer_phone', phone)
+            .ilike('order_accounts.tidal_id', tidalId)
             .neq('payment_status', 'failed')
             .neq('payment_status', 'cancelled')
             .neq('payment_status', 'refunded')
@@ -48,7 +44,7 @@ export async function POST(req: NextRequest) {
             payment_status: string;
             products: { name: string } | null;
             product_plans: { duration_months: number } | null;
-            order_accounts: { end_date: string }[] | null;
+            order_accounts: { tidal_id: string; end_date: string }[] | null;
         }
 
         const orders = (rawOrders as unknown as RawOrder[])?.map((o) => ({

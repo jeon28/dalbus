@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, X } from "lucide-react";
+import Link from "next/link";
 
 export default function PriceComparison() {
     return (
@@ -30,26 +31,32 @@ export default function PriceComparison() {
                             </ul>
                         </CardContent>
                     </Card>
-                    <Card className="relative overflow-hidden border-2 border-primary bg-background shadow-lg">
-                        <div className="absolute top-0 right-0 bg-primary px-3 py-1 text-xs font-bold text-primary-foreground rounded-bl-lg">
-                            BEST CHOICE
-                        </div>
-                        <CardHeader className="flex flex-col items-center justify-center space-y-2 border-b p-6 bg-primary/5">
-                            <div className="grid place-items-center rounded-full bg-primary p-3">
-                                <Check className="h-6 w-6 text-primary-foreground" />
+
+                    <Link href="/public/products" className="block group">
+                        <Card className="relative overflow-hidden border-2 border-primary bg-background shadow-lg cursor-pointer transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-xl active:scale-[0.98]">
+                            <div className="absolute top-0 right-0 bg-primary px-3 py-1 text-xs font-bold text-primary-foreground rounded-bl-lg">
+                                BEST CHOICE
                             </div>
-                            <CardTitle className="text-xl font-bold text-primary">달버스 (Dalbus)</CardTitle>
-                            <div className="text-4xl font-bold text-primary">₩4,900<span className="text-sm font-normal text-primary/70">/월</span></div>
-                            <p className="text-xs text-muted-foreground">6개월권 약 ₩30,000</p>
-                        </CardHeader>
-                        <CardContent className="grid gap-4 p-6 place-items-center">
-                            <ul className="grid gap-2 text-sm text-center">
-                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 압도적인 가격 혜택</li>
-                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 6개월 / 12개월 선택 가능</li>
-                                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 장기간 안정적 이용</li>
-                            </ul>
-                        </CardContent>
-                    </Card>
+                            <CardHeader className="flex flex-col items-center justify-center space-y-2 border-b p-6 bg-primary/5">
+                                <div className="grid place-items-center rounded-full bg-primary p-3 transition-transform group-hover:scale-110">
+                                    <Check className="h-6 w-6 text-primary-foreground" />
+                                </div>
+                                <CardTitle className="text-xl font-bold text-primary">달버스 (Dalbus)</CardTitle>
+                                <div className="text-4xl font-bold text-primary">₩4,900<span className="text-sm font-normal text-primary/70">/월</span></div>
+                                <p className="text-xs text-muted-foreground">6개월권 약 ₩30,000</p>
+                            </CardHeader>
+                            <CardContent className="grid gap-4 p-6 place-items-center">
+                                <ul className="grid gap-2 text-sm text-center">
+                                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 압도적인 가격 혜택</li>
+                                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 6개월 / 12개월 선택 가능</li>
+                                    <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 장기간 안정적 이용</li>
+                                </ul>
+                                <div className="mt-2 text-sm font-bold text-primary flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                    서비스 신청하기 →
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
                 </div>
             </div>
         </section>
