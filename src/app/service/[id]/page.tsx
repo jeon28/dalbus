@@ -107,6 +107,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         order_number: string;
         products?: { name: string };
         end_date?: string;
+        buyer_name?: string;
+        buyer_phone?: string;
         buyer_email?: string;
     }
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
@@ -286,9 +288,13 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
     const handleSelectOrderForExtension = (order: ExtensionOrder) => {
         setSelectedOrder(order);
-        if (order.buyer_email) {
-            setGuestInfo(prev => ({ ...prev, email: order.buyer_email || '' }));
-        }
+        setGuestInfo(prev => ({
+            ...prev,
+            name: order.buyer_name || prev.name,
+            phone: order.buyer_phone || prev.phone,
+            email: order.buyer_email || prev.email,
+            depositor: order.buyer_name || prev.depositor || order.buyer_name || ''
+        }));
     };
 
     const currentPlan = plans.find(p => p.duration_months === selectedPeriod);
@@ -393,7 +399,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
                             <div className="space-y-4">
                                 <Input
-                                    placeholder="구매 시 사용한 Tidal ID"
+                                    placeholder="구매 시 사용한 Tidal ID (예: tidalid@hifitidal.com)"
                                     value={guestInfo.tidalId}
                                     onChange={(e) => setGuestInfo({ ...guestInfo, tidalId: e.target.value })}
                                 />
@@ -451,17 +457,20 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             <Input
                                 placeholder="성함을 입력해 주세요."
                                 value={guestInfo.name}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, name: e.target.value })}
-                                readOnly={!!selectedOrder}
-                                className={selectedOrder ? 'bg-gray-50 cursor-not-allowed' : ''}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                    const newName = e.target.value;
+                                    setGuestInfo(prev => ({
+                                        ...prev,
+                                        name: newName,
+                                        depositor: prev.depositor === prev.name ? newName : prev.depositor
+                                    }));
+                                }}
                             />
                             <Input
                                 type="tel"
                                 placeholder="휴대폰번호를 입력해 주세요."
                                 value={guestInfo.phone}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
-                                readOnly={!!selectedOrder}
-                                className={selectedOrder ? 'bg-gray-50 cursor-not-allowed' : ''}
                             />
                             <Input
                                 type="email"
@@ -504,8 +513,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                         />
 
                         <p className="text-xs text-green-600 mt-2">
-                            * 정확한 입금자명을 적어주셔야 자동매칭 되어 즉시 발송됩니다.<br />
-                            * 국내 카드사 정책에 따라, 디지털 상품의 경우 카드결제가 제한되지 않는 점 양해 부탁드립니다.
+                            * 정확한 입금자명을 적어주셔야 입금확인 가능합니다.<br />
+                            * 현재 결제수단은 무통장 입금만 가능합니다.
                         </p>
                     </div>
 

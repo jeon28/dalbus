@@ -63,3 +63,52 @@ export const sendAdminOrderNotification = async (
         return { success: false, error };
     }
 };
+
+interface ExpiryNotificationProps {
+    buyerName: string;
+    tidalId: string;
+    endDate: string;
+    message: string;
+}
+
+export const sendExpiryNotification = async (
+    targetEmail: string,
+    details: ExpiryNotificationProps
+) => {
+    if (!resend) {
+        console.error('RESEND_API_KEY is missing. Email notification skipped.');
+        return { success: false, error: 'Missing API Key' };
+    }
+
+    try {
+        const { buyerName, tidalId, endDate, message } = details;
+
+        const { data, error } = await resend.emails.send({
+            from: 'Dalbus <onboarding@resend.dev>', // Default Resend sender, change for production
+            to: [targetEmail],
+            subject: `[Dalbus] 서비스 만료 안내 - ${buyerName}님`,
+            html: `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+          <h2 style="color: #2563eb;">서비스 만료 안내</h2>
+          <div style="white-space: pre-wrap; margin-bottom: 20px;">
+${message.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).replace(/{end_date}/g, endDate)}
+          </div>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 정보통신망법 등 관련 법령에 의거하여 발송되는 안내 메일입니다.
+          </p>
+        </div>
+      `,
+        });
+
+        if (error) {
+            console.error('Email sending failed:', error);
+            return { success: false, error };
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error('Unexpected error sending email:', error);
+        return { success: false, error };
+    }
+};

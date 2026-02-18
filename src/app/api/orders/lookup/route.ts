@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
                 order_number,
                 created_at,
                 payment_status,
+                buyer_name,
+                buyer_phone,
+                buyer_email,
                 products ( name ),
                 product_plans ( duration_months ),
                 order_accounts!inner ( tidal_id, end_date )

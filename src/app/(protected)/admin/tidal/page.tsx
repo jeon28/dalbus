@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -1007,7 +1007,153 @@ function TidalAccountsContent() {
     };
 
 
+    const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
+    const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
+    const [isSendingNotify, setIsSendingNotify] = useState(false);
+
+    const defaultTemplate = `{buyer_name}님 
+{tidal_id} 서비스가 {end_date}에 만료됩니다.
+
+연장을 원하시면 아래 링크로 접속하여서 신청바랍니다.
+${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL}/public`;
+
     if (!isAdmin) return null;
+
+    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
+        if (selectedAssignmentIds.size === filteredFlat.length) {
+            setSelectedAssignmentIds(new Set());
+        } else {
+            setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
+        }
+    };
+
+    const getFlattenedAssignments = () => {
+        const flattened: {
+            id: string;
+            assignment: Assignment;
+            account: Account;
+            period: number;
+            originalAccIndex: number;
+        }[] = [];
+
+        accounts.forEach((acc, accIdx) => {
+            const assignments = [...(acc.order_accounts || [])];
+            assignments.forEach(assignment => {
+                // Search Filter
+                const query = searchQuery.toLowerCase().trim();
+                if (query) {
+                    const buyerName = (assignment.buyer_name || assignment.orders?.buyer_name || '').toLowerCase();
+                    const tidalId = (assignment.tidal_id || '').toLowerCase();
+                    const buyerPhone = (assignment.buyer_phone || assignment.orders?.buyer_phone || '').toLowerCase();
+                    if (!buyerName.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) return;
+                }
+
+                // Expired Filter
+                if (showExpiredOnly && assignment.end_date) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (parseISO(assignment.end_date) >= today) return;
+                } else if (showExpiredOnly && !assignment.end_date) {
+                    return;
+                }
+
+                let periodNum = assignment.period_months || 0;
+                if (!periodNum && assignment.start_date && assignment.end_date) {
+                    try {
+                        const start = parseISO(assignment.start_date);
+                        const end = parseISO(assignment.end_date);
+                        periodNum = differenceInMonths(end, start);
+                    } catch { }
+                }
+
+                flattened.push({
+                    id: assignment.id,
+                    assignment,
+                    account: acc,
+                    period: periodNum,
+                    originalAccIndex: accIdx
+                });
+            });
+        });
+
+        return flattened;
+    };
+
+    const handleToggleSelection = (id: string) => {
+        const next = new Set(selectedAssignmentIds);
+        if (next.has(id)) {
+            next.delete(id);
+        } else {
+            next.add(id);
+        }
+        setSelectedAssignmentIds(next);
+    };
+
+    const handleBulkNotify = async () => {
+        if (selectedAssignmentIds.size === 0) return;
+
+        setIsSendingNotify(true);
+        try {
+            // Get selected assignment details
+            interface Recipient {
+                email: string | undefined;
+                buyerName: string;
+                tidalId: string;
+                endDate: string;
+            }
+
+            interface Failure {
+                email: string;
+                error: string;
+            }
+
+            const flattened = getFlattenedAssignments();
+            const recipients: Recipient[] = flattened
+                .filter(item => selectedAssignmentIds.has(item.id))
+                .map(item => ({
+                    email: item.assignment.buyer_email || item.assignment.orders?.buyer_email,
+                    buyerName: item.assignment.buyer_name || item.assignment.orders?.buyer_name || '고객',
+                    tidalId: item.assignment.tidal_id || '알 수 없음',
+                    endDate: item.assignment.end_date || '알 수 없음'
+                }))
+                .filter((r): r is Recipient & { email: string } => !!r.email);
+
+            if (recipients.length === 0) {
+                alert('선택된 항목 중 이메일 정보가 있는 회원이 없습니다.');
+                setIsSendingNotify(false);
+                return;
+            }
+
+            const res = await fetch('/api/admin/tidal/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    recipients,
+                    messageTemplate: notificationMessage
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                if (data.failCount > 0) {
+                    const failList = data.failures.map((f: Failure) => `${f.email}: ${f.error}`).join('\n');
+                    alert(`${data.message}\n\n실패 상세:\n${failList}`);
+                } else {
+                    alert(`${data.message}`);
+                }
+                setIsNotifyModalOpen(false);
+                setSelectedAssignmentIds(new Set());
+            } else {
+                alert('발송 중 오류: ' + (data.error || 'Unknown Error'));
+            }
+        } catch (error) {
+            console.error('Notify Failed:', error);
+            alert('발송에 실패했습니다.');
+        } finally {
+            setIsSendingNotify(false);
+        }
+    };
 
     return (
         <main className={styles.main}>
@@ -1068,7 +1214,23 @@ function TidalAccountsContent() {
                             <Download size={16} /> 엑셀 다운로드
                         </Button>
 
-                        {/* 6. 그룹 추가 */}
+                        {/* 6. 알림 보내기 */}
+                        {isGridView && (
+                            <Button
+                                variant="default"
+                                size="sm"
+                                disabled={selectedAssignmentIds.size === 0}
+                                onClick={() => {
+                                    setNotificationMessage(defaultTemplate);
+                                    setIsNotifyModalOpen(true);
+                                }}
+                                className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}
+                            >
+                                <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
+                            </Button>
+                        )}
+
+                        {/* 7. 그룹 추가 */}
                         <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8">
                             <Plus size={16} /> 그룹 추가
                         </Button>
@@ -1082,6 +1244,13 @@ function TidalAccountsContent() {
                         <table className="w-full text-xs min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100 border-b">
+                                    <th className="w-10 text-center py-2 border-r border-gray-200">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length}
+                                            onChange={() => toggleSelectAll(getFlattenedAssignments())}
+                                        />
+                                    </th>
                                     <th className="w-[100px] text-center text-[10px] font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('login_id')}>
                                         <div className="flex items-center justify-center gap-1">
                                             GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
@@ -1124,52 +1293,7 @@ function TidalAccountsContent() {
                             <tbody>
                                 {(() => {
                                     // 1. Flatten assignments
-                                    const flattened: {
-                                        id: string;
-                                        assignment: Assignment;
-                                        account: Account;
-                                        period: number;
-                                        originalAccIndex: number;
-                                    }[] = [];
-                                    accounts.forEach((acc, accIdx) => {
-                                        const assignments = [...(acc.order_accounts || [])];
-                                        assignments.forEach(assignment => {
-                                            // Search Filter
-                                            const query = searchQuery.toLowerCase().trim();
-                                            if (query) {
-                                                const buyerName = (assignment.buyer_name || assignment.orders?.buyer_name || '').toLowerCase();
-                                                const tidalId = (assignment.tidal_id || '').toLowerCase();
-                                                const buyerPhone = (assignment.buyer_phone || assignment.orders?.buyer_phone || '').toLowerCase();
-                                                if (!buyerName.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) return;
-                                            }
-
-                                            // Expired Filter
-                                            if (showExpiredOnly && assignment.end_date) {
-                                                const today = new Date();
-                                                today.setHours(0, 0, 0, 0);
-                                                if (parseISO(assignment.end_date) >= today) return;
-                                            } else if (showExpiredOnly && !assignment.end_date) {
-                                                return;
-                                            }
-
-                                            let periodNum = assignment.period_months || 0;
-                                            if (!periodNum && assignment.start_date && assignment.end_date) {
-                                                try {
-                                                    const start = parseISO(assignment.start_date);
-                                                    const end = parseISO(assignment.end_date);
-                                                    periodNum = differenceInMonths(end, start);
-                                                } catch { }
-                                            }
-
-                                            flattened.push({
-                                                id: assignment.id,
-                                                assignment,
-                                                account: acc,
-                                                period: periodNum,
-                                                originalAccIndex: accIdx
-                                            });
-                                        });
-                                    });
+                                    const flattened = getFlattenedAssignments();
 
                                     // 2. Sort
                                     if (sortConfig) {
@@ -1229,7 +1353,14 @@ function TidalAccountsContent() {
                                         const isExpired = assignment.end_date ? parseISO(assignment.end_date) < today : false;
 
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''}`}>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                                <td className="text-center py-1 border-r border-gray-100 bg-gray-50/10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedAssignmentIds.has(assignment.id)}
+                                                        onChange={() => handleToggleSelection(assignment.id)}
+                                                    />
+                                                </td>
                                                 <td className="text-center text-[10px] py-1 border-r border-gray-100 bg-gray-50/50 font-medium">
                                                     {item.account.login_id}
                                                 </td>
@@ -1895,6 +2026,60 @@ function TidalAccountsContent() {
                     )}
                     <DialogFooter>
                         <Button onClick={() => setIsImportResultModalOpen(false)}>확인</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isNotifyModalOpen} onOpenChange={setIsNotifyModalOpen}>
+                <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>만료 알림 메세지 발송</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
+                            <p className="font-bold mb-1">💡 안내</p>
+                            <p>전체 {selectedAssignmentIds.size}명의 회원에게 메일을 발송합니다.</p>
+                            <p>치환 코드: <b>{'{buyer_name}'}, {'{tidal_id}'}, {'{end_date}'}</b></p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="flex justify-between items-center">
+                                <span>발신 명단 ({selectedAssignmentIds.size})</span>
+                                <Button variant="ghost" size="sm" onClick={() => setSelectedAssignmentIds(new Set())} className="h-6 px-2 text-[10px]">전체 삭제</Button>
+                            </Label>
+                            <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 border rounded-md max-h-40 overflow-y-auto">
+                                {Array.from(selectedAssignmentIds).map(id => {
+                                    const item = getFlattenedAssignments().find(a => a.id === id);
+                                    if (!item) return null;
+                                    const bName = item.assignment.buyer_name || item.assignment.orders?.buyer_name || '고객';
+                                    const tId = item.assignment.tidal_id || '알 수 없음';
+                                    const eDate = item.assignment.end_date ? format(parseISO(item.assignment.end_date), 'yy/MM/dd') : '알 수 없음';
+                                    return (
+                                        <div key={id} className="flex items-center justify-between gap-1 bg-white border border-gray-200 px-2 py-1.5 rounded shadow-sm text-[11px] group hover:border-orange-300">
+                                            <span className="text-gray-600 truncate">{bName} / {eDate} / {tId}</span>
+                                            <button
+                                                onClick={() => handleToggleSelection(id)}
+                                                className="p-1 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors flex-shrink-0"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>메세지 내용 (메일 본문)</Label>
+                            <textarea
+                                className="w-full h-80 p-3 text-sm border rounded-md focus:ring-2 focus:ring-primary outline-none whitespace-pre-wrap"
+                                value={notificationMessage}
+                                onChange={(e) => setNotificationMessage(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsNotifyModalOpen(false)}>취소</Button>
+                        <Button onClick={handleBulkNotify} disabled={isSendingNotify} className="bg-orange-600 hover:bg-orange-700">
+                            {isSendingNotify ? '발송 중...' : '메일 발송하기'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
