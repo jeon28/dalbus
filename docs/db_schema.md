@@ -159,28 +159,106 @@ erDiagram
 
 ---
 
-## 3. 상세 테이블 정의 (주요 테이블)
+## 3. 상세 테이블 정의
 
-### `orders` (주문)
-- `payment_status`: `pending`, `paid`, `failed`, `cancelled`, `refunded`
-- `assignment_status`: `waiting`, `assigned`, `expired`, `replaced`, `completed`
-- `order_type`: `NEW` (신규), `EXT` (연장)
-- `related_order_id`: 연장 주문인 경우 이전 주문의 UUID를 저장
-- `user_id`: 회원 주문인 경우만 존재 (비회원은 `is_guest = true`)
+### 3.1 회원 및 인증
+#### `profiles` (사용자 프로필)
+- `id`: `uuid` (PK, `auth.users.id` 참조)
+- `email`: `text` (이메일)
+- `name`: `text` (이름)
+- `phone`: `text` (연락처, nullable)
+- `role`: `user_role` (`user`, `admin`)
+- `memo`: `text` (관리자용 메모)
+- `created_at / updated_at`: `timestamptz`
 
-### `accounts` (마스터 계정)
-- `login_pw`: 보안상의 이유로 nullable로 관리 가능 (필요 시에만 입력)
-- `payment_day`: 매월 결제되는 날짜
-- `max_slots`: 기본 6개 설정 (Tidal 기준)
+### 3.2 서비스 및 상품
+#### `products` (구독 서비스 상품)
+- `slug`: `text` (URL 식별자, Unique)
+- `name`: `text` (상품명)
+- `description`: `text` (설명)
+- `original_price`: `integer` (원가)
+- `detail_content`: `text` (상세 HTML 내용)
+- `image_url`: `text` (대표 이미지)
+- `tags / benefits / cautions`: `text[]` (태그 / 혜택 / 주의사항 배열)
+- `is_active`: `boolean` (활성화 여부)
+- `sort_order`: `integer` (출력 순서)
 
-### `order_accounts` (슬롯 배정)
-- `type`: `master` (마스터 계정 정보), `user` (일반 사용자)
-- `slot_number`: 0~5 번호 부여
-- `tidal_id`: 슬롯별 개별 소속 ID (독립 계정 방식), `is_active=true`인 경우만 UNIQUE 제약 적용 (Partial Index)
-- `order_number`: 주문번호 중복 저장 (추적성 강화)
-- `is_active`: 배정 활성화 여부 (기본값 true). 만료/종료 시 false로 업데이트하여 슬롯 확보.
+#### `product_plans` (상품 이용권 구성)
+- `product_id`: `uuid` (FK -> `products.id`)
+- `duration_months`: `integer` (이용 기간)
+- `price`: `integer` (결제 금액)
+- `discount_rate`: `numeric` (할인율)
+- `is_active`: `boolean` (판매 여부)
 
-### `site_settings` (운영 설정)
-- `admin_login_id`: 관리자 로그인 ID
-- `admin_email`: 주문 알림(Resend) 수신용 이메일
-- `admin_phone`: 향후 알림톡 수신용 번호
+### 3.3 주문 및 배정
+#### `orders` (주문/결제 정보)
+- `order_number`: `text` (주문번호, Unique)
+- `user_id`: `uuid` (FK -> `profiles.id`, nullable)
+- `product_id`: `uuid` (FK -> `products.id`)
+- `plan_id`: `uuid` (FK -> `product_plans.id`)
+- `amount`: `integer` (최종 결제 금액)
+- `payment_status`: `payment_status` (`pending`, `paid`, `failed`, `cancelled`, `refunded`)
+- `assignment_status`: `assignment_status` (`waiting`, `assigned`, `expired`, `replaced`, `completed`)
+- `order_type`: `order_type` (`NEW`, `EXT`)
+- `related_order_id`: `uuid` (연장 주문 시 원본 주문 참조)
+- `paid_at / assigned_at`: `timestamptz` (결제일 / 배정일)
+- `buyer_name / buyer_phone / buyer_email`: `text` (주문자 정보)
+- `is_guest`: `boolean` (비회원 여부)
+
+#### `order_accounts` (배정된 슬롯 정보)
+- `order_id`: `uuid` (FK -> `orders.id`, nullable)
+- `account_id`: `uuid` (FK -> `accounts.id`)
+- `slot_number`: `integer` (슬롯 번호 0~5)
+- `tidal_id`: `text` (Tidal 계정 ID)
+- `tidal_password`: `text` (Tidal 계정 PW)
+- `type`: `account_type` (`master`, `user`)
+- `start_date / end_date`: `date` (이용 기간)
+- `is_active`: `boolean` (활성 상태)
+- `order_number`: `text` (추적용 주문번호)
+
+### 3.4 리소스 관리
+#### `accounts` (마스터 계정 풀)
+- `product_id`: `uuid` (FK -> `products.id`)
+- `login_id / login_pw`: `text` (마스터 로그인 정보)
+- `payment_email`: `text` (결제용 이메일)
+- `payment_day`: `integer` (결제일)
+- `status`: `account_status` (`available`, `assigned`, `disabled`)
+- `max_slots / used_slots`: `integer` (최대 / 사용 중인 슬롯 수)
+
+### 3.5 시스템 및 설정
+#### `site_settings` (운영 설정)
+- `admin_login_id / admin_login_pw`: `text` (관리자 인증 정보)
+- `admin_email`: `text` (시스템 알림 수신용)
+- `admin_phone`: `text` (비상 연락망)
+
+#### `bank_accounts` (무통장 입금 계좌)
+- `bank_name`: `text` (은행명)
+- `account_number`: `text` (계좌번호)
+- `account_holder`: `text` (예금주)
+- `is_active`: `boolean` (노출 여부)
+
+#### `notification_logs` (알림 발송 이력)
+- `user_id / order_id`: `uuid` (참조 ID)
+- `type`: `notification_type` (`assignment`, `expiry_d7`, `expiry_d1` 등)
+- `channel`: `notification_channel` (`sms`, `alimtalk`)
+- `status`: `notification_status` (`pending`, `sent`, `failed`)
+- `sent_at`: `timestamptz`
+
+### 3.6 게시판 및 고객 문의
+#### `notices` (공지사항)
+- `category`: `notice_category` (`service`, `update`, `event`, `maintenance`)
+- `is_published / is_pinned`: `boolean` (게시 여부 / 고정 여부)
+
+#### `faqs` (자주 묻는 질문)
+- `category`: `text` (카테고리명)
+- `is_published`: `boolean`
+
+#### `faq_categories` (FAQ 카테고리 관리)
+- `name`: `text` (카테고리명, Unique)
+- `sort_order`: `integer`
+
+#### `qna` (1:1 문의)
+- `is_secret`: `boolean` (비밀글 여부)
+- `status`: `text` (`waiting`, `answered`)
+- `answer_content`: `text` (답변 내용)
+- `answered_at`: `timestamptz` (답변 시각)
