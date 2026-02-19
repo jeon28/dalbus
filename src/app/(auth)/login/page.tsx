@@ -2,9 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { logger } from '@/lib/logger';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import styles from './auth.module.css';
 
@@ -13,7 +11,6 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,108 +21,68 @@ export default function LoginPage() {
         }
 
         setIsLoading(true);
-        logger.debug('Login attempt started for:', id);
+        console.log('Login: Attempting login for', id);
 
-        // 1. Check if email exists using API (bypasses RLS)
         try {
-            const checkResponse = await fetch('/api/auth/check-user', {
+            const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: id })
+                body: JSON.stringify({ email: id, password }),
+                cache: 'no-store'
             });
 
-            logger.debug('Check-user response status:', checkResponse.status);
-            const checkResult = await checkResponse.json();
+            console.log('Login: API response status', response.status);
+            const data = await response.json();
+            console.log('Login: API response data received');
 
-            if (!checkResult.exists) {
-                // Email doesn't exist
-                alert('❌ 가입되지 않은 이메일입니다.\n\n회원가입을 먼저 진행해주세요.');
-                setIsLoading(false);
-                return;
-            }
-            logger.info('Email exists, proceeding to signInWithPassword');
-        } catch (error) {
-            logger.error('Email check error:', error);
-            // Continue with login attempt even if check fails
-        }
-
-        // 2. Email exists, try to login
-        try {
-            // Helper to add timeout to promise
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Request timed out')), 15000) // 15s timeout
-            );
-
-            const { data, error } = await Promise.race([
-                supabase.auth.signInWithPassword({
-                    email: id,
-                    password: password,
-                }),
-                timeoutPromise
-            ]) as { data: { user: { id: string } | null; session: unknown } | null; error: { message: string } | null };
-
-            console.log('signInWithPassword result:', data?.user ? 'Success' : 'Fail', error ? error.message : '');
-
-            if (error) {
-                // Email exists but password is wrong or other error
-                if (error.message.includes('Invalid login credentials') ||
-                    error.message.includes('invalid') ||
-                    error.message.includes('credentials')) {
+            if (!response.ok) {
+                console.warn('Login: API error', data.error);
+                if (data.error === 'USER_NOT_FOUND') {
+                    alert('❌ 가입되지 않은 이메일입니다.\n\n회원가입을 먼저 진행해주세요.');
+                } else if (data.error === 'INVALID_PASSWORD') {
                     alert('❌ 비밀번호가 일치하지 않습니다.\n\n비밀번호를 다시 확인해주세요.');
                 } else {
-                    // 기타 예상치 못한 오류
-                    if (!error.message.includes('aborted')) {
-                        alert('❌ 로그인 중 오류가 발생했습니다.\n\n' + error.message + '\n\n잠시 후 다시 시도해주세요.');
-                    }
+                    alert(`❌ 로그인 실패: ${data.message || data.error || '알 수 없는 오류'}`);
                 }
                 setIsLoading(false);
                 return;
             }
 
-            // Success - check if user is admin
-            if (data?.user) {
+            if (data.session) {
+                console.log('Login: Setting session');
+
+                // Wrap setSession in a timeout to prevent hanging
+                const setSessionPromise = supabase.auth.setSession(data.session);
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('SetSession Timeout')), 2000)
+                );
+
                 try {
-                    const { data: profile, error: profileErr } = await supabase
-                        .from('profiles')
-                        .select('role')
-                        .eq('id', data.user.id)
-                        .single();
-
-                    if (profileErr) {
-                        // Silent fail for AbortError during navigation
-                        if (!profileErr.message.includes('AbortError') && !profileErr.message.includes('aborted')) {
-                            console.error('Profile fetch error:', profileErr);
-                        }
-                    }
-
-                    if (profile?.role === 'admin') {
-                        console.log('User is admin, navigating to /admin');
-                        router.push('/admin');
-                    } else {
-                        console.log('User is regular user, navigating to /');
-                        router.push('/');
-                    }
-                } catch (profileCatchErr) {
-                    // If navigation already triggered and fetch aborted
-                    const err = profileCatchErr as { message?: string };
-                    if (!err.message?.includes('aborted')) {
-                        router.push('/');
-                    }
+                    await Promise.race([setSessionPromise, timeoutPromise]);
+                    console.log('Login: Session set success');
+                } catch (err) {
+                    const errorMessage = err instanceof Error ? err.message : String(err);
+                    console.warn('Login: Session set warning (proceeding anyway):', errorMessage);
                 }
+
+                console.log('Login: Forcing navigation...');
+                const targetUrl = data.role === 'admin' ? '/admin' : '/';
+                window.location.replace(targetUrl);
             } else {
-                router.push('/');
+                console.warn('Login: No session in response');
+                alert('로그인 성공했으나 세션 정보가 없습니다.');
+                setIsLoading(false);
             }
-        } catch (loginError) {
-            const err = loginError as { message?: string };
-            if (!err.message?.includes('aborted')) {
-                console.error('Unhandled login error:', loginError);
-                alert('로그인 처리 중 예기치 못한 오류가 발생했습니다.');
+
+        } catch (error) {
+            const err = error as { name?: string; message?: string };
+            if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+                console.warn('Login: Request aborted');
+                return;
             }
-        } finally {
-            // Do not setIsLoading(false) if we are navigating, but if we stay on page (error case), we should.
-            // However, it's safer to keep it true if navigation might take time.
-            // If the user reaches here without a redirect, let's reset it.
-            setTimeout(() => setIsLoading(false), 5000);
+            console.error('Login: Fetch error', error);
+            alert('로그인 요청 중 오류가 발생했습니다. (네트워크 상태를 확인해주세요)');
+            setIsLoading(false);
         }
     };
 

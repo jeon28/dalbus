@@ -27,31 +27,7 @@ export default function Header() {
                         <Link href="/public/qna" className="transition-colors hover:text-foreground/80 text-foreground/60">
                             Q&A
                         </Link>
-                        {isAdmin && (
-                            <>
-                                <Link href="/admin/orders" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                    주문내역
-                                </Link>
-                                <Link href="/admin/members" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                    회원정보
-                                </Link>
-                                <Link href="/admin/services" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                    서비스 관리
-                                </Link>
-                                <Link href="/admin/notices" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                    공지사항 관리
-                                </Link>
-                                <Link href="/admin/faqs" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                    FAQ 관리
-                                </Link>
-                                <Link href="/admin/qna" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                    Q&A 관리
-                                </Link>
-                                <Link href="/admin/tidal" className="transition-colors hover:text-primary font-bold text-foreground/80">
-                                    Tidal 계정
-                                </Link>
-                            </>
-                        )}
+
                     </nav>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

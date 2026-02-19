@@ -1,6 +1,31 @@
 # Changelog
-1: 
-2: ## v1.0.0 - 2026-02-18
+
+## v1.1.0 - 2026-02-19
+
+### 🛡️ Next.js 15 시스템 안정화 및 AbortError 완전 해결
+
+#### 핵심 해결 사항 (Critical Fixes)
+1. **Supabase "locks.js:98" 에러 해결**:
+    - Next.js 15 상위 버전 및 React Strict Mode에서 발생하는 Supabase 내부 `Navigator.locks` 충돌 문제를 해결했습니다.
+    - `supabase.ts`에서 커스텀 `lock` 핸들러(No-op)를 도입하여 브라우저 잠금 API 사용을 안전하게 우회했습니다.
+2. **AbortError 오버레이 원천 차단**:
+    - `ServiceContext`의 배경 데이터 페칭 로직을 `fetch`에서 `XMLHttpRequest` (XHR)로 전환하여 Next.js의 전역 fetch 가로채기 문제를 회피했습니다.
+    - `useRef` 기반의 `isMounted` 가드를 전면 도입하여 컴포넌트 언마운트 시의 상태 업데이트 에러를 방지했습니다.
+    - `ErrorHandler` 컴포넌트의 전역 캡처 로직을 강화하여 `AbortError` 오버레이가 사용자에게 노출되지 않도록 조치했습니다.
+3. **Next.js 15 규격 준수**:
+    - 모든 동적 API 라우트(`[id]`)에서 `params`를 정상적으로 `await` 하도록 수정하여 서버 사이드 경고 및 불안정성을 제거했습니다.
+
+#### 개선 사항 (Improvements)
+1. **관리자 기능 고도화**:
+    - **회원 관리**: 회원 목록에 ID 컬럼 추가 및 상세 모달 UI 개선으로 가독성 향상
+    - **설정 시스템**: `site_settings` 테이블을 Key-Value 구조로 리팩토링하여 유연한 운영 설정 가능 (발신자 이메일 설정 등 추가)
+2. **빌드 안정화**:
+    - 전체 가이드 프로젝트의 ESLint 에러 (`any` 타입, 미사용 변수/import)를 전량 수정했습니다.
+    - `npm run build` 및 `npm run lint` 통과 확인 (Exit code: 0)
+
+---
+
+## v1.0.0 - 2026-02-18
 3: 
 4: ### ⚙️ 빌드 안정화 및 알림 시스템 고도화
 5: 

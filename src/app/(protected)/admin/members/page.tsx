@@ -25,13 +25,38 @@ export interface Member {
     memo?: string | null;
 }
 
+interface MemberAccount {
+    id: string;
+    tidal_id: string | null;
+    tidal_password: string | null;
+    slot_number: number;
+    assigned_at: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    orders: {
+        products: {
+            name: string;
+        } | null;
+        product_plans: {
+            duration_months: number;
+        } | null;
+    } | null;
+}
+
 export default function MemberListPage() {
     const { isAdmin } = useServices();
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [memoInput, setMemoInput] = useState("");
+
     const [isMemoOpen, setIsMemoOpen] = useState(false);
+
+    // Accounts Modal State
+    const [memberAccounts, setMemberAccounts] = useState<MemberAccount[]>([]);
+    const [isAccountsOpen, setIsAccountsOpen] = useState(false);
+    const [loadingAccounts, setLoadingAccounts] = useState(false);
+
     const router = useRouter();
 
     useEffect(() => {
@@ -113,6 +138,25 @@ export default function MemberListPage() {
         }
     };
 
+    const handleOpenAccounts = async (member: Member) => {
+        setSelectedMember(member);
+        setIsAccountsOpen(true);
+        setLoadingAccounts(true);
+        setMemberAccounts([]);
+
+        try {
+            const res = await fetch(`/api/admin/members/${member.id}/accounts`);
+            if (!res.ok) throw new Error('Failed to fetch accounts');
+            const data = await res.json();
+            setMemberAccounts(data);
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
+            alert('주문 계정 정보를 불러오는데 실패했습니다.');
+        } finally {
+            setLoadingAccounts(false);
+        }
+    };
+
     if (!isAdmin) return null;
 
     return (
@@ -129,6 +173,7 @@ export default function MemberListPage() {
                         <table className={styles.table}>
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>가입일</th>
                                     <th>이름</th>
                                     <th>이메일</th>
@@ -149,6 +194,13 @@ export default function MemberListPage() {
                                 ) : (
                                     members.map(member => (
                                         <tr key={member.id}>
+                                            <td
+                                                className="cursor-pointer text-blue-600 hover:underline font-mono text-xs"
+                                                onClick={() => handleOpenAccounts(member)}
+                                                title="클릭하여 주문 계정 보기"
+                                            >
+                                                {member.id.substring(0, 8)}...
+                                            </td>
                                             <td>{new Date(member.created_at).toLocaleDateString()}</td>
                                             <td className="font-medium">{member.name}</td>
                                             <td>{member.email}</td>
@@ -211,6 +263,72 @@ export default function MemberListPage() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsMemoOpen(false)}>취소</Button>
                         <Button onClick={handleSaveMemo}>저장</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Accounts List Modal */}
+            <Dialog open={isAccountsOpen} onOpenChange={setIsAccountsOpen}>
+                <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>주문 계정 목록 - {selectedMember?.name}</DialogTitle>
+                        <DialogDescription>
+                            이 회원이 주문한 계정 목록입니다.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4">
+                        {loadingAccounts ? (
+                            <div className="text-center py-8">로딩 중...</div>
+                        ) : memberAccounts.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">주문 내역이 없습니다.</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Tidal ID</th>
+                                            <th className="px-4 py-2 text-left">상품명</th>
+                                            <th className="px-4 py-2 text-center">개월수</th>
+                                            <th className="px-4 py-2 text-center">시작일</th>
+                                            <th className="px-4 py-2 text-center">종료일</th>
+                                            <th className="px-4 py-2 text-center">상태</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {memberAccounts.map((account) => {
+                                            const isActive = account.end_date ? new Date(account.end_date) > new Date() : false;
+                                            return (
+                                                <tr key={account.id} className="hover:bg-gray-50">
+                                                    <td className="px-4 py-3 font-medium">{account.tidal_id || '-'}</td>
+                                                    <td className="px-4 py-3 text-gray-600">
+                                                        {account.orders?.products?.name || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        {account.orders?.product_plans?.duration_months ? `${account.orders.product_plans.duration_months}개월` : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-gray-500">
+                                                        {account.start_date ? new Date(account.start_date).toLocaleDateString() : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-gray-500">
+                                                        {account.end_date ? new Date(account.end_date).toLocaleDateString() : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                            {isActive ? '활성' : '만료'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button onClick={() => setIsAccountsOpen(false)}>닫기</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

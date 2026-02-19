@@ -1,4 +1,4 @@
-# Dalbus Database Schema (v3.1)
+# Dalbus Database Schema (v3.2)
 
 이 문서는 달버스의 데이터베이스 구조와 관계를 정리한 문서입니다. Supabase (PostgreSQL) 환경을 기준으로 합니다.
 
@@ -118,6 +118,12 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+
+    site_settings {
+        string key PK
+        string value
+        timestamp updated_at
+    }
 ```
 
 ---
@@ -153,7 +159,7 @@ erDiagram
 ### 2.5 시스템 및 설정 (System)
 | 테이블명 | 설명 | 비고 |
 | :--- | :--- | :--- |
-| `site_settings` | 관리자 계정 및 운영 설정 | 관리자 이메일/비밀번호 포함 |
+| `site_settings` | 시스템 운영 설정 (Key-Value) | 관리자 이메일, 알림 설정 등 |
 | `bank_accounts` | 무통장 입금 계좌 목록 | |
 | `notification_logs` | 알림톡/SMS 발송 이력 | |
 
@@ -226,10 +232,10 @@ erDiagram
 - `max_slots / used_slots`: `integer` (최대 / 사용 중인 슬롯 수)
 
 ### 3.5 시스템 및 설정
-#### `site_settings` (운영 설정)
-- `admin_login_id / admin_login_pw`: `text` (관리자 인증 정보)
-- `admin_email`: `text` (시스템 알림 수신용)
-- `admin_phone`: `text` (비상 연락망)
+#### `site_settings` (운영 설정 - Key/Value)
+- `key`: `text` (PK, 설정 키)
+- `value`: `text` (설정 값)
+- `updated_at`: `timestamptz`
 
 #### `bank_accounts` (무통장 입금 계좌)
 - `bank_name`: `text` (은행명)

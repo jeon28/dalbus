@@ -24,20 +24,20 @@ interface BankAccount {
 }
 
 export default function AdminPage() {
-    const { isAdmin, loginAdmin, isHydrated } = useServices();
+    const { isAdmin, loginAdmin, isHydrated, user } = useServices();
 
     // Auth Form State
-    const [loginId, setLoginId] = useState('');
     const [loginPw, setLoginPw] = useState('');
     const [orders, setOrders] = useState<Order[]>([]);
 
     // Settings State
     const [settings, setSettings] = useState({
-        admin_login_id: '',
         admin_login_pw: '',
+        admin_sender_email: '',
         admin_email: '',
         admin_phone: ''
     });
+    const [originalSettings, setOriginalSettings] = useState(settings);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [newBank, setNewBank] = useState({ bank_name: '', account_number: '', account_holder: '' });
 
@@ -57,6 +57,7 @@ export default function AdminPage() {
         if (res.ok) {
             const data = await res.json();
             setSettings(data);
+            setOriginalSettings(data);
         }
     };
 
@@ -82,10 +83,10 @@ export default function AdminPage() {
             const res = await fetch('/api/admin/settings');
             const adminCreds = await res.json();
 
-            if (loginId === adminCreds.admin_login_id && loginPw === adminCreds.admin_login_pw) {
+            if (loginPw === adminCreds.admin_login_pw) {
                 loginAdmin();
             } else {
-                alert('아이디 또는 비밀번호가 올바르지 않습니다.');
+                alert('비밀번호가 올바르지 않습니다.');
             }
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
@@ -94,12 +95,31 @@ export default function AdminPage() {
     };
 
     const handleSaveSettings = async () => {
+        const updates: Record<string, string> = {};
+
+        // Calculate diff
+        (Object.keys(settings) as Array<keyof typeof settings>).forEach(key => {
+            if (settings[key] !== originalSettings[key]) {
+                updates[key] = settings[key];
+            }
+        });
+
+        if (Object.keys(updates).length === 0) {
+            alert('변경사항이 없습니다.');
+            return;
+        }
+
         const res = await fetch('/api/admin/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
+            body: JSON.stringify(updates)
         });
-        if (res.ok) alert('관리자 설정이 저장되었습니다.');
+
+        if (res.ok) {
+            alert('관리자 설정이 저장되었습니다.');
+            // Update original settings to match current state
+            setOriginalSettings(prev => ({ ...prev, ...updates }));
+        }
     };
 
     const handleAddBank = async () => {
@@ -132,29 +152,43 @@ export default function AdminPage() {
         );
     }
 
+    // 1. 관리자 권한(role)이 없는 경우 -> 403 Access Denied
+    if (!user || user.role !== 'admin') {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
+                <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-gray-100">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">접근 권한이 없습니다</h2>
+                    <p className="text-gray-500 mb-6">
+                        이 페이지는 관리자 전용입니다.<br />
+                        일반 사용자는 접근할 수 없습니다.
+                    </p>
+                    <Button
+                        onClick={() => window.location.href = '/'}
+                        className="w-full bg-black hover:bg-gray-800 text-white font-bold h-12"
+                    >
+                        메인으로 돌아가기
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    // 2. 관리자 권한은 있지만, 2차 인증(비밀번호)을 하지 않은 경우 -> Admin Login Prompt
     if (!isAdmin) {
-        // If user is logged in but not admin, maybe they shouldn't be here at all? 
-        // For now, if user is logged in and isHydrated, but not admin, show login.
-        // But if they are admin, we transition.
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
                 <Card className="w-full max-w-[400px] shadow-2xl border-none">
                     <CardHeader className="space-y-1 pt-8">
-                        <CardTitle className="text-2xl font-bold text-center">Dalbus Admin</CardTitle>
-                        <p className="text-sm text-center text-muted-foreground">관리자 계정으로 로그인하세요</p>
+                        <CardTitle className="text-2xl font-bold text-center">Admin Verification</CardTitle>
+                        <p className="text-sm text-center text-muted-foreground">관리자 확인을 위해 비밀번호를 입력하세요</p>
                     </CardHeader>
                     <CardContent className="pb-8">
                         <form onSubmit={handleLogin} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="loginId">아이디</Label>
-                                <Input
-                                    id="loginId"
-                                    placeholder="Enter Admin ID"
-                                    value={loginId}
-                                    onChange={(e) => setLoginId(e.target.value)}
-                                    className="h-11"
-                                />
-                            </div>
                             <div className="space-y-2">
                                 <Label htmlFor="loginPw">비밀번호</Label>
                                 <Input
@@ -167,7 +201,7 @@ export default function AdminPage() {
                                 />
                             </div>
                             <Button type="submit" className="w-full h-11 bg-black hover:bg-gray-800 text-white font-bold mt-2">
-                                LOGIN
+                                UNLOCK DASHBOARD
                             </Button>
                         </form>
                     </CardContent>
@@ -217,18 +251,20 @@ export default function AdminPage() {
                         </h3>
                         <div className={`${styles.settingsGrid} glass shadow-sm`}>
                             <div className={styles.settingsItem}>
-                                <Label>관리자 아이디</Label>
-                                <Input
-                                    value={settings.admin_login_id}
-                                    onChange={e => setSettings({ ...settings, admin_login_id: e.target.value })}
-                                />
-                            </div>
-                            <div className={styles.settingsItem}>
                                 <Label>관리자 비밀번호</Label>
                                 <Input
                                     type="password"
                                     value={settings.admin_login_pw}
                                     onChange={e => setSettings({ ...settings, admin_login_pw: e.target.value })}
+                                />
+                            </div>
+                            <div className={styles.settingsItem}>
+                                <Label>발신자 메일계정</Label>
+                                <Input
+                                    type="email"
+                                    placeholder="sender@example.com"
+                                    value={settings.admin_sender_email || ''}
+                                    onChange={e => setSettings({ ...settings, admin_sender_email: e.target.value })}
                                 />
                             </div>
                             <div className={styles.settingsItem}>

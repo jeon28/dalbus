@@ -7,25 +7,45 @@ export default function ErrorHandler() {
         // 전역 unhandledrejection 이벤트 핸들러
         const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
             const error = event.reason;
-
-            // AbortError는 조용히 무시 (React Strict Mode cleanup)
-            if (
+            const msg = error?.message || '';
+            const isAbort =
                 error?.name === 'AbortError' ||
-                error?.message?.includes('aborted') ||
-                error?.message?.includes('signal is aborted')
-            ) {
-                event.preventDefault(); // 콘솔 에러 출력 방지
+                error?.name === 'CanceledError' ||
+                msg.includes('aborted') ||
+                msg.includes('signal is aborted') ||
+                msg.includes('Canceled');
+
+            if (isAbort) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
                 return;
             }
 
-            // 다른 에러는 정상적으로 처리
             console.error('Unhandled rejection:', error);
         };
 
-        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+        // 전역 error 이벤트 핸들러
+        const handleError = (event: ErrorEvent) => {
+            const msg = event.message || '';
+            const isAbort =
+                msg.includes('aborted') ||
+                msg.includes('signal is aborted') ||
+                msg.includes('AbortError') ||
+                msg.includes('Canceled');
+
+            if (isAbort) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                return;
+            }
+        };
+
+        window.addEventListener('unhandledrejection', handleUnhandledRejection, true);
+        window.addEventListener('error', handleError, true);
 
         return () => {
-            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection, true);
+            window.removeEventListener('error', handleError, true);
         };
     }, []);
 
