@@ -97,29 +97,13 @@ function TidalAccountsContent() {
     const { isAdmin, isHydrated } = useServices();
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    // --- State ---
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [isGridView, setIsGridView] = useState(true);
-
-    // Grid State: Store edits locally before save
     const [gridValues, setGridValues] = useState<Record<string, GridValue>>({});
     const [editingSlots, setEditingSlots] = useState<Record<string, boolean>>({});
-
-    const startEdit = (accountId: string, slotIdx: number) => {
-        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
-    };
-
-    const cancelEdit = (accountId: string, slotIdx: number) => {
-        setEditingSlots(prev => {
-            const newEditingSlots = { ...prev };
-            delete newEditingSlots[`${accountId}_${slotIdx}`];
-            return newEditingSlots;
-        });
-        // Revert gridValues for this slot to original fetched data
-        fetchAccounts(); // Re-fetch all to ensure data consistency
-    };
-
-    // Modals
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -129,180 +113,125 @@ function TidalAccountsContent() {
         success: { masters: number, slots: number },
         failed: { id: string, reason: string }[]
     } | null>(null);
-
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
     const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
     const [viewOrder, setViewOrder] = useState<Order | null>(null);
-
-    // Order Data
     const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
-
-    // Move Data
     const [moveTargets, setMoveTargets] = useState<Account[]>([]);
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
-
-    // Filter & Search State
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-
-    // Sorting State for Grid View
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
-
-    const handleSort = (key: string) => {
-        let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    // Forms
     const [newAccount, setNewAccount] = useState({
         login_id: '',
-        login_pw: '', // Will stay empty as per user request
+        login_pw: '',
         payment_email: '',
         payment_day: 1,
         memo: '',
         product_id: '',
         max_slots: 6
     });
-
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
+    const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
+    const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
+    const [isSendingNotify, setIsSendingNotify] = useState(false);
 
-    const generateTidalPassword = () => {
-        const chars = "abcdefghijklmnopqrstuvwxyz";
-        const upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const numbers = "0123456789";
-        const special = "!@$";
+    const defaultTemplate = React.useMemo(() => `{buyer_name}님 
+{tidal_id} 서비스가 {end_date}에 만료됩니다.
 
-        let pass = "";
-        pass += upperChars.charAt(Math.floor(Math.random() * upperChars.length));
-        pass += chars.charAt(Math.floor(Math.random() * chars.length));
-        pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
-        pass += special.charAt(Math.floor(Math.random() * special.length));
+연장을 원하시면 아래 링크로 접속하여서 신청바랍니다.
+${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL}/public`, []);
 
-        const allChars = chars + upperChars + numbers + special;
-        for (let i = 0; i < 4; i++) {
-            pass += allChars.charAt(Math.floor(Math.random() * allChars.length));
-        }
-
-        // Shuffle
-        return pass.split('').sort(() => 0.5 - Math.random()).join('');
-    };
+    // --- Hooks & Effects ---
+    useEffect(() => {
+        setNotificationMessage(defaultTemplate);
+    }, [defaultTemplate]);
 
     useEffect(() => {
-        if (isHydrated && !isAdmin) {
-            router.push('/admin');
-        } else if (isHydrated && isAdmin) {
+        if (isHydrated && !isAdmin) router.push('/admin');
+        else if (isHydrated && isAdmin) {
             fetchAccounts();
             fetchPendingOrders();
         }
     }, [isAdmin, isHydrated, router]);
 
-    // URL에서 accountId 읽어서 해당 계정 자동 expand
     useEffect(() => {
         const accountId = searchParams.get('accountId');
         if (accountId && accounts.length > 0) {
-            console.log('Detected accountId in URL, expanding group:', accountId);
-            // 해당 계정을 expandedRows에 추가
             setExpandedRows(prev => {
                 const newSet = new Set(prev);
                 newSet.add(accountId);
                 return newSet;
             });
-
-            // 해당 계정으로 스크롤 및 하이라이트
             const scrollToAndHighlight = () => {
                 const element = document.getElementById(`account-${accountId}`);
                 if (element) {
                     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // 하이라이트 효과
                     element.style.transition = 'background-color 0.5s ease-in-out';
-                    element.style.backgroundColor = '#e0f2fe'; // blue-100
-
-                    setTimeout(() => {
-                        element.style.backgroundColor = '';
-                    }, 3000);
-                } else {
-                    // If element not found yet, retry once
-                    setTimeout(scrollToAndHighlight, 500);
-                }
+                    element.style.backgroundColor = '#e0f2fe';
+                    setTimeout(() => { if (element) element.style.backgroundColor = ''; }, 3000);
+                } else setTimeout(scrollToAndHighlight, 500);
             };
-
             setTimeout(scrollToAndHighlight, 500);
         }
     }, [searchParams, accounts]);
 
-    // Filter Effect: Auto-expand when filter is enabled
     useEffect(() => {
         if (showExpiredOnly) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const newExpanded = new Set<string>();
-
             accounts.forEach(acc => {
                 const hasExpired = acc.order_accounts?.some(oa => {
                     if (!oa.end_date) return false;
                     return parseISO(oa.end_date) < today;
                 });
-                if (hasExpired) {
-                    newExpanded.add(acc.id);
-                }
+                if (hasExpired) newExpanded.add(acc.id);
             });
             setExpandedRows(newExpanded);
         }
     }, [showExpiredOnly, accounts]);
 
-    const fetchAccounts = async () => {
 
+    // --- Fetching Functions ---
+    const fetchAccounts = async () => {
         try {
             const res = await fetch('/api/admin/accounts', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
 
-            // Initialize Grid Values from fetched data
             const initialGrid: Record<string, GridValue> = {};
             data.forEach((acc: Account) => {
                 for (let i = 0; i < acc.max_slots; i++) {
                     const assignment = acc.order_accounts?.find((oa: Assignment) => oa.slot_number === i);
-                    // For Slot 1 (i===0), default to Master Password if no specific slot password exists
                     let defaultPw = assignment?.tidal_password || '';
-                    if (i === 0 && !defaultPw) {
-                        defaultPw = acc.login_pw;
-                    }
+                    if (i === 0 && !defaultPw) defaultPw = acc.login_pw;
 
                     initialGrid[`${acc.id}_${i}`] = {
                         assignment_id: assignment?.id,
                         tidal_id: assignment?.tidal_id ?? null,
                         tidal_password: defaultPw,
-                        // Prefer buyer info from order_accounts, fallback to orders table
                         buyer_name: assignment?.buyer_name || assignment?.orders?.buyer_name || assignment?.orders?.profiles?.name || '',
                         buyer_phone: assignment?.buyer_phone || assignment?.orders?.buyer_phone || assignment?.orders?.profiles?.phone || '',
                         buyer_email: assignment?.buyer_email || assignment?.orders?.buyer_email || '',
                         start_date: assignment?.start_date || '',
                         end_date: assignment?.end_date || '',
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
-                        type: assignment?.type || (i === 0 ? 'master' : 'user'), // Slot 1 defaults to master, others to user
+                        type: assignment?.type || (i === 0 ? 'master' : 'user'),
                         period_months: assignment?.period_months || 0,
                     };
                 }
             });
             setGridValues(initialGrid);
-
         } catch (error) {
-            const err = error as Error;
-            if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
-                return;
-            }
             console.error(error);
         }
-
     };
 
     const fetchPendingOrders = async () => {
@@ -317,591 +246,18 @@ function TidalAccountsContent() {
                 setPendingOrders(waiting);
             }
         } catch (error) {
-            const err = error as Error;
-            if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
-                return;
-            }
             console.error(error);
         }
     };
 
-
-    const toggleRow = (id: string) => {
-        const newSet = new Set(expandedRows);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-        } else {
-            newSet.add(id);
-        }
-        setExpandedRows(newSet);
-    };
-
-    const updateGridValue = (accountId: string, slotIdx: number, field: string, value: string | number | null) => {
-        const key = `${accountId}_${slotIdx}`;
-        setGridValues(prev => {
-            const current = prev[key] || {};
-            const next = { ...current, [field]: value };
-
-            // Auto-generate Tidal ID when Email is changed
-            if (field === 'buyer_email' && typeof value === 'string') {
-                const emailPrefix = value.split('@')[0];
-                if (emailPrefix) {
-                    next.tidal_id = `${emailPrefix}@hifitidal.com`;
-                } else {
-                    next.tidal_id = null;
-                }
-            }
-
-            // Auto-calculate end_date if start_date and period_months exist
-            if ((field === 'start_date' || field === 'period_months') && (next.start_date && next.period_months)) {
-                try {
-                    const start = parseISO(next.start_date);
-                    const months = parseInt(String(next.period_months)) || 0;
-                    if (months > 0) {
-                        const end = new Date(start);
-                        end.setMonth(end.getMonth() + months);
-                        next.end_date = end.toISOString().split('T')[0];
-                    }
-                } catch (err) {
-                    console.error('Date calculation error:', err);
-                }
-            }
-
-            return {
-                ...prev,
-                [key]: next
-            };
-        });
-    };
-
-    // --- Actions ---
-
-    const handleSaveRow = async (accountId: string, slotIdx: number) => {
-        const key = `${accountId}_${slotIdx}`;
-        const data = gridValues[key];
-
-        if (!data) return;
-
+    // --- Computed Helpers ---
+    const getPeriodMonths = (start?: string, end?: string) => {
+        if (!start || !end) return 0;
         try {
-            if (data.assignment_id) {
-                // UPDATE existing assignment
-                const res = await fetch(`/api/admin/assignments/${data.assignment_id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Update failed');
-                }
-            } else {
-                // CREATE new assignment (Manual Order)
-                if (!data.buyer_name && !data.buyer_email) {
-                    alert('이름 또는 ID(이메일)를 입력해주세요.');
-                    return;
-                }
-
-                const res = await fetch(`/api/admin/accounts/${accountId}/assign`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        order_id: data.order_id,
-                        order_number: data.order_number,
-                        slot_number: slotIdx,
-                        tidal_password: data.tidal_password,
-                        tidal_id: data.tidal_id || null,
-                        type: data.type,
-                        // Manual fields
-                        buyer_name: data.buyer_name,
-                        buyer_phone: data.buyer_phone,
-                        buyer_email: data.buyer_email,
-                        start_date: data.start_date,
-                        end_date: data.end_date
-                    })
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Create failed');
-                }
-            }
-
-            // Success
-            alert('저장되었습니다.');
-            setEditingSlots(prev => ({ ...prev, [key]: false })); // Exit edit mode
-            fetchAccounts();
-        } catch (e: unknown) {
-            const errorMsg = e instanceof Error ? e.message : String(e);
-            if (!errorMsg.includes('이미 사용 중인 Tidal ID')) {
-                console.error('Save row error:', e);
-            }
-            alert('저장 실패: ' + errorMsg);
-        }
-    };
-
-    const handleDelete = async (assignmentId: string) => {
-        if (!confirm('정말 삭제(배정 해제)하시겠습니까?')) return;
-        try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
-                method: 'DELETE',
-            });
-            if (!res.ok) throw new Error('Delete failed');
-            fetchAccounts();
-            fetchPendingOrders();
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.';
-            alert('삭제 실패: ' + message);
-        }
-    };
-
-    const handleDeactivate = async (assignmentId: string) => {
-        if (!confirm('해당 배정을 종료(비활성화)하시겠습니까?\n비활성화된 배정은 "지난 내역" 메뉴에서 확인할 수 있습니다.')) return;
-        try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: false })
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Deactivation failed');
-            }
-
-            alert('비활성화 되었습니다.');
-            fetchAccounts();
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '오류가 발생했습니다.';
-            alert('비활성화 실패: ' + message);
-        }
-    };
-
-    const handleCreateAccount = async () => {
-        // 1. Validate required fields
-        if (!newAccount.login_id || !newAccount.login_id.trim()) {
-            alert('❌ 그룹 ID는 필수 입력 항목입니다.');
-            return;
-        }
-
-        if (!newAccount.payment_email || !newAccount.payment_email.trim()) {
-            alert('❌ 결제 계정은 필수 입력 항목입니다.');
-            return;
-        }
-
-        if (!newAccount.payment_day || newAccount.payment_day < 1 || newAccount.payment_day > 31) {
-            alert('❌ 결제일은 1~31 사이의 값이어야 합니다.');
-            return;
-        }
-
-        // 2. Check if payment_email already exists in another group
-        const duplicateGroup = accounts.find(acc =>
-            acc.payment_email === newAccount.payment_email.trim()
-        );
-
-        if (duplicateGroup) {
-            alert(`❌ 결제 계정 중복\n\n결제 계정 '${newAccount.payment_email}'은(는) 이미 다른 그룹에서 사용 중입니다.\n\n【사용 중인 그룹】\n그룹 ID: ${duplicateGroup.login_id}\n\n※ 결제 계정은 한 개의 그룹에만 할당할 수 있습니다.`);
-            return;
-        }
-
-        try {
-            const prodRes = await fetch('/api/admin/products');
-            const products = await prodRes.json();
-            const tidal = products.find((p: { name: string; id: string }) => p.name.includes('Tidal')) || products[0];
-
-            const payload = { ...newAccount, product_id: tidal?.id };
-
-            const res = await fetch('/api/admin/accounts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) throw new Error('Failed to create account');
-
-            alert('✅ 그룹이 생성되었습니다.');
-            setIsAddModalOpen(false);
-            fetchAccounts();
-            setNewAccount({ login_id: '', login_pw: '', payment_email: '', payment_day: 1, memo: '', product_id: '', max_slots: 6 });
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '그룹 생성 중 오류가 발생했습니다.';
-            alert('❌ 그룹 생성 실패: ' + message);
-        }
-    };
-
-    const handleEditMasterAccount = (account: Account) => {
-        setEditingAccount(account);
-        setIsEditModalOpen(true);
-    };
-
-    const handleUpdateMasterAccount = async () => {
-        if (!editingAccount) return;
-
-        // 1. Validate required fields
-        if (!editingAccount.login_id || !editingAccount.login_id.trim()) {
-            alert('❌ 그룹 ID는 필수 입력 항목입니다.');
-            return;
-        }
-
-        if (!editingAccount.payment_email || !editingAccount.payment_email.trim()) {
-            alert('❌ 결제 계정은 필수 입력 항목입니다.');
-            return;
-        }
-
-        if (!editingAccount.payment_day || editingAccount.payment_day < 1 || editingAccount.payment_day > 31) {
-            alert('❌ 결제일은 1~31 사이의 값이어야 합니다.');
-            return;
-        }
-
-        // 2. Check if payment_email already exists in another group (excluding current group)
-        const duplicateGroup = accounts.find(acc =>
-            acc.payment_email === editingAccount.payment_email.trim() &&
-            acc.id !== editingAccount.id // Exclude current group being edited
-        );
-
-        if (duplicateGroup) {
-            alert(`❌ 결제 계정 중복\n\n결제 계정 '${editingAccount.payment_email}'은(는) 이미 다른 그룹에서 사용 중입니다.\n\n【사용 중인 그룹】\n그룹 ID: ${duplicateGroup.login_id}\n\n※ 결제 계정은 한 개의 그룹에만 할당할 수 있습니다.`);
-            return;
-        }
-
-        try {
-            const res = await fetch(`/api/admin/accounts/${editingAccount.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    login_id: editingAccount.login_id,
-                    payment_email: editingAccount.payment_email,
-                    payment_day: editingAccount.payment_day,
-                    memo: editingAccount.memo
-                })
-            });
-
-            if (!res.ok) throw new Error('Failed to update account');
-
-            setIsEditModalOpen(false);
-            fetchAccounts();
-            alert('✅ 수정되었습니다.');
-        } catch (error) {
-            console.error(error);
-            alert('❌ 수정 실패');
-        }
-    };
-
-    const handleDeleteMasterAccount = async (account: Account) => {
-        if ((account.order_accounts?.length || 0) > 0) {
-            alert('슬롯이 배정되어 있는 그룹은 삭제할 수 없습니다. 먼저 배정을 해제해 주세요.');
-            return;
-        }
-
-        if (!confirm(`'${account.login_id}' 그룹을 삭제하시겠습니까?`)) return;
-
-        try {
-            const res = await fetch(`/api/admin/accounts/${account.id}`, {
-                method: 'DELETE'
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || '삭제 실패');
-            }
-
-            fetchAccounts();
-            alert('삭제되었습니다.');
-        } catch (error) {
-            const e = error as Error;
-            alert(e.message);
-        }
-    };
-
-    const exportToExcel = () => {
-        interface ExcelRow {
-            'No.': string | number;
-            '그룹 ID': string;
-            '결제 계정': string;
-            '결제일': string;
-            '메모': string;
-            'Slot': string;
-            '고객명': string;
-            '전화번호': string;
-            '주문번호': string;
-            '소속 ID': string;
-            '소속 PW': string;
-            '시작일': string;
-            '종료일': string;
-            '개월': string | number;
-        }
-        const excelData: ExcelRow[] = [];
-
-        if (isGridView) {
-            // Export flat data equivalent to Grid View
-            const flatData = getFlatAssignments();
-            flatData.forEach((item, idx) => {
-                const val = gridValues[`${item.accountId}_${item.slotIdx}`] || {};
-                excelData.push({
-                    'No.': idx + 1,
-                    '그룹 ID': item.accountLoginId,
-                    '결제 계정': item.accountPaymentEmail,
-                    '결제일': `${item.accountPaymentDay}일`,
-                    '메모': item.accountMemo ?? '',
-                    'Slot': `Slot ${item.slotIdx + 1}`,
-                    '고객명': val.buyer_name || '',
-                    '전화번호': val.buyer_phone || '',
-                    '주문번호': val.order_number || '',
-                    '소속 ID': val.tidal_id || '',
-                    '소속 PW': val.tidal_password || '',
-                    '시작일': val.start_date || '',
-                    '종료일': val.end_date || '',
-                    '개월': getPeriodMonths(val.start_date, val.end_date)
-                });
-            });
-        } else {
-            // Keep existing grouped format for List View
-            const query = searchQuery.toLowerCase().trim();
-            accounts
-                .filter(acc => {
-                    if (!query) return true;
-                    if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) return true;
-                    return acc.order_accounts?.some(oa => {
-                        const tidalId = (oa.tidal_id || '').toLowerCase();
-                        const buyerName = (oa.buyer_name || oa.orders?.buyer_name || '').toLowerCase();
-                        const phone = (oa.buyer_phone || oa.orders?.buyer_phone || '').toLowerCase();
-                        return tidalId.includes(query) || buyerName.includes(query) || phone.includes(query);
-                    });
-                })
-                .forEach((acc, accIdx) => {
-                    // Master account row
-                    excelData.push({
-                        'No.': accIdx + 1,
-                        '그룹 ID': acc.login_id,
-                        '결제 계정': acc.payment_email,
-                        '결제일': `${acc.payment_day}일`,
-                        '메모': acc.memo ?? '',
-                        'Slot': '',
-                        '고객명': '',
-                        '전화번호': '',
-                        '주문번호': '',
-                        '소속 ID': '',
-                        '소속 PW': '',
-                        '시작일': '',
-                        '종료일': '',
-                        '개월': ''
-                    });
-
-                    // Dynamic slot rows
-                    const sortedAssignments = getSortedAssignments(acc);
-                    sortedAssignments.forEach((assignment) => {
-                        const order = assignment.orders;
-                        const period = getPeriodMonths(assignment.start_date, assignment.end_date);
-
-                        excelData.push({
-                            'No.': '',
-                            '그룹 ID': '',
-                            '결제 계정': '',
-                            '결제일': '',
-                            '메모': '',
-                            'Slot': `Slot ${assignment.slot_number + 1}`,
-                            '고객명': order?.buyer_name || order?.profiles?.name || '',
-                            '전화번호': order?.buyer_phone || order?.profiles?.phone || '',
-                            '주문번호': order?.order_number || '',
-                            '소속 ID': assignment.tidal_id || '',
-                            '소속 PW': assignment.tidal_password || '',
-                            '시작일': assignment.start_date ? new Date(assignment.start_date).toLocaleDateString() : '',
-                            '종료일': assignment.end_date ? new Date(assignment.end_date).toLocaleDateString() : '',
-                            '개월': period
-                        });
-                    });
-                });
-        }
-
-        // Create workbook
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(excelData);
-        XLSX.utils.book_append_sheet(wb, ws, 'Tidal 계정');
-
-        // Generate file
-        const fileName = `Tidal계정_${isGridView ? 'Grid' : 'List'}_${new Date().toLocaleDateString()}.xlsx`;
-        XLSX.writeFile(wb, fileName);
-    };
-
-    const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            const data = new Uint8Array(event.target?.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            interface ImportRow {
-                '그룹 ID': string;
-                '결제 계정': string;
-                '결제일': number | string;
-                '메모': string;
-                [key: string]: string | number | undefined;
-            }
-            const jsonData = XLSX.utils.sheet_to_json<ImportRow>(worksheet);
-
-            // Validation: Check headers
-            const requiredHeaders = ['그룹 ID', '결제 계정', '결제일', '메모'];
-            const firstRow = jsonData[0];
-            if (!firstRow || !requiredHeaders.every(h => h in firstRow)) {
-                alert('엑셀 양식이 올바르지 않습니다. 다운로드 양식을 확인해 주세요.');
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/admin/accounts/import', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ accounts: jsonData })
-                });
-
-                if (!res.ok) throw new Error('Import failed');
-
-                const summary = await res.json();
-                setImportResults(summary);
-                setIsImportResultModalOpen(true);
-                fetchAccounts();
-            } catch (error) {
-                console.error(error);
-                alert('임포트 처리 중 오류가 발생했습니다.');
-            }
-        };
-        reader.readAsArrayBuffer(file);
-        // Reset input
-        e.target.value = '';
-    };
-
-    // --- Modals --- (Assign/Move)
-
-    const openAssignModal = (account: Account, slotIndex: number) => {
-        try {
-            if (!account) throw new Error('계정 정보가 없습니다.');
-            setSelectedAccount(account);
-            setSelectedSlot(slotIndex);
-            setSlotPasswordModal(generateTidalPassword());
-            setIsAssignModalOpen(true);
-        } catch (e) {
-            console.error('Open assign modal error:', e);
-            alert('배정 창을 여는 중 오류가 발생했습니다: ' + String(e));
-        }
-    };
-
-    const getStatusLabel = (order: Order) => {
-        if (order.assignment_status === 'completed') return '작업완료';
-        if (order.assignment_status === 'assigned') return '배정완료';
-        if (order.payment_status === 'paid') return '입금확인';
-        return '주문신청';
-    };
-
-    const openOrderDetail = (order?: Order) => {
-        if (!order) return;
-        setViewOrder(order);
-        setIsOrderDetailOpen(true);
-    };
-
-    const handleAssign = (orderId: string) => {
-        if (!selectedAccount || selectedSlot === null) return;
-        const order = pendingOrders.find(o => o.id === orderId);
-        if (!order) return;
-
-        const key = `${selectedAccount.id}_${selectedSlot}`;
-        const emailPrefix = order.buyer_email?.split('@')[0] || '';
-
-        setGridValues(prev => ({
-            ...prev,
-            [key]: {
-                ...prev[key],
-                order_id: order.id,
-                buyer_name: order.buyer_name || order.profiles?.name || '',
-                buyer_email: order.buyer_email || '',
-                buyer_phone: order.buyer_phone || order.profiles?.phone || '',
-                start_date: order.start_date || '',
-                end_date: order.end_date || '',
-                order_number: order.order_number || '',
-                tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : null,
-                tidal_password: slotPasswordModal || '',
-                full_order: order // Store full order for detail view
-            }
-        }));
-
-        // Optimistically update accounts state to ensure the new slot renders
-        setAccounts(prev => prev.map(acc => {
-            if (acc.id === selectedAccount.id) {
-                const newAssignment: Assignment = {
-                    id: `temp-${Date.now()}`,
-                    // account_id removed as it's not in Assignment interface
-                    slot_number: selectedSlot,
-                    type: selectedSlot === 0 ? 'master' : 'user',
-                    tidal_id: (emailPrefix ? `${emailPrefix}@hifitidal.com` : null) || undefined,
-                    tidal_password: slotPasswordModal || '',
-                    order_id: order.id,
-                    orders: order
-                };
-
-                const newOrderAccounts = [...(acc.order_accounts || [])];
-                const existingIdx = newOrderAccounts.findIndex(oa => oa.slot_number === selectedSlot);
-
-                if (existingIdx !== -1) {
-                    newOrderAccounts[existingIdx] = { ...newOrderAccounts[existingIdx], ...newAssignment };
-                } else {
-                    newOrderAccounts.push(newAssignment);
-                }
-
-                return { ...acc, used_slots: newOrderAccounts.length, order_accounts: newOrderAccounts };
-            }
-            return acc;
-        }));
-
-        setEditingSlots(prev => ({ ...prev, [key]: true }));
-        setIsAssignModalOpen(false);
-    };
-
-    const openMoveModal = (currentAssignment: Assignment) => {
-        setSelectedAssignment(currentAssignment);
-        setMoveTargets(accounts.filter(a => a.used_slots < a.max_slots));
-        setSelectedTargetAccount('');
-        setSelectedTargetSlot(null);
-        setSlotPasswordModal(currentAssignment.tidal_password || '');
-        setIsMoveModalOpen(true);
-    };
-
-    const handleMove = async () => {
-        // ... Move logic ...
-        try {
-            if (!selectedAssignment?.orders?.id) {
-                alert('이동할 주문 정보가 없습니다.');
-                return;
-            }
-            const res = await fetch('/api/admin/accounts/move', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    order_id: selectedAssignment.orders.id,
-                    target_account_id: selectedTargetAccount,
-                    target_slot_number: selectedTargetSlot,
-                    target_tidal_password: selectedAssignment?.tidal_password // Use existing Pw
-                })
-            });
-            if (!res.ok) throw new Error('Failed');
-            setIsMoveModalOpen(false);
-            fetchAccounts();
+            return differenceInMonths(parseISO(end), parseISO(start));
         } catch {
-            alert('이동 실패');
+            return 0;
         }
-    };
-
-    // ...
-
-    const getSortedAssignments = (acc: Account) => {
-        return [...(acc.order_accounts || [])]
-            .filter(oa => oa && typeof oa === 'object')
-            .sort((a, b) => {
-                if (a.type === 'master') return -1;
-                if (b.type === 'master') return 1;
-                const dateA = a.end_date || '9999-12-31';
-                const dateB = b.end_date || '9999-12-31';
-                return dateA.localeCompare(dateB);
-            });
     };
 
     const getAvailableSlots = (accountId: string) => {
@@ -916,117 +272,8 @@ function TidalAccountsContent() {
         }
         return available;
     };
-    const getPeriodMonths = (start?: string, end?: string) => {
-        if (!start || !end) return 0;
-        try {
-            return differenceInMonths(parseISO(end), parseISO(start));
-        } catch {
-            return 0;
-        }
-    };
-
-    const getFlatAssignments = () => {
-        interface FlatAssignment extends GridValue {
-            accountId: string;
-            accountLoginId: string;
-            accountPaymentEmail: string;
-            accountPaymentDay: number;
-            accountMemo: string | null;
-            slotIdx: number;
-            assignmentId?: string;
-            [key: string]: string | number | boolean | null | undefined | Order | Assignment;
-        }
-        const flat: FlatAssignment[] = [];
-        const query = searchQuery.toLowerCase().trim();
-
-        accounts.forEach(acc => {
-            for (let i = 0; i < acc.max_slots; i++) {
-                const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
-                const val = gridValues[`${acc.id}_${i}`] || {};
-
-                // Apply Search Filter
-                if (query) {
-                    const buyerName = (val.buyer_name || '').toLowerCase();
-                    const tidalId = (val.tidal_id || '').toLowerCase();
-                    const buyerPhone = (val.buyer_phone || '').toLowerCase();
-
-                    if (!buyerName.includes(query) &&
-                        !tidalId.includes(query) &&
-                        !buyerPhone.includes(query)) {
-                        continue; // Skip if no match
-                    }
-                }
-
-                // Apply Expired Filter
-                if (showExpiredOnly) {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    if (!val.end_date || parseISO(val.end_date) >= today) {
-                        continue;
-                    }
-                }
-
-                flat.push({
-                    accountId: acc.id,
-                    accountLoginId: acc.login_id,
-                    accountPaymentEmail: acc.payment_email,
-                    accountPaymentDay: acc.payment_day,
-                    accountMemo: acc.memo,
-                    slotIdx: i,
-                    assignmentId: assignment?.id,
-                    ...val
-                });
-            }
-        });
-
-        // Sorting
-        if (sortConfig) {
-            flat.sort((a, b) => {
-                let valA: string | number | boolean | null | undefined | Order | Assignment = a[sortConfig.key];
-                let valB: string | number | boolean | null | undefined | Order | Assignment = b[sortConfig.key];
-
-                if (sortConfig.key === 'period') {
-                    valA = getPeriodMonths(a.start_date, a.end_date);
-                    valB = getPeriodMonths(b.start_date, b.end_date);
-                }
-
-                if (valA === undefined || valA === null) valA = '';
-                if (valB === undefined || valB === null) valB = '';
-
-                // Safely compare values
-                const sA = (typeof valA === 'object' ? JSON.stringify(valA) : valA) as string | number | boolean;
-                const sB = (typeof valB === 'object' ? JSON.stringify(valB) : valB) as string | number | boolean;
-
-                if (sA < sB) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (sA > sB) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
-
-        return flat;
-    };
 
 
-    const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
-    const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
-    const [notificationMessage, setNotificationMessage] = useState('');
-    const [isSendingNotify, setIsSendingNotify] = useState(false);
-
-    const defaultTemplate = `{buyer_name}님 
-{tidal_id} 서비스가 {end_date}에 만료됩니다.
-
-연장을 원하시면 아래 링크로 접속하여서 신청바랍니다.
-${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL}/public`;
-
-    if (!isAdmin) return null;
-
-    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
-        if (selectedAssignmentIds.size === filteredFlat.length) {
-            setSelectedAssignmentIds(new Set());
-        } else {
-            setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
-        }
-    };
 
     const getFlattenedAssignments = () => {
         const flattened: {
@@ -1076,40 +323,465 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 });
             });
         });
-
         return flattened;
     };
 
-    const handleToggleSelection = (id: string) => {
-        const next = new Set(selectedAssignmentIds);
-        if (next.has(id)) {
-            next.delete(id);
-        } else {
-            next.add(id);
+    const getFlatAssignments = () => {
+        interface FlatAssignment extends GridValue {
+            accountId: string;
+            accountLoginId: string;
+            accountPaymentEmail: string;
+            accountPaymentDay: number;
+            accountMemo: string | null;
+            slotIdx: number;
+            assignmentId?: string;
+            [key: string]: string | number | boolean | null | undefined | Order | Assignment;
         }
-        setSelectedAssignmentIds(next);
+        const flat: FlatAssignment[] = [];
+        const query = searchQuery.toLowerCase().trim();
+
+        accounts.forEach(acc => {
+            for (let i = 0; i < acc.max_slots; i++) {
+                const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
+                const val = gridValues[`${acc.id}_${i}`] || {};
+
+                // Apply Search Filter
+                if (query) {
+                    const buyerName = (val.buyer_name || '').toLowerCase();
+                    const tidalId = (val.tidal_id || '').toLowerCase();
+                    const buyerPhone = (val.buyer_phone || '').toLowerCase();
+
+                    if (!buyerName.includes(query) &&
+                        !tidalId.includes(query) &&
+                        !buyerPhone.includes(query)) {
+                        continue;
+                    }
+                }
+
+                // Apply Expired Filter
+                if (showExpiredOnly) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (!val.end_date || parseISO(val.end_date) >= today) {
+                        continue;
+                    }
+                }
+
+                flat.push({
+                    accountId: acc.id,
+                    accountLoginId: acc.login_id,
+                    accountPaymentEmail: acc.payment_email,
+                    accountPaymentDay: acc.payment_day,
+                    accountMemo: acc.memo,
+                    slotIdx: i,
+                    assignmentId: assignment?.id,
+                    ...val
+                });
+            }
+        });
+
+        // Sorting for Flat View
+        if (sortConfig) {
+            flat.sort((a, b) => {
+                let valA: string | number | boolean | null | undefined | Order | Assignment = a[sortConfig.key];
+                let valB: string | number | boolean | null | undefined | Order | Assignment = b[sortConfig.key];
+
+                if (sortConfig.key === 'period') {
+                    valA = getPeriodMonths(a.start_date, a.end_date);
+                    valB = getPeriodMonths(b.start_date, b.end_date);
+                }
+
+                if (valA === undefined || valA === null) valA = '';
+                if (valB === undefined || valB === null) valB = '';
+
+                const sA = (typeof valA === 'object' ? JSON.stringify(valA) : valA) as string | number | boolean;
+                const sB = (typeof valB === 'object' ? JSON.stringify(valB) : valB) as string | number | boolean;
+
+                if (sA < sB) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (sA > sB) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return flat;
+    };
+
+    // --- Filtered and Sorted Data for List View ---
+    const filteredAccounts = accounts.filter(acc => {
+        const query = searchQuery.toLowerCase().trim();
+        if (!query) return true;
+        if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) return true;
+        return acc.order_accounts?.some(oa => {
+            const tidalId = (oa.tidal_id || '').toLowerCase();
+            const buyerName = (oa.buyer_name || oa.orders?.buyer_name || '').toLowerCase();
+            const phone = (oa.buyer_phone || oa.orders?.buyer_phone || '').toLowerCase();
+            return tidalId.includes(query) || buyerName.includes(query) || phone.includes(query);
+        });
+    });
+
+    const sortedAccounts = [...filteredAccounts].sort((a, b) => {
+        if (sortConfig && !isGridView) {
+            let aVal: string | number = '';
+            let bVal: string | number = '';
+            switch (sortConfig.key) {
+                case 'login_id': aVal = a.login_id; bVal = b.login_id; break;
+                case 'used_slots': aVal = a.order_accounts?.length || 0; bVal = b.order_accounts?.length || 0; break;
+                case 'end_date':
+                    aVal = a.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
+                    bVal = b.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
+                    break;
+                default: return 0;
+            }
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        } else if (!sortConfig) {
+            // Default Sort for List View
+            const usedA = a.order_accounts?.length || 0;
+            const usedB = b.order_accounts?.length || 0;
+            if (usedA !== usedB) return usedA - usedB;
+
+            const endA = a.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
+            const endB = b.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
+            if (endA < endB) return 1;
+            if (endA > endB) return -1;
+            return 0;
+        }
+        return 0;
+    });
+
+    // --- Action Handlers ---
+    const toggleRow = (id: string) => {
+        setExpandedRows(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleAllRows = () => {
+        const allFilteredIds = filteredAccounts.map(acc => acc.id);
+        const allExpanded = allFilteredIds.every(id => expandedRows.has(id));
+        if (allExpanded) {
+            const next = new Set(expandedRows);
+            allFilteredIds.forEach(id => next.delete(id));
+            setExpandedRows(next);
+        } else {
+            const next = new Set(expandedRows);
+            allFilteredIds.forEach(id => next.add(id));
+            setExpandedRows(next);
+        }
+    };
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        setSortConfig({ key, direction });
+    };
+
+    const updateGridValue = (accountId: string, slotIdx: number, field: string, value: string | number | null) => {
+        const key = `${accountId}_${slotIdx}`;
+        setGridValues(prev => {
+            const current = prev[key] || {};
+            const next = { ...current, [field]: value };
+
+            if (field === 'buyer_email' && typeof value === 'string') {
+                const emailPrefix = value.split('@')[0];
+                next.tidal_id = emailPrefix ? `${emailPrefix}@hifitidal.com` : null;
+            }
+
+            if ((field === 'start_date' || field === 'period_months') && (next.start_date && next.period_months)) {
+                try {
+                    const start = parseISO(next.start_date);
+                    const months = parseInt(String(next.period_months)) || 0;
+                    if (months > 0) {
+                        const end = new Date(start);
+                        end.setMonth(end.getMonth() + months);
+                        next.end_date = end.toISOString().split('T')[0];
+                    }
+                } catch { }
+            }
+            return { ...prev, [key]: next };
+        });
+    };
+
+    const handleSaveRow = async (accountId: string, slotIdx: number) => {
+        const key = `${accountId}_${slotIdx}`;
+        const data = gridValues[key];
+        if (!data) return;
+
+        try {
+            if (data.assignment_id) {
+                const res = await fetch(`/api/admin/assignments/${data.assignment_id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Update failed');
+            } else {
+                if (!data.buyer_name && !data.buyer_email) {
+                    alert('이름 또는 ID(이메일)를 입력해주세요.');
+                    return;
+                }
+                const res = await fetch(`/api/admin/accounts/${accountId}/assign`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...data, slot_number: slotIdx })
+                });
+                if (!res.ok) throw new Error('Create failed');
+            }
+            alert('저장되었습니다.');
+            setEditingSlots(prev => ({ ...prev, [key]: false }));
+            fetchAccounts();
+        } catch (e) {
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
+        }
+    };
+
+    const handleDelete = async (assignmentId: string) => {
+        if (!confirm('정말 삭제하시겠습니까?')) return;
+        try {
+            const res = await fetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+            fetchAccounts();
+            fetchPendingOrders();
+        } catch (error) {
+            alert('삭제 실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleDeactivate = async (assignmentId: string) => {
+        if (!confirm('배정을 종료하시겠습니까?')) return;
+        try {
+            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: false })
+            });
+            if (!res.ok) throw new Error('Deactivation failed');
+            alert('비활성화 되었습니다.');
+            fetchAccounts();
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleCreateAccount = async () => {
+        if (!newAccount.login_id.trim() || !newAccount.payment_email.trim()) {
+            alert('필수 항목을 입력해주세요.');
+            return;
+        }
+        try {
+            const prodRes = await fetch('/api/admin/products');
+            const products = await prodRes.json();
+            const tidal = products.find((p: { name: string }) => p.name.includes('Tidal')) || products[0];
+
+            const res = await fetch('/api/admin/accounts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...newAccount, product_id: tidal?.id })
+            });
+            if (!res.ok) throw new Error('Failed to create');
+            alert('생성되었습니다.');
+            setIsAddModalOpen(false);
+            fetchAccounts();
+            setNewAccount({ login_id: '', login_pw: '', payment_email: '', payment_day: 1, memo: '', product_id: '', max_slots: 6 });
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleEditMasterAccount = (account: Account) => {
+        setEditingAccount(account);
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateMasterAccount = async () => {
+        if (!editingAccount) return;
+        try {
+            const res = await fetch(`/api/admin/accounts/${editingAccount.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editingAccount)
+            });
+            if (!res.ok) throw new Error('Failed to update');
+            setIsEditModalOpen(false);
+            fetchAccounts();
+            alert('수정되었습니다.');
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleDeleteMasterAccount = async (account: Account) => {
+        if ((account.order_accounts?.length || 0) > 0) {
+            alert('슬롯이 배정되어 있는 그룹은 삭제할 수 없습니다.');
+            return;
+        }
+        if (!confirm('그룹을 삭제하시겠습니까?')) return;
+        try {
+            const res = await fetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+            fetchAccounts();
+            alert('삭제되었습니다.');
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const exportToExcel = () => {
+        const excelData: Record<string, string | number>[] = [];
+        const flatData = getFlatAssignments();
+        flatData.forEach((item, idx) => {
+            excelData.push({
+                'No.': idx + 1,
+                '그룹 ID': item.accountLoginId,
+                '결제 계정': item.accountPaymentEmail,
+                '결제일': `${item.accountPaymentDay}일`,
+                '메모': item.accountMemo ?? '',
+                'Slot': `Slot ${item.slotIdx + 1}`,
+                '고객명': item.buyer_name || '',
+                '전화번호': item.buyer_phone || '',
+                '주문번호': item.order_number || '',
+                '소속 ID': item.tidal_id || '',
+                '소속 PW': item.tidal_password || '',
+                '시작일': item.start_date || '',
+                '종료일': item.end_date || '',
+                '개월': getPeriodMonths(item.start_date, item.end_date)
+            });
+        });
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(excelData);
+        XLSX.utils.book_append_sheet(wb, ws, 'Tidal 계정');
+        XLSX.writeFile(wb, `Tidal계정_${new Date().toLocaleDateString()}.xlsx`);
+    };
+
+    const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                const res = await fetch('/api/admin/accounts/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accounts: jsonData })
+                });
+                if (!res.ok) throw new Error('Import failed');
+                const summary = await res.json();
+                setImportResults(summary);
+                setIsImportResultModalOpen(true);
+                fetchAccounts();
+            } catch {
+                alert('임포트 오류');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        e.target.value = '';
+    };
+
+    const openAssignModal = (account: Account, slotIndex: number) => {
+        setSelectedAccount(account);
+        setSelectedSlot(slotIndex);
+        setSlotPasswordModal(generateTidalPassword());
+        setIsAssignModalOpen(true);
+    };
+
+    const handleAssign = (orderId: string) => {
+        if (!selectedAccount || selectedSlot === null) return;
+        const order = pendingOrders.find(o => o.id === orderId);
+        if (!order) return;
+        const key = `${selectedAccount.id}_${selectedSlot}`;
+        const emailPrefix = order.buyer_email?.split('@')[0] || '';
+
+        setGridValues(prev => ({
+            ...prev,
+            [key]: {
+                ...prev[key],
+                order_id: order.id,
+                buyer_name: order.buyer_name || order.profiles?.name || '',
+                buyer_email: order.buyer_email || '',
+                buyer_phone: order.buyer_phone || order.profiles?.phone || '',
+                start_date: order.start_date || '',
+                end_date: order.end_date || '',
+                order_number: order.order_number || '',
+                tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : null,
+                tidal_password: slotPasswordModal || '',
+                full_order: order
+            }
+        }));
+        setEditingSlots(prev => ({ ...prev, [key]: true }));
+        setIsAssignModalOpen(false);
+    };
+
+    const openMoveModal = (currentAssignment: Assignment) => {
+        setSelectedAssignment(currentAssignment);
+        setMoveTargets(accounts.filter(a => a.used_slots < a.max_slots));
+        setSelectedTargetAccount('');
+        setSelectedTargetSlot(null);
+        setIsMoveModalOpen(true);
+    };
+
+    const handleMove = async () => {
+        if (!selectedAssignment?.orders?.id) return;
+        try {
+            const res = await fetch('/api/admin/accounts/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    order_id: selectedAssignment.orders.id,
+                    target_account_id: selectedTargetAccount,
+                    target_slot_number: selectedTargetSlot,
+                    target_tidal_password: selectedAssignment.tidal_password
+                })
+            });
+            if (!res.ok) throw new Error('Move failed');
+            setIsMoveModalOpen(false);
+            fetchAccounts();
+        } catch {
+            alert('이동 실패');
+        }
+    };
+
+    const openOrderDetail = (order?: Order) => {
+        if (!order) return;
+        setViewOrder(order);
+        setIsOrderDetailOpen(true);
+    };
+
+    const getStatusLabel = (order: Order) => {
+        if (order.assignment_status === 'completed') return '작업완료';
+        if (order.assignment_status === 'assigned') return '배정완료';
+        if (order.payment_status === 'paid') return '입금확인';
+        return '주문신청';
+    };
+
+    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
+        if (selectedAssignmentIds.size === filteredFlat.length) {
+            setSelectedAssignmentIds(new Set());
+        } else {
+            setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
+        }
+    };
+
+    const handleToggleSelection = (id: string) => {
+        setSelectedAssignmentIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     };
 
     const handleBulkNotify = async () => {
         if (selectedAssignmentIds.size === 0) return;
-
         setIsSendingNotify(true);
         try {
-            // Get selected assignment details
-            interface Recipient {
-                email: string | undefined;
-                buyerName: string;
-                tidalId: string;
-                endDate: string;
-            }
-
-            interface Failure {
-                email: string;
-                error: string;
-            }
-
             const flattened = getFlattenedAssignments();
-            const recipients: Recipient[] = flattened
+            const recipients = flattened
                 .filter(item => selectedAssignmentIds.has(item.id))
                 .map(item => ({
                     email: item.assignment.buyer_email || item.assignment.orders?.buyer_email,
@@ -1117,43 +789,49 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     tidalId: item.assignment.tidal_id || '알 수 없음',
                     endDate: item.assignment.end_date || '알 수 없음'
                 }))
-                .filter((r): r is Recipient & { email: string } => !!r.email);
-
-            if (recipients.length === 0) {
-                alert('선택된 항목 중 이메일 정보가 있는 회원이 없습니다.');
-                setIsSendingNotify(false);
-                return;
-            }
+                .filter(r => !!r.email);
 
             const res = await fetch('/api/admin/tidal/notify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    recipients,
-                    messageTemplate: notificationMessage
-                })
+                body: JSON.stringify({ recipients, messageTemplate: notificationMessage })
             });
 
-            const data = await res.json();
             if (res.ok) {
-                if (data.failCount > 0) {
-                    const failList = data.failures.map((f: Failure) => `${f.email}: ${f.error}`).join('\n');
-                    alert(`${data.message}\n\n실패 상세:\n${failList}`);
-                } else {
-                    alert(`${data.message}`);
-                }
+                alert('발송되었습니다.');
                 setIsNotifyModalOpen(false);
                 setSelectedAssignmentIds(new Set());
             } else {
-                alert('발송 중 오류: ' + (data.error || 'Unknown Error'));
+                alert('발송 실패');
             }
-        } catch (error) {
-            console.error('Notify Failed:', error);
-            alert('발송에 실패했습니다.');
+        } catch {
+            alert('오류 발생');
         } finally {
             setIsSendingNotify(false);
         }
     };
+
+    const generateTidalPassword = () => {
+        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$";
+        let pass = "";
+        for (let i = 0; i < 8; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        return pass;
+    };
+
+    const startEdit = (accountId: string, slotIdx: number) => {
+        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
+    };
+
+    const cancelEdit = (accountId: string, slotIdx: number) => {
+        setEditingSlots(prev => {
+            const next = { ...prev };
+            delete next[`${accountId}_${slotIdx}`];
+            return next;
+        });
+        fetchAccounts();
+    };
+
+    if (!isAdmin) return null;
 
     return (
         <main className={styles.main}>
@@ -1464,31 +1142,28 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 ) : (
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-sm">
-                            <div className="col-span-1">No.</div>
+                            <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>
+                                GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                            </div>
                             <div className="col-span-2">결제계좌</div>
-                            <div className="col-span-1 text-center">결제일</div>
+                            <div className="col-span-1 text-center font-bold">결제일</div>
                             <div className="col-span-1 text-left">메모</div>
                             <div className="col-span-2 text-left">마스터계정</div>
-                            <div className="col-span-2 text-left text-orange-600">종료예정일</div>
+                            <div className="col-span-2 text-left text-gray-900 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('end_date')}>
+                                종료예정일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                            </div>
                             <div className="col-span-1 text-left">지속개월</div>
-                            <div className="col-span-1 text-center">슬롯</div>
+                            <div className="col-span-1 text-center cursor-pointer hover:bg-gray-100 flex items-center justify-center gap-1" onClick={() => handleSort('used_slots')}>
+                                슬롯 {sortConfig?.key === 'used_slots' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                            </div>
                             <div className="col-span-1 text-center">관리</div>
-                            <div className="col-span-1 text-center">상세</div>
+                            <div className="col-span-1 text-center cursor-pointer hover:text-blue-600 whitespace-nowrap" onClick={toggleAllRows}>
+                                {filteredAccounts.length > 0 && filteredAccounts.every(acc => expandedRows.has(acc.id)) ? '전체접기' : '전체펼치기'}
+                            </div>
                         </div>
 
-                        {accounts
-                            .filter(acc => {
-                                const query = searchQuery.toLowerCase().trim();
-                                if (!query) return true;
-                                if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) return true;
-                                return acc.order_accounts?.some(oa => {
-                                    const tidalId = (oa.tidal_id || '').toLowerCase();
-                                    const buyerName = (oa.buyer_name || oa.orders?.buyer_name || '').toLowerCase();
-                                    const phone = (oa.buyer_phone || oa.orders?.buyer_phone || '').toLowerCase();
-                                    return tidalId.includes(query) || buyerName.includes(query) || phone.includes(query);
-                                });
-                            })
-                            .map((acc, idx) => {
+                        {sortedAccounts
+                            .map((acc) => {
                                 const isExpanded = expandedRows.has(acc.id);
                                 let sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => {
                                     if (a.type === 'master') return -1;
@@ -1514,11 +1189,37 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
 
 
+                                const masterSlot = acc.order_accounts?.find(oa => oa.type === 'master');
+                                const tidalId = masterSlot?.tidal_id || '-';
+                                const endDate = masterSlot?.end_date || '-';
+
+                                let isWarning = false;
+                                if (masterSlot?.end_date) {
+                                    try {
+                                        const end = parseISO(masterSlot.end_date);
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        const warningThreshold = new Date(today);
+                                        warningThreshold.setDate(today.getDate() + 30);
+                                        if (end < warningThreshold) isWarning = true;
+                                    } catch { }
+                                }
+
+                                let duration = '-';
+                                if (masterSlot?.start_date) {
+                                    try {
+                                        const start = parseISO(masterSlot.start_date);
+                                        const now = new Date();
+                                        const diff = differenceInMonths(now, start);
+                                        duration = `${diff}개월`;
+                                    } catch { }
+                                }
+
                                 return (
                                     <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
                                         <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
-                                            <div className="col-span-1 text-gray-500 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                                {String(idx + 1).padStart(3, '0')}
+                                            <div className="col-span-1 text-gray-700 font-medium cursor-pointer truncate" title={acc.login_id} onClick={() => toggleRow(acc.id)}>
+                                                {acc.login_id}
                                             </div>
                                             <div className="col-span-2 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
                                                 <div className="font-medium text-[10px] leading-tight">
@@ -1532,33 +1233,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             <div className="col-span-1 text-gray-500 text-[10px] text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
                                                 {acc.memo}
                                             </div>
-                                            {(() => {
-                                                const masterSlot = acc.order_accounts?.find(oa => oa.type === 'master');
-                                                const tidalId = masterSlot?.tidal_id || '-';
-                                                const endDate = masterSlot?.end_date || '-';
-                                                let duration = '-';
-                                                if (masterSlot?.start_date) {
-                                                    try {
-                                                        const start = parseISO(masterSlot.start_date);
-                                                        const now = new Date();
-                                                        const diff = differenceInMonths(now, start);
-                                                        duration = `${diff}개월`;
-                                                    } catch { }
-                                                }
-                                                return (
-                                                    <>
-                                                        <div className="col-span-2 text-gray-700 text-xs truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>
-                                                            {tidalId}
-                                                        </div>
-                                                        <div className="col-span-2 text-orange-600 font-mono text-xs cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                                            {endDate}
-                                                        </div>
-                                                        <div className="col-span-1 text-gray-500 font-mono text-xs cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                                            {duration}
-                                                        </div>
-                                                    </>
-                                                );
-                                            })()}
+                                            <div className="col-span-2 text-gray-700 text-xs truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>
+                                                {tidalId}
+                                            </div>
+                                            <div className={`col-span-2 font-mono text-xs cursor-pointer ${isWarning ? 'text-red-600 font-bold' : 'text-gray-900'}`} onClick={() => toggleRow(acc.id)}>
+                                                {endDate}
+                                            </div>
+                                            <div className="col-span-1 text-gray-500 font-mono text-xs cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                {duration}
+                                            </div>
                                             <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                                     {acc.order_accounts?.length || 0}/6

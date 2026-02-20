@@ -485,14 +485,26 @@ export default function OrderHistoryPage() {
     };
 
     const markAsCompleted = async (orderId: string) => {
-        if (!confirm('작업 완료 처리하시겠습니까?')) return;
+        if (!confirm('작업완료 하시겠습니까 ?')) return;
         try {
             const res = await fetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ assignment_status: 'completed' })
             });
+
             if (!res.ok) throw new Error('Update failed');
+
+            const result = await res.json();
+
+            if (result.emailSent) {
+                alert('작업이 완료되었으며, 고객에게 안내 메일이 발송되었습니다.');
+            } else if (result.emailError) {
+                alert(`작업 완료 처리되었으나 메일 발송에 실패했습니다.\n오류: ${result.emailError}`);
+            } else {
+                alert('작어 완료 처리되었습니다.');
+            }
+
             fetchOrders();
         } catch {
             alert('상태 변경 실패');
