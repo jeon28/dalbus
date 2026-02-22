@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Responsive mobile menu for the Admin Portal (Sheet-based navigation).
+- Confirmation dialog after order assignment for optional redirection to Tidal management.
+
+### Changed
+- Simplified Admin access: Removed secondary password verification for accounts with 'admin' role.
+- Improved order assignment flow: Redirection now happens in the same window after user confirmation, bypassing popup blockers.
+- Optimized Admin Sidebar to be reusable between desktop and mobile.
+
+### Fixed
+- Next.js 15 build artifacts mismatch error (cleared `.next` cache).
+- Unused imports and variables in `AdminPage` causing build failures.
+- Missing `@supabase.js` runtime error by clearing build cache and zombie processes.
+
 ## v1.4.0 - 2026-02-22
 
 ### 🎨 마이페이지 디자인 개편 및 관리자 UI 최적화

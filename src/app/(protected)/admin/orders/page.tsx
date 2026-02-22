@@ -422,22 +422,14 @@ export default function OrderHistoryPage() {
                 throw new Error(data.error || 'Match failed');
             }
 
-            // 1. Close Modal Immediately
+            // Success: Close Modal and Refresh List
             setIsMatchModalOpen(false);
-
-            // 2. Refresh Orders
             fetchOrders();
 
-            // 3. Open Tidal management in new tab
-            // Note: window.open after an await might be blocked by some browsers.
-            // But doing it before alert is much better.
-            const targetUrl = `/admin/tidal?accountId=${selectedAccount}`;
-            window.open(targetUrl, '_blank');
-
-            // 4. Finally show alert (blocking)
-            setTimeout(() => {
-                alert('배정되었습니다.');
-            }, 100);
+            // Ask to redirect to Tidal Management
+            if (confirm('배정되었습니다. Tidal 계정을 확인하시겠습니까?')) {
+                router.push(`/admin/tidal?accountId=${selectedAccount}`);
+            }
 
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
