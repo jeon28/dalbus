@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
 import { supabase } from '@/lib/supabase';
@@ -58,6 +58,14 @@ export default function MyPage() {
     const [updating, setUpdating] = useState(false);
     const router = useRouter();
 
+    const isMounted = useRef(true);
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
     // Profile form state
     const [profileForm, setProfileForm] = useState({
         name: '',
@@ -80,73 +88,86 @@ export default function MyPage() {
         setLoading(true);
 
         try {
-            // Fetch all orders for history
-            const { data: orderData, error: orderError } = await supabase
-                .from('orders')
-                .select(`
-                    id,
-                    order_number,
-                    amount,
-                    created_at,
-                    assignment_status,
-                    products(name),
-                    product_plans(duration_months)
-                `)
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+            // Get session token for authentication
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
 
-            if (orderError) throw orderError;
-
-            if (orderData) {
-                const typedOrders = orderData as unknown as SupabaseOrder[];
-                const history: OrderHistoryItem[] = typedOrders.map(item => ({
-                    id: item.id,
-                    order_number: item.order_number,
-                    product_name: item.products?.name || 'Service',
-                    plan_name: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
-                    amount: item.amount,
-                    created_at: new Date(item.created_at).toLocaleDateString(),
-                    assignment_status: item.assignment_status
-                }));
-                setOrders(history);
-
-                // Derive active subscriptions from completed assignments
-                const activeSubs: UserSubscription[] = typedOrders
-                    .filter(item => item.assignment_status === 'completed')
-                    .map(item => ({
-                        service_name: item.products?.name || 'Service',
-                        duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
-                        end_date: '-',
-                        account_id: '정보 확인 중',
-                        account_pw: '정보 확인 중',
-                        status: '이용 중'
-                    }));
-
-                // Get account info if possible
-                const { data: accountData } = await supabase
-                    .from('order_accounts')
-                    .select('*, orders(products(name))')
-                    .in('order_id', typedOrders.map(o => o.id));
-
-                if (accountData && accountData.length > 0) {
-                    const typedAccounts = accountData as unknown as SupabaseAccountAssignment[];
-                    const enrichedSubs: UserSubscription[] = typedAccounts.map(acc => ({
-                        service_name: acc.orders?.products?.name || 'Service',
-                        duration: '-',
-                        end_date: acc.end_date || '-',
-                        account_id: acc.account_id || '정보 없음',
-                        account_pw: acc.account_pw || '정보 없음',
-                        status: '이용 중'
-                    }));
-                    setSubscriptions(enrichedSubs);
-                } else {
-                    setSubscriptions(activeSubs);
-                }
+            if (!token) {
+                setLoading(false);
+                return;
             }
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/user/mypage', true);
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+            xhr.onload = function () {
+                if (!isMounted.current) return;
+                setLoading(false);
+
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const { orders: orderData, assignments: accountData } = JSON.parse(xhr.responseText) as {
+                            orders: SupabaseOrder[],
+                            assignments: SupabaseAccountAssignment[]
+                        };
+
+                        if (orderData) {
+                            const history: OrderHistoryItem[] = orderData.map(item => ({
+                                id: item.id,
+                                order_number: item.order_number,
+                                product_name: item.products?.name || 'Service',
+                                plan_name: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
+                                amount: item.amount,
+                                created_at: new Date(item.created_at).toLocaleDateString(),
+                                assignment_status: item.assignment_status
+                            }));
+                            setOrders(history);
+
+                            // Derive active subscriptions from completed assignments
+                            const activeSubs: UserSubscription[] = orderData
+                                .filter(item => item.assignment_status === 'completed')
+                                .map(item => ({
+                                    service_name: item.products?.name || 'Service',
+                                    duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
+                                    end_date: '-',
+                                    account_id: '정보 확인 중',
+                                    account_pw: '정보 확인 중',
+                                    status: '이용 중'
+                                }));
+
+                            if (accountData && accountData.length > 0) {
+                                const enrichedSubs: UserSubscription[] = accountData.map(acc => ({
+                                    service_name: acc.orders?.products?.name || 'Service',
+                                    duration: '-',
+                                    end_date: acc.end_date || '-',
+                                    account_id: acc.account_id || '정보 없음',
+                                    account_pw: acc.account_pw || '정보 없음',
+                                    status: '이용 중'
+                                }));
+                                setSubscriptions(enrichedSubs);
+                            } else {
+                                setSubscriptions(activeSubs);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('MyPage: JSON Parse error', e);
+                    }
+                } else {
+                    console.error('MyPage API responded with status:', xhr.status);
+                }
+            };
+
+            xhr.onerror = function () {
+                if (isMounted.current) setLoading(false);
+                console.error('MyPage API network error');
+            };
+
+            xhr.send();
+
         } catch (error) {
             console.error('Error fetching MyPage data:', error);
-        } finally {
-            setLoading(false);
+            if (isMounted.current) setLoading(false);
         }
     }, [user]);
 
