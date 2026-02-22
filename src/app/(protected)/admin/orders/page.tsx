@@ -73,6 +73,7 @@ interface OrderAccount {
     type?: 'master' | 'member';
     accounts?: Account;
     orders?: Order;
+    is_active?: boolean;
 }
 
 interface Account {
@@ -256,7 +257,7 @@ export default function OrderHistoryPage() {
 
                 // Filter accounts with available slots
                 // Note: For extensions, the account of the previous assignment should be included even if it's full (since we'll be re-using a slot)
-                let available = data.filter((acc: Account) => acc.used_slots < acc.max_slots);
+                let available = data.filter((acc: Account) => (acc.order_accounts?.length || 0) < acc.max_slots);
 
                 if (prev) {
                     const alreadyIn = available.some((acc: Account) => acc.id === prev.account_id);
@@ -283,8 +284,8 @@ export default function OrderHistoryPage() {
                         return expiryB.localeCompare(expiryA);
                     }
 
-                    const slotsA = a.max_slots - a.used_slots;
-                    const slotsB = b.max_slots - b.used_slots;
+                    const slotsA = a.max_slots - (a.order_accounts?.length || 0);
+                    const slotsB = b.max_slots - (b.order_accounts?.length || 0);
                     return slotsB - slotsA;
                 });
 
@@ -795,7 +796,7 @@ export default function OrderHistoryPage() {
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             <span className="text-gray-500 shrink-0">잔여 slot:</span>
-                                            <span className="font-semibold text-blue-700">{(previousAssignment.accounts?.max_slots || 0) - (previousAssignment.accounts?.used_slots || 0)}개</span>
+                                            <span className="font-semibold text-blue-700">{(previousAssignment.accounts?.max_slots || 0) - (previousAssignment.accounts?.order_accounts?.length || 0)}개</span>
                                         </div>
                                     </div>
                                 </div>
@@ -889,7 +890,7 @@ export default function OrderHistoryPage() {
                                             {availableAccounts.map(acc => (
                                                 <SelectItem key={acc.id} value={acc.id}>
                                                     <div className="text-xs">
-                                                        {acc.login_id}/{getMasterInfo(acc)}/잔여 {acc.max_slots - acc.used_slots}
+                                                        {acc.login_id}/{getMasterInfo(acc)}/잔여 {acc.max_slots - (acc.order_accounts?.length || 0)}
                                                     </div>
                                                 </SelectItem>
                                             ))}
