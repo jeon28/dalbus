@@ -43,9 +43,9 @@ export default function Header() {
                                     </>
                                 ) : (
                                     <>
-                                        <Link href="/mypage">
-                                            <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">{user.name}</Button>
-                                        </Link>
+                                        <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3" asChild>
+                                            <Link href="/mypage">{user.name}</Link>
+                                        </Button>
                                         <Button variant="outline" size="sm" onClick={logout} className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">로그아웃</Button>
                                     </>
                                 )}

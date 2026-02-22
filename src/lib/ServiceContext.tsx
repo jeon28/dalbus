@@ -32,6 +32,7 @@ interface ServiceContextType {
     isAdmin: boolean;
     loginAdmin: () => void;
     logoutAdmin: () => void;
+    refreshUser: () => Promise<void>;
 }
 
 const ServiceContext = createContext<ServiceContextType | undefined>(undefined);
@@ -98,50 +99,74 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    useEffect(() => {
-        // 초기 session 확인 및 설정
-        const initializeAuth = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
+    // Auth 초기화 및 세션 체크 로직을 별도 함수로 추출하여 재사용
+    const fetchUserProfile = useCallback(async (userId: string) => {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('name, email, phone, role')
+            .eq('id', userId)
+            .single();
+
+        return profile;
+    }, []);
+
+    const initializeAuth = useCallback(async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!isMounted.current) return;
+
+            if (session?.user) {
+                const profile = await fetchUserProfile(session.user.id);
+
                 if (!isMounted.current) return;
 
-                if (session?.user) {
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('name, email, phone, role')
-                        .eq('id', session.user.id)
-                        .single();
-
-                    if (!isMounted.current) return;
-
-                    const userObj: User = {
-                        id: session.user.id,
-                        name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
-                        email: profile?.email || session.user.email || '',
-                        phone: profile?.phone || '',
-                        role: profile?.role
-                    };
-                    setUser(userObj);
-                    localStorage.setItem('dalbus-user', JSON.stringify(userObj));
-                    setIsAdmin(false);
-                } else {
-                    setUser(null);
-                    setIsAdmin(false);
-                    localStorage.removeItem('dalbus-user');
-                }
-            } catch (error) {
-                const err = error as Error;
-                if (err.name !== 'AbortError' && !err.message?.includes('aborted')) {
-                    console.error('Failed to initialize auth:', error);
-                }
+                const userObj: User = {
+                    id: session.user.id,
+                    name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+                    email: profile?.email || session.user.email || '',
+                    phone: profile?.phone || '',
+                    role: profile?.role
+                };
+                setUser(userObj);
+                localStorage.setItem('dalbus-user', JSON.stringify(userObj));
+                setIsAdmin(false);
+            } else {
                 setUser(null);
                 setIsAdmin(false);
                 localStorage.removeItem('dalbus-user');
-            } finally {
-                if (isMounted.current) setIsHydrated(true);
             }
-        };
+        } catch (error) {
+            const err = error as Error;
+            if (err.name !== 'AbortError' && !err.message?.includes('aborted')) {
+                console.error('Failed to initialize auth:', error);
+            }
+            setUser(null);
+            setIsAdmin(false);
+            localStorage.removeItem('dalbus-user');
+        } finally {
+            if (isMounted.current) setIsHydrated(true);
+        }
+    }, [fetchUserProfile]);
 
+    const refreshUserProfile = useCallback(async () => {
+        if (!user?.id) return;
+        const profile = await fetchUserProfile(user.id);
+        if (!isMounted.current) return;
+
+        if (profile) {
+            const userObj: User = {
+                ...user,
+                name: profile.name || user.name,
+                email: profile.email || user.email,
+                phone: profile.phone || '',
+                role: profile.role
+            };
+            setUser(userObj);
+            localStorage.setItem('dalbus-user', JSON.stringify(userObj));
+        }
+    }, [user, fetchUserProfile]);
+
+    useEffect(() => {
         const init = async () => {
             if (!isMounted.current) return;
             await fetchServices();
@@ -160,20 +185,9 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     setIsAdmin(false);
                     localStorage.removeItem('dalbus-user');
                 } else if (session?.user) {
-                    const { data: profile, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('name, email, phone, role')
-                        .eq('id', session.user.id)
-                        .single();
+                    const profile = await fetchUserProfile(session.user.id);
 
                     if (!isMounted.current) return;
-
-                    if (profileError) {
-                        if (profileError.message?.includes('AbortError') || profileError.code === 'PGRST301') {
-                            return;
-                        }
-                        console.error('Profile fetch error during auth change:', profileError);
-                    }
 
                     const userObj: User = {
                         id: session.user.id,
@@ -201,7 +215,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         return () => {
             subscription.unsubscribe();
         };
-    }, [fetchServices]);
+    }, [fetchServices, initializeAuth, fetchUserProfile]);
 
     const updatePrice = async (id: string, newPrice: string) => {
         const numericPrice = parseInt(newPrice.replace(/,/g, ''));
@@ -226,11 +240,16 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = async () => {
-        await supabase.auth.signOut();
-        setUser(null);
-        setIsAdmin(false);
-        localStorage.removeItem('dalbus-user');
-        window.location.replace('/public');
+        try {
+            await supabase.auth.signOut();
+        } catch (error) {
+            console.error('Logout error (Supabase):', error);
+        } finally {
+            setUser(null);
+            setIsAdmin(false);
+            localStorage.removeItem('dalbus-user');
+            window.location.replace('/public');
+        }
     };
 
     const loginAdmin = () => setIsAdmin(true);
@@ -247,7 +266,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             refreshServices: fetchServices,
             isAdmin,
             loginAdmin,
-            logoutAdmin
+            logoutAdmin,
+            refreshUser: refreshUserProfile
         }}>
             {children}
         </ServiceContext.Provider>

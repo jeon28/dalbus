@@ -1,129 +1,49 @@
 .main {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
     padding-bottom: 100px;
 }
 
 .header {
-    height: var(--header-height);
+    height: 70px;
     display: flex;
     align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+    position: sticky;
+    top: 0;
+    z-index: 50;
 }
 
 .title {
-    font-size: 1.2rem;
-    font-weight: 700;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #1e293b;
+    letter-spacing: -0.025em;
 }
 
 .content {
-    padding-top: 25px;
-    display: flex;
-    flex-direction: column;
-    gap: 30px;
+    animation: fadeIn 0.5s ease-out;
 }
 
-.section h3 {
-    font-size: 1rem;
-    margin-bottom: 15px;
-    color: var(--text-main);
+.section {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.activeCard {
-    padding: 20px;
-    border-radius: var(--radius);
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+.section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
-.cardTop {
-    display: flex;
-    align-items: center;
-    gap: 15px;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.serviceIcon {
-    font-size: 2.5rem;
-}
-
-.serviceInfo h4 {
-    font-size: 1.1rem;
-    margin-bottom: 4px;
-}
-
-.serviceInfo p {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-}
-
-.statusBadge {
-    margin-left: auto;
-    font-size: 0.75rem;
-    background: #eef2ff;
-    color: #4f46e5;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-weight: 700;
-}
-
-.credentials {
-    background: var(--secondary);
-    padding: 15px;
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.credItem {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-}
-
-.credItem span {
-    color: var(--text-muted);
-}
-
-.notice {
-    font-size: 0.75rem;
-    color: #fa5252;
-}
-
-.menuList {
-    border-radius: 15px;
-    overflow: hidden;
-}
-
-.menuItem {
-    padding: 15px 20px;
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--glass-border);
-    font-size: 0.95rem;
-    cursor: pointer;
-}
-
-.menuItem:last-child {
-    border-bottom: none;
-}
-
-.menuItem span {
-    color: var(--text-muted);
-    font-size: 1.2rem;
-}
-
-.bottomNav {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    right: 20px;
-    height: 60px;
-    border-radius: 30px;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    z-index: 1000;
-}
-
-.navItem {
-    font-size: 1.4rem;
-}
+/* Glass effect utilities handled by global in globals.css */

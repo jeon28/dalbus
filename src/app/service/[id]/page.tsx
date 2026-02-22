@@ -457,6 +457,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             <Input
                                 placeholder="성함을 입력해 주세요."
                                 value={guestInfo.name}
+                                readOnly={!!user}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     const newName = e.target.value;
                                     setGuestInfo(prev => ({
@@ -470,12 +471,14 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                 type="tel"
                                 placeholder="휴대폰번호를 입력해 주세요."
                                 value={guestInfo.phone}
+                                readOnly={!!user}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
                             />
                             <Input
                                 type="email"
                                 placeholder="이메일을 입력해 주세요."
                                 value={guestInfo.email}
+                                readOnly={!!user}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
                             />
                             <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>

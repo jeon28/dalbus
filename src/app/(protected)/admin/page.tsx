@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
+import { useRouter } from 'next/navigation';
 import styles from './admin.module.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ interface BankAccount {
 
 export default function AdminPage() {
     const { isAdmin, loginAdmin, isHydrated, user } = useServices();
+    const router = useRouter();
 
     // Auth Form State
     const [loginPw, setLoginPw] = useState('');
@@ -144,6 +146,12 @@ export default function AdminPage() {
         if (res.ok) fetchBankAccounts();
     };
 
+    useEffect(() => {
+        if (isHydrated && !user) {
+            router.push('/login?returnTo=/admin');
+        }
+    }, [isHydrated, user, router]);
+
     if (!isHydrated) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -152,8 +160,11 @@ export default function AdminPage() {
         );
     }
 
-    // 1. 관리자 권한(role)이 없는 경우 -> 403 Access Denied
-    if (!user || user.role !== 'admin') {
+    // 1. 로그인하지 않은 경우 (Guest) -> 렌더링 중단 (useEffect에서 리다이렉트 처리)
+    if (!user) return null;
+
+    // 2. 관리자 권한(role)이 없는 경우 -> 403 Access Denied
+    if (user.role !== 'admin') {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
                 <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-gray-100">

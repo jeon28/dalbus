@@ -83,6 +83,63 @@ export const sendAdminOrderNotification = async (
     }
 };
 
+/**
+ * 사용자용 주문 접수 알림 메일 발송
+ */
+export const sendUserOrderNotification = async (
+    userEmail: string,
+    order: OrderNotificationProps
+) => {
+    if (!resend) {
+        console.error('RESEND_API_KEY is missing. Email notification skipped.');
+        return { success: false, error: 'Missing API Key' };
+    }
+
+    try {
+        const { orderId, productName, planName, amount, buyerName, depositorName } = order;
+        const sender = await getSenderEmail();
+
+        const { data, error } = await resend.emails.send({
+            from: sender,
+            to: [userEmail],
+            subject: `[Dalbus] 주문 접수 안내 - ${buyerName}님`,
+            html: `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">주문이 정상적으로 접수되었습니다.</h2>
+          <p>안녕하세요, <strong>${buyerName}</strong>님! Dalbus를 이용해 주셔서 감사합니다.</p>
+          <p>주문하신 서비스의 입금이 확인되면 계정 배정이 시작됩니다.</p>
+          
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>주문 번호:</strong> ${orderId}</p>
+            <p style="margin: 5px 0;"><strong>상품명:</strong> ${productName}</p>
+            <p style="margin: 5px 0;"><strong>요금제:</strong> ${planName}</p>
+            <p style="margin: 5px 0;"><strong>결제 금액:</strong> ${amount.toLocaleString()}원</p>
+            <p style="margin: 5px 0;"><strong>입금자명:</strong> ${depositorName}</p>
+          </div>
+
+          <p>관리자가 입금 확인 후 영업일 기준 24시간 이내에 계정 세팅을 완료해 드립니다.</p>
+          <p>계정 배정 및 작업이 완료되면 다시 한번 안내 메일을 보내드리겠습니다.</p>
+          
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 발신전용입니다. 문의사항은 관리자 페이지 또는 고객센터를 이용해 주세요.
+          </p>
+        </div>
+      `,
+        });
+
+        if (error) {
+            console.error('User Email sending failed:', error);
+            return { success: false, error };
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error('Unexpected error sending user email:', error);
+        return { success: false, error };
+    }
+};
+
 interface ExpiryNotificationProps {
     buyerName: string;
     tidalId: string;

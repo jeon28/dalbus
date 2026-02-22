@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { sendAdminOrderNotification } from '@/lib/email';
+import { sendAdminOrderNotification, sendUserOrderNotification } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
     try {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
         // 3. Send Notification if admin email exists
         if (adminEmailSetting?.value) {
-            await sendAdminOrderNotification(adminEmailSetting.value, {
+            const notificationParams = {
                 orderId: order.order_number,
                 productName: product_name,
                 planName: plan_name,
@@ -39,7 +39,15 @@ export async function POST(req: NextRequest) {
                 buyerName: orderData.buyer_name,
                 buyerPhone: orderData.buyer_phone,
                 depositorName: orderData.depositor_name
-            });
+            };
+
+            // Admin notification
+            await sendAdminOrderNotification(adminEmailSetting.value, notificationParams);
+
+            // User notification (using buyer_email from the request)
+            if (orderData.buyer_email) {
+                await sendUserOrderNotification(orderData.buyer_email, notificationParams);
+            }
         }
 
         return NextResponse.json({ success: true, order });

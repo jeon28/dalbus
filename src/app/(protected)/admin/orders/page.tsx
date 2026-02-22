@@ -58,6 +58,7 @@ interface Order {
     payment_status?: string;
     order_accounts?: OrderAccount[];
     related_order_id?: string;
+    depositor_name?: string;
     end_date?: string;
 }
 
@@ -190,7 +191,8 @@ export default function OrderHistoryPage() {
             '주문번호': order.order_number,
             '구분': order.order_type === 'NEW' ? '신규' : '연장',
             '회원여부': order.is_guest ? '비회원' : '회원',
-            '고객명': order.profiles?.name || order.buyer_name || 'Unknown',
+            '고객명': (order.profiles?.name || order.buyer_name || 'Unknown') +
+                (order.depositor_name && order.depositor_name !== (order.profiles?.name || order.buyer_name) ? ` (${order.depositor_name})` : ''),
             '이메일': order.profiles?.email || order.buyer_email || '-',
             '연락처': order.profiles?.phone || order.buyer_phone || '-',
             '서비스': order.products?.name || 'Product',
@@ -601,7 +603,14 @@ export default function OrderHistoryPage() {
                                     </span>
                                 </td>
                                 <td>
-                                    <div className="font-medium">{o.profiles?.name || o.buyer_name || 'Unknown'}</div>
+                                    <div className="font-medium">
+                                        {o.profiles?.name || o.buyer_name || 'Unknown'}
+                                        {o.depositor_name && o.depositor_name !== (o.profiles?.name || o.buyer_name) && (
+                                            <span className="text-xs text-orange-600 ml-1">
+                                                ({o.depositor_name})
+                                            </span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td>
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
