@@ -7,6 +7,7 @@
 - Confirmation dialog after order assignment for optional redirection to Tidal management.
 - User name display in Header for all roles, with an "Admin" link specifically for administrators (Order: Admin -> Name -> Logout).
 - Refined Tidal account redirection: Automatically switches to "List View" (grouped) and expands only the relevant group when navigating from order assignment.
+- Improved order assignment sorting: Available accounts are now sorted primarily by master account expiry date and secondarily by the number of empty slots.
 
 ### Changed
 - Simplified Admin access: Removed secondary password verification for accounts with 'admin' role.

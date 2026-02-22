@@ -268,13 +268,24 @@ export default function OrderHistoryPage() {
                     }
                 }
 
-                // Sort by master account expiry date (end_date)
+                // Sort by:
+                // 1. Master account expiry date (end_date) - descending (most time remaining first)
+                // 2. Available slots - descending (most available slots first)
                 available.sort((a: Account, b: Account) => {
                     const getExpiry = (acc: Account) => {
                         const masterSlot = acc.order_accounts?.find((oa: OrderAccount) => oa.type === 'master');
-                        return masterSlot?.end_date || '9999-12-31';
+                        return masterSlot?.end_date || '0000-00-00';
                     };
-                    return getExpiry(b).localeCompare(getExpiry(a));
+                    const expiryA = getExpiry(a);
+                    const expiryB = getExpiry(b);
+
+                    if (expiryA !== expiryB) {
+                        return expiryB.localeCompare(expiryA);
+                    }
+
+                    const slotsA = a.max_slots - a.used_slots;
+                    const slotsB = b.max_slots - b.used_slots;
+                    return slotsB - slotsA;
                 });
 
                 setAvailableAccounts(available);
