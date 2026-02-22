@@ -416,19 +416,29 @@ export default function OrderHistoryPage() {
                     end_date: selectedOrder.order_type === 'NEW' ? newEndDate : extEndDate
                 })
             });
+
             if (!res.ok) {
                 const data = await res.json();
                 throw new Error(data.error || 'Match failed');
             }
 
-            alert('배정되었습니다.');
+            // 1. Close Modal Immediately
             setIsMatchModalOpen(false);
 
-            // Tidal 계정 관리 페이지를 새 탭으로 열기
-            window.open(`/admin/tidal?accountId=${selectedAccount}`, '_blank');
-
-            // 주문 목록 새로고침
+            // 2. Refresh Orders
             fetchOrders();
+
+            // 3. Open Tidal management in new tab
+            // Note: window.open after an await might be blocked by some browsers.
+            // But doing it before alert is much better.
+            const targetUrl = `/admin/tidal?accountId=${selectedAccount}`;
+            window.open(targetUrl, '_blank');
+
+            // 4. Finally show alert (blocking)
+            setTimeout(() => {
+                alert('배정되었습니다.');
+            }, 100);
+
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             alert(message);
