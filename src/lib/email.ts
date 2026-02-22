@@ -67,7 +67,7 @@ export const sendAdminOrderNotification = async (
         </ul>
         <hr />
         <p>관리자 페이지에서 입금 확인 후 배정을 진행해주세요.</p>
-        <a href="${process.env.NEXT_PUBLIC_SITE_URL}/admin/orders">관리자 페이지 바로가기</a>
+        <a href="https://dalbus.vercel.app/admin/orders">관리자 페이지 바로가기</a>
       `,
         });
 

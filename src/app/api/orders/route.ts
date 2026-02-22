@@ -23,16 +23,16 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Fetch Admin Email Settings
-        const { data: settings } = await supabaseAdmin
+        const { data: adminEmailSetting } = await supabaseAdmin
             .from('site_settings')
-            .select('admin_email')
-            .eq('id', 'main')
+            .select('value')
+            .eq('key', 'admin_email')
             .single();
 
         // 3. Send Notification if admin email exists
-        if (settings?.admin_email) {
-            await sendAdminOrderNotification(settings.admin_email, {
-                orderId: order.id,
+        if (adminEmailSetting?.value) {
+            await sendAdminOrderNotification(adminEmailSetting.value, {
+                orderId: order.order_number,
                 productName: product_name,
                 planName: plan_name,
                 amount: orderData.amount,

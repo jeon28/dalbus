@@ -69,7 +69,7 @@ erDiagram
 
     orders {
         uuid id PK
-        string order_number UK "8-digit random number"
+        string order_number UK "8-digit date-based (YYMMDDNN)"
         uuid user_id FK "nullable (guest)"
         uuid product_id FK
         uuid plan_id FK
@@ -140,7 +140,7 @@ erDiagram
 | :--- | :--- | :--- |
 | `products` | 구독 서비스 (Tidal, YouTube 등) | `slug`로 URL 식별 |
 | `product_plans` | 서비스별 이용 기간 및 가격 | 1개월, 3개월 등 |
-| `orders` | 결제 및 서비스 이용 내역 | 주문번호 자동 생성 (`ORD-...`) |
+| `orders` | 결제 및 서비스 이용 내역 | 주문번호 자동 생성 (`YYMMDDNN`) |
 
 ### 2.3 계정 관리 (Resource)
 | 테이블명 | 설명 | 비고 |
@@ -198,7 +198,7 @@ erDiagram
 
 ### 3.3 주문 및 배정
 #### `orders` (주문/결제 정보)
-- `order_number`: `text` (주문번호, Unique)
+- `order_number`: `text` (주문번호, Unique, YYMMDDNN 형식)
 - `user_id`: `uuid` (FK -> `profiles.id`, nullable)
 - `product_id`: `uuid` (FK -> `products.id`)
 - `plan_id`: `uuid` (FK -> `product_plans.id`)
