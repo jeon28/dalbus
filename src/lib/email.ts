@@ -249,3 +249,55 @@ export const sendAssignmentNotification = async (
         return { success: false, error };
     }
 };
+
+/**
+ * 비밀번호 초기화 인증번호 메일 발송
+ */
+export const sendPasswordResetCode = async (
+    targetEmail: string,
+    code: string
+) => {
+    if (!resend) {
+        console.error('RESEND_API_KEY is missing. Email notification skipped.');
+        return { success: false, error: 'Missing API Key' };
+    }
+
+    try {
+        const sender = await getSenderEmail();
+
+        const { data, error } = await resend.emails.send({
+            from: sender,
+            to: [targetEmail],
+            subject: `[Dalbus] 비밀번호 초기화 인증번호 안내`,
+            html: `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">비밀번호 초기화 인증번호</h2>
+          <p>안녕하세요, Dalbus입니다.</p>
+          <p>비밀번호를 초기화하기 위한 인증번호입니다. 아래 번호를 입력창에 입력해 주세요.</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <span style="font-size: 2rem; font-weight: bold; letter-spacing: 5px; color: #2563eb;">${code}</span>
+          </div>
+
+          <p>인증번호는 발송 후 10분 동안만 유효합니다.</p>
+          <p>본인이 요청하지 않은 경우 이 메일을 무시해 주세요.</p>
+          
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 발신전용입니다. 문의사항은 고객센터를 이용해 주세요.
+          </p>
+        </div>
+      `,
+        });
+
+        if (error) {
+            console.error('Password reset email sending failed:', error);
+            return { success: false, error };
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error('Unexpected error sending password reset email:', error);
+        return { success: false, error };
+    }
+};

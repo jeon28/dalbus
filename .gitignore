@@ -35,3 +35,4 @@ output.log
 order_accounts_migration.sql
 
 supabase/.temp/
+supabase-migration/

@@ -12,6 +12,7 @@ import styles from './mypage.module.css';
 interface UserSubscription {
     service_name: string;
     duration: string;
+    start_date: string;
     end_date: string;
     account_id: string;
     account_pw: string;
@@ -41,11 +42,17 @@ interface SupabaseOrder {
 interface SupabaseAccountAssignment {
     id: string;
     account_id: string;
+    tidal_id?: string;
+    tidal_password?: string;
     account_pw?: string;
+    start_date: string | null;
     end_date: string | null;
     orders: {
         products: {
             name: string;
+        } | null;
+        product_plans: {
+            duration_months: number;
         } | null;
     } | null;
 }
@@ -56,6 +63,7 @@ export default function MyPage() {
     const [orders, setOrders] = useState<OrderHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
+    const fetchingRef = useRef(false);
     const router = useRouter();
 
     const isMounted = useRef(true);
@@ -84,7 +92,8 @@ export default function MyPage() {
     }, [user]);
 
     const fetchData = useCallback(async () => {
-        if (!user) return;
+        if (!user || fetchingRef.current) return;
+        fetchingRef.current = true;
         setLoading(true);
 
         try {
@@ -94,6 +103,7 @@ export default function MyPage() {
 
             if (!token) {
                 setLoading(false);
+                fetchingRef.current = false;
                 return;
             }
 
@@ -104,6 +114,7 @@ export default function MyPage() {
             xhr.onload = function () {
                 if (!isMounted.current) return;
                 setLoading(false);
+                fetchingRef.current = false;
 
                 if (xhr.status >= 200 && xhr.status < 300) {
                     try {
@@ -130,6 +141,7 @@ export default function MyPage() {
                                 .map(item => ({
                                     service_name: item.products?.name || 'Service',
                                     duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
+                                    start_date: '-',
                                     end_date: '-',
                                     account_id: '정보 확인 중',
                                     account_pw: '정보 확인 중',
@@ -139,10 +151,11 @@ export default function MyPage() {
                             if (accountData && accountData.length > 0) {
                                 const enrichedSubs: UserSubscription[] = accountData.map(acc => ({
                                     service_name: acc.orders?.products?.name || 'Service',
-                                    duration: '-',
+                                    duration: acc.orders?.product_plans?.duration_months ? `${acc.orders.product_plans.duration_months}개월` : '-',
+                                    start_date: acc.start_date || '-',
                                     end_date: acc.end_date || '-',
-                                    account_id: acc.account_id || '정보 없음',
-                                    account_pw: acc.account_pw || '정보 없음',
+                                    account_id: acc.tidal_id || acc.account_id || '정보 없음',
+                                    account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
                                     status: '이용 중'
                                 }));
                                 setSubscriptions(enrichedSubs);
@@ -159,7 +172,10 @@ export default function MyPage() {
             };
 
             xhr.onerror = function () {
-                if (isMounted.current) setLoading(false);
+                if (isMounted.current) {
+                    setLoading(false);
+                    fetchingRef.current = false;
+                }
                 console.error('MyPage API network error');
             };
 
@@ -167,17 +183,20 @@ export default function MyPage() {
 
         } catch (error) {
             console.error('Error fetching MyPage data:', error);
-            if (isMounted.current) setLoading(false);
+            if (isMounted.current) {
+                setLoading(false);
+                fetchingRef.current = false;
+            }
         }
-    }, [user]);
+    }, [user?.id]);
 
     useEffect(() => {
-        if (isHydrated && user) {
+        if (isHydrated && user?.id) {
             fetchData();
         } else if (isHydrated && !user) {
             setLoading(false);
         }
-    }, [isHydrated, user, fetchData]);
+    }, [isHydrated, user?.id, fetchData]);
 
     const handleUpdateProfile = async () => {
         if (!user) return;
@@ -280,7 +299,7 @@ export default function MyPage() {
                                         <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">이용 중</span>
                                     </div>
                                     <div className="text-sm space-y-1 text-muted-foreground">
-                                        <p>기간: {sub.duration}</p>
+                                        <p>기간: {sub.start_date} ~ {sub.end_date} ({sub.duration})</p>
                                         <p>만료일: {sub.end_date}</p>
                                     </div>
                                     <div className="bg-white/50 p-3 rounded-lg text-sm font-mono space-y-1 border border-white/20">

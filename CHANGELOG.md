@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Added
+- **비밀번호 찾기(Forgot Password) 기능 구현 및 고도화**:
+    - 이메일, 이름, 전화번호 일치 확인을 통한 강화된 본인 인증 프로세스.
+    - Resend 기반 이메일 OTP(6자리) 발송 시스템.
+    - OTP 재발송 시 **60초 쿨타임(제한)** 적용으로 시스템 부하 방지.
+    - 새 비밀번호 설정 시 **기존 비밀번호와 동일한 비밀번호 설정 방지** (백엔드 검증 강화).
+    - 사용자 경험(UX) 최적화: `alert()` 대신 **인라인 상태 메시지(붉은색/푸른색)** 표시.
+    - 인터페이스 충돌 방지: 비밀번호 찾기 다이얼로그를 로그인 폼 외부로 분리.
+
+### Added
 - Responsive mobile menu for the Admin Portal (Sheet-based navigation).
 - Confirmation dialog after order assignment for optional redirection to Tidal management.
 - User name display in Header for all roles, with an "Admin" link specifically for administrators (Order: Admin -> Name -> Logout).

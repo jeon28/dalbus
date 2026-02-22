@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import styles from './auth.module.css';
+import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 
 export default function LoginPage() {
     const [id, setId] = useState('');
@@ -181,6 +182,9 @@ export default function LoginPage() {
                         {isLoading ? '로그인 처리 중...' : '로그인'}
                     </button>
                 </form>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+                    <ForgotPasswordDialog />
+                </div>
 
                 <p className={styles.footer}>
                     계정이 없으신가요?
