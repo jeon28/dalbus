@@ -173,7 +173,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const { count: actualCount } = await supabaseAdmin
             .from('order_accounts')
             .select('*', { count: 'exact', head: true })
-            .eq('account_id', account_id);
+            .eq('account_id', account_id)
+            .eq('is_active', true);
 
         await supabaseAdmin.from('accounts').update({ used_slots: actualCount || 0 }).eq('id', account_id);
 

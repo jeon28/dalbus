@@ -8,6 +8,7 @@
 - User name display in Header for all roles, with an "Admin" link specifically for administrators (Order: Admin -> Name -> Logout).
 - Refined Tidal account redirection: Automatically switches to "List View" (grouped) and expands only the relevant group when navigating from order assignment.
 - Improved order assignment sorting: Available accounts are now sorted primarily by master account expiry date and secondarily by the number of empty slots.
+- Fixed `used_slots` calculation: Online active assignments are now counted toward the used slot limit, ensuring inactive assignments (history) are correctly excluded.
 
 ### Changed
 - Simplified Admin access: Removed secondary password verification for accounts with 'admin' role.

@@ -42,11 +42,15 @@ export async function GET() {
 
         if (error) throw error;
 
-        // Filter out inactive assignments from the response
-        const filteredData = data?.map(account => ({
-            ...account,
-            order_accounts: account.order_accounts.filter((oa: { is_active?: boolean }) => oa.is_active !== false) // default to true if null/undefined, or strictly check true if nullable
-        }));
+        // Filter out inactive assignments and recalculate used_slots locally for accuracy
+        const filteredData = data?.map(account => {
+            const activeAssignments = account.order_accounts.filter((oa: { is_active?: boolean }) => oa.is_active !== false);
+            return {
+                ...account,
+                order_accounts: activeAssignments,
+                used_slots: activeAssignments.length
+            };
+        });
 
         return NextResponse.json(filteredData);
     } catch (error) {
