@@ -5,6 +5,7 @@
 ### Added
 - Responsive mobile menu for the Admin Portal (Sheet-based navigation).
 - Confirmation dialog after order assignment for optional redirection to Tidal management.
+- User name display in Header for all roles, with an "Admin" link specifically for administrators (Order: Admin -> Name -> Logout).
 
 ### Changed
 - Simplified Admin access: Removed secondary password verification for accounts with 'admin' role.

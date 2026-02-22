@@ -34,21 +34,22 @@ export default function Header() {
                     <nav className="flex items-center gap-1 md:gap-2">
                         {user ? (
                             <>
-                                {isAdmin ? (
-                                    <>
-                                        <Link href="/admin">
-                                            <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3 font-bold text-primary">관리자</Button>
-                                        </Link>
-                                        <Button variant="outline" size="sm" onClick={() => { logout(); logoutAdmin(); }} className="border-red-200 text-red-600 hover:bg-red-50 h-8 md:h-9 text-xs md:text-sm">로그아웃</Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3" asChild>
-                                            <Link href="/mypage">{user.name}</Link>
-                                        </Button>
-                                        <Button variant="outline" size="sm" onClick={logout} className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">로그아웃</Button>
-                                    </>
+                                {isAdmin && (
+                                    <Link href="/admin">
+                                        <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3 font-bold text-primary">관리자</Button>
+                                    </Link>
                                 )}
+                                <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3" asChild>
+                                    <Link href="/mypage">{user.name}</Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => { logout(); if (isAdmin) logoutAdmin(); }}
+                                    className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3"
+                                >
+                                    로그아웃
+                                </Button>
                             </>
                         ) : (
                             <>
