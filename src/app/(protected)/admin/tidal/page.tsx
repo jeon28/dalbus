@@ -163,11 +163,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     useEffect(() => {
         const accountId = searchParams.get('accountId');
         if (accountId && accounts.length > 0) {
-            setExpandedRows(prev => {
-                const newSet = new Set(prev);
-                newSet.add(accountId);
-                return newSet;
-            });
+            // Switch to List View (grouped view) and expand only the assigned account
+            setIsGridView(false);
+            setExpandedRows(new Set([accountId]));
+
             const scrollToAndHighlight = () => {
                 const element = document.getElementById(`account-${accountId}`);
                 if (element) {
