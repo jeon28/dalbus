@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-const menuItems = [
+export const menuItems = [
     { title: "대시보드", href: "/admin", exact: true },
     { title: "주문내역", href: "/admin/orders" },
     { title: "회원정보", href: "/admin/members" },

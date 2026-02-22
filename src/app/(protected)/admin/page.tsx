@@ -4,9 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import { useRouter } from 'next/navigation';
 import styles from './admin.module.css';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface Order {
@@ -25,11 +24,9 @@ interface BankAccount {
 }
 
 export default function AdminPage() {
-    const { isAdmin, loginAdmin, isHydrated, user } = useServices();
+    const { isAdmin, isHydrated, user } = useServices();
     const router = useRouter();
 
-    // Auth Form State
-    const [loginPw, setLoginPw] = useState('');
     const [orders, setOrders] = useState<Order[]>([]);
 
     // Settings State
@@ -79,22 +76,6 @@ export default function AdminPage() {
         }
     }, [isAdmin]);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            const res = await fetch('/api/admin/settings');
-            const adminCreds = await res.json();
-
-            if (loginPw === adminCreds.admin_login_pw) {
-                loginAdmin();
-            } else {
-                alert('비밀번호가 올바르지 않습니다.');
-            }
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-            alert(`로그인 처리 중 오류가 발생했습니다: ${message}`);
-        }
-    };
 
     const handleSaveSettings = async () => {
         const updates: Record<string, string> = {};
@@ -189,37 +170,6 @@ export default function AdminPage() {
         );
     }
 
-    // 2. 관리자 권한은 있지만, 2차 인증(비밀번호)을 하지 않은 경우 -> Admin Login Prompt
-    if (!isAdmin) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-                <Card className="w-full max-w-[400px] shadow-2xl border-none">
-                    <CardHeader className="space-y-1 pt-8">
-                        <CardTitle className="text-2xl font-bold text-center">Admin Verification</CardTitle>
-                        <p className="text-sm text-center text-muted-foreground">관리자 확인을 위해 비밀번호를 입력하세요</p>
-                    </CardHeader>
-                    <CardContent className="pb-8">
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="loginPw">비밀번호</Label>
-                                <Input
-                                    id="loginPw"
-                                    type="password"
-                                    placeholder="Enter Password"
-                                    value={loginPw}
-                                    onChange={(e) => setLoginPw(e.target.value)}
-                                    className="h-11"
-                                />
-                            </div>
-                            <Button type="submit" className="w-full h-11 bg-black hover:bg-gray-800 text-white font-bold mt-2">
-                                UNLOCK DASHBOARD
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <main className={styles.main}>

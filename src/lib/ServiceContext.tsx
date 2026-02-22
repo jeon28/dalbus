@@ -129,7 +129,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 };
                 setUser(userObj);
                 localStorage.setItem('dalbus-user', JSON.stringify(userObj));
-                setIsAdmin(false);
+                setIsAdmin(profile?.role === 'admin');
             } else {
                 setUser(null);
                 setIsAdmin(false);
@@ -198,7 +198,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     };
                     setUser(userObj);
                     localStorage.setItem('dalbus-user', JSON.stringify(userObj));
-                    setIsAdmin(false);
+                    setIsAdmin(profile?.role === 'admin');
                 } else {
                     setUser(null);
                     setIsAdmin(false);
