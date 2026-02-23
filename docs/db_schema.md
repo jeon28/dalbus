@@ -173,6 +173,7 @@ erDiagram
 - `email`: `text` (이메일)
 - `name`: `text` (이름)
 - `phone`: `text` (연락처, nullable)
+- `birth_date`: `text` (생년월일, nullable)
 - `role`: `user_role` (`user`, `admin`)
 - `memo`: `text` (관리자용 메모)
 - `created_at / updated_at`: `timestamptz`

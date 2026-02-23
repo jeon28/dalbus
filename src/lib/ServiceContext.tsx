@@ -18,6 +18,7 @@ export interface User {
     name: string;
     email: string;
     phone?: string;
+    birth_date?: string;
     role?: string;
 }
 
@@ -103,7 +104,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     const fetchUserProfile = useCallback(async (userId: string) => {
         const { data: profile } = await supabase
             .from('profiles')
-            .select('name, email, phone, role')
+            .select('name, email, phone, birth_date, role')
             .eq('id', userId)
             .single();
 
@@ -125,6 +126,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
                     email: profile?.email || session.user.email || '',
                     phone: profile?.phone || '',
+                    birth_date: profile?.birth_date || session.user.user_metadata.birthdate || '',
                     role: profile?.role
                 };
                 setUser(userObj);
@@ -159,6 +161,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 name: profile.name || user.name,
                 email: profile.email || user.email,
                 phone: profile.phone || '',
+                birth_date: profile.birth_date || '',
                 role: profile.role
             };
             setUser(userObj);
@@ -194,6 +197,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                         name: profile?.name || session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
                         email: profile?.email || session.user.email || '',
                         phone: profile?.phone || '',
+                        birth_date: profile?.birth_date || session.user.user_metadata.birthdate || '',
                         role: profile?.role
                     };
                     setUser(userObj);

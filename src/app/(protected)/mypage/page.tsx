@@ -78,7 +78,8 @@ export default function MyPage() {
     const [profileForm, setProfileForm] = useState({
         name: '',
         phone: '',
-        email: ''
+        email: '',
+        birth_date: ''
     });
 
     useEffect(() => {
@@ -86,7 +87,8 @@ export default function MyPage() {
             setProfileForm({
                 name: user.name || '',
                 phone: user.phone || '',
-                email: user.email || ''
+                email: user.email || '',
+                birth_date: user.birth_date || ''
             });
         }
     }, [user]);
@@ -188,7 +190,7 @@ export default function MyPage() {
                 fetchingRef.current = false;
             }
         }
-    }, [user?.id]);
+    }, [user]);
 
     useEffect(() => {
         if (isHydrated && user?.id) {
@@ -196,7 +198,7 @@ export default function MyPage() {
         } else if (isHydrated && !user) {
             setLoading(false);
         }
-    }, [isHydrated, user?.id, fetchData]);
+    }, [isHydrated, user, fetchData]);
 
     const handleUpdateProfile = async () => {
         if (!user) return;
@@ -207,7 +209,8 @@ export default function MyPage() {
                 .update({
                     name: profileForm.name,
                     phone: profileForm.phone,
-                    email: profileForm.email
+                    email: profileForm.email,
+                    birth_date: profileForm.birth_date
                 })
                 .eq('id', user.id);
 
@@ -273,6 +276,15 @@ export default function MyPage() {
                                 type="email"
                                 value={profileForm.email}
                                 onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="birth_date">생년월일</Label>
+                            <Input
+                                id="birth_date"
+                                placeholder="YYYY.MM.DD"
+                                value={profileForm.birth_date}
+                                onChange={(e) => setProfileForm({ ...profileForm, birth_date: e.target.value })}
                             />
                         </div>
                         <Button

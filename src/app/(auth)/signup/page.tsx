@@ -237,6 +237,7 @@ export default function SignupPage() {
                         name: formData.name,
                         email: formData.id,
                         phone: formData.phone,
+                        birth_date: `${formData.birthYear}.${formData.birthMonth.padStart(2, '0')}.${formData.birthDay.padStart(2, '0')}`,
                         updated_at: new Date().toISOString()
                     }
                 ], {

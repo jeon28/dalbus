@@ -21,6 +21,7 @@ export interface Member {
     name: string;
     email: string;
     phone: string | null;
+    birth_date: string | null;
     created_at: string;
     memo?: string | null;
 }
@@ -176,6 +177,7 @@ export default function MemberListPage() {
                                     <th>ID</th>
                                     <th>가입일</th>
                                     <th>이름</th>
+                                    <th>생년월일</th>
                                     <th>이메일</th>
                                     <th>연락처</th>
                                     <th>관리자 메모</th>
@@ -203,6 +205,7 @@ export default function MemberListPage() {
                                             </td>
                                             <td>{new Date(member.created_at).toLocaleDateString()}</td>
                                             <td className="font-medium">{member.name}</td>
+                                            <td className="text-sm">{member.birth_date || '-'}</td>
                                             <td>{member.email}</td>
                                             <td>{member.phone || '-'}</td>
                                             <td>

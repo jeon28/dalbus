@@ -8,7 +8,7 @@ export async function GET() {
     // Fetching profiles with role 'user'
     const { data, error } = await supabaseAdmin
         .from('profiles')
-        .select('id, name, email, phone, created_at, memo')
+        .select('id, name, email, phone, birth_date, created_at, memo')
         .eq('role', 'user')
         .order('created_at', { ascending: false });
 
