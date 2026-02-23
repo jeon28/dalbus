@@ -154,11 +154,12 @@ export function ForgotPasswordDialog() {
                 <button type="button" style={{
                     background: 'none',
                     border: 'none',
-                    color: '#2563eb',
-                    fontSize: '13px',
+                    color: 'var(--primary)',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
                     cursor: 'pointer',
                     padding: '0',
-                    textDecoration: 'underline'
+                    textDecoration: 'none'
                 }}>
                     비밀번호를 잊으셨나요?
                 </button>

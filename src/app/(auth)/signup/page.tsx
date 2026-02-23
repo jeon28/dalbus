@@ -4,13 +4,16 @@ import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Eye, EyeOff, Lock, Mail, User, Phone } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, User, Phone, Calendar } from 'lucide-react';
 import styles from '../login/auth.module.css';
 
 export default function SignupPage() {
     const [formData, setFormData] = useState({
         id: '',
         name: '',
+        birthYear: '',
+        birthMonth: '',
+        birthDay: '',
         phone: '',
         password: '',
         confirmPassword: ''
@@ -18,10 +21,23 @@ export default function SignupPage() {
     const [errors, setErrors] = useState({
         id: '',
         name: '',
+        birthdate: '',
         phone: '',
         password: '',
         confirmPassword: ''
     });
+
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+    // Function to get days in month
+    const getDaysInMonth = (year: string, month: string) => {
+        if (!year || !month) return 31;
+        return new Date(parseInt(year), parseInt(month), 0).getDate();
+    };
+
+    const days = Array.from({ length: getDaysInMonth(formData.birthYear, formData.birthMonth) }, (_, i) => i + 1);
     const [loading, setLoading] = useState(false);
     const [emailChecked, setEmailChecked] = useState(false);
     const [checkingEmail, setCheckingEmail] = useState(false);
@@ -31,6 +47,7 @@ export default function SignupPage() {
     // Refs for focus management
     const idRef = useRef<HTMLInputElement>(null);
     const nameRef = useRef<HTMLInputElement>(null);
+    const birthdateRef = useRef<HTMLSelectElement>(null);
     const phoneRef = useRef<HTMLInputElement>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
     const confirmPasswordRef = useRef<HTMLInputElement>(null);
@@ -41,10 +58,13 @@ export default function SignupPage() {
     const isFormValid =
         emailChecked &&
         formData.name.trim() !== '' &&
+        formData.birthYear !== '' &&
+        formData.birthMonth !== '' &&
+        formData.birthDay !== '' &&
         formData.phone.trim() !== '' &&
         formData.password.length >= 6 &&
         formData.password === formData.confirmPassword &&
-        !errors.id && !errors.name && !errors.phone && !errors.password && !errors.confirmPassword;
+        !errors.id && !errors.name && !errors.birthdate && !errors.phone && !errors.password && !errors.confirmPassword;
 
     const validateField = (name: string, value: string) => {
         let error = '';
@@ -55,6 +75,10 @@ export default function SignupPage() {
             else if (!emailChecked) error = '이메일 중복 확인을 해주세요.';
         } else if (name === 'name') {
             if (!value) error = '이름을 입력해주세요.';
+        } else if (name === 'birthdate') {
+            if (!formData.birthYear || !formData.birthMonth || !formData.birthDay) {
+                error = '생년월일을 모두 선택해주세요.';
+            }
         } else if (name === 'phone') {
             const phoneRegex = /^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/;
             if (!value) error = '전화번호를 입력해주세요.';
@@ -127,7 +151,7 @@ export default function SignupPage() {
         setErrors(prev => ({ ...prev, [name]: error }));
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
 
@@ -148,6 +172,7 @@ export default function SignupPage() {
         // Final validation check
         const idErr = validateField('id', formData.id);
         const nameErr = validateField('name', formData.name);
+        const birthdateErr = validateField('birthdate', '');
         const phoneErr = validateField('phone', formData.phone);
         const passErr = validateField('password', formData.password);
         const confErr = validateField('confirmPassword', formData.confirmPassword);
@@ -155,6 +180,7 @@ export default function SignupPage() {
         const newErrors = {
             id: idErr,
             name: nameErr,
+            birthdate: birthdateErr,
             phone: phoneErr,
             password: passErr,
             confirmPassword: confErr
@@ -164,6 +190,7 @@ export default function SignupPage() {
 
         if (idErr) { idRef.current?.focus(); return; }
         if (nameErr) { nameRef.current?.focus(); return; }
+        if (birthdateErr) { birthdateRef.current?.focus(); return; }
         if (phoneErr) { phoneRef.current?.focus(); return; }
         if (passErr) { passwordRef.current?.focus(); return; }
         if (confErr) { confirmPasswordRef.current?.focus(); return; }
@@ -178,6 +205,7 @@ export default function SignupPage() {
                 emailRedirectTo: `${window.location.origin}/login`,
                 data: {
                     name: formData.name,
+                    birthdate: `${formData.birthYear}.${formData.birthMonth.padStart(2, '0')}.${formData.birthDay.padStart(2, '0')}`,
                     phone: formData.phone,
                     login_id: formData.id
                 }
@@ -231,7 +259,7 @@ export default function SignupPage() {
     return (
         <main className={styles.main}>
             <div className={`${styles.card} glass animate-fade-in`}>
-                <h1 className={styles.title}>Join<br /><span>Dalbus.</span></h1>
+                <h1 className={styles.title}>Join <span>Dalbus</span></h1>
 
                 <form className={styles.form} onSubmit={handleSubmit} noValidate>
                     {/* 1. 이메일 (중복 체크) */}
@@ -315,6 +343,79 @@ export default function SignupPage() {
                             />
                         </div>
                         {errors.name && <span className={styles.errorText}>{errors.name}</span>}
+                    </div>
+
+                    {/* 생일 */}
+                    <div className={styles.inputGroup}>
+                        <label>생년월일</label>
+                        <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
+                            <div style={{
+                                position: 'absolute',
+                                left: '15px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: '#64748b',
+                                pointerEvents: 'none',
+                                zIndex: 1
+                            }}>
+                                <Calendar size={18} />
+                            </div>
+                            <select
+                                ref={birthdateRef}
+                                name="birthYear"
+                                value={formData.birthYear}
+                                onChange={handleChange}
+                                onBlur={() => {
+                                    const err = validateField('birthdate', '');
+                                    setErrors(prev => ({ ...prev, birthdate: err }));
+                                }}
+                                className={errors.birthdate ? styles.inputError : ''}
+                                style={{ flex: 1.2, paddingLeft: '38px' }}
+                                disabled={!emailChecked}
+                            >
+                                <option value="">년도</option>
+                                {years.map(year => (
+                                    <option key={year} value={year}>{year}년</option>
+                                ))}
+                            </select>
+                            <select
+                                name="birthMonth"
+                                value={formData.birthMonth}
+                                onChange={handleChange}
+                                onBlur={() => {
+                                    const err = validateField('birthdate', '');
+                                    setErrors(prev => ({ ...prev, birthdate: err }));
+                                }}
+                                className={errors.birthdate ? styles.inputError : ''}
+                                style={{ flex: 1 }}
+                                disabled={!emailChecked}
+                            >
+                                <option value="">월</option>
+                                {months.map(month => (
+                                    <option key={month} value={month}>{month}월</option>
+                                ))}
+                            </select>
+                            <select
+                                name="birthDay"
+                                value={formData.birthDay}
+                                onChange={handleChange}
+                                onBlur={() => {
+                                    const err = validateField('birthdate', '');
+                                    setErrors(prev => ({ ...prev, birthdate: err }));
+                                }}
+                                className={errors.birthdate ? styles.inputError : ''}
+                                style={{ flex: 1 }}
+                                disabled={!emailChecked}
+                            >
+                                <option value="">일</option>
+                                {days.map(day => (
+                                    <option key={day} value={day}>{day}일</option>
+                                ))}
+                            </select>
+                        </div>
+                        {errors.birthdate && <span className={styles.errorText}>{errors.birthdate}</span>}
                     </div>
 
                     {/* 3. 전화번호 */}
