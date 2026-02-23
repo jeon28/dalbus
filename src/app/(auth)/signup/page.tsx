@@ -227,31 +227,10 @@ export default function SignupPage() {
         }
 
         if (data.user) {
-            // 2. Create or Update Profile in public.profiles table
-            // upsert: 이미 존재하면 업데이트, 없으면 삽입
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .upsert([
-                    {
-                        id: data.user.id,
-                        name: formData.name,
-                        email: formData.id,
-                        phone: formData.phone,
-                        birth_date: `${formData.birthYear}.${formData.birthMonth.padStart(2, '0')}.${formData.birthDay.padStart(2, '0')}`,
-                        updated_at: new Date().toISOString()
-                    }
-                ], {
-                    onConflict: 'id' // id가 중복되면 업데이트
-                });
+            // [참고] profiles 테이블은 DB 트리거(on_auth_user_created)에 의해 자동 생성되므로 
+            // 별도의 upsert 로직을 제거하여 RLS 위반 문제를 방지합니다.
 
-            if (profileError) {
-                console.error('Error creating profile:', profileError);
-                alert('⚠️ 프로필 생성 실패: ' + profileError.message + '\n\n관리자에게 문의하세요.');
-                setLoading(false);
-                return;
-            }
-
-            alert('✅ 회원가입이 완료되었습니다!');
+            alert('회원가입이 완료되었습니다. 로그인해주세요.');
             router.push('/login');
         }
         setLoading(false);
