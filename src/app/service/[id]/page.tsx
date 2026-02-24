@@ -236,7 +236,10 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     price: amount.toString(),
                     period: selectedPeriod.toString(),
                     depositor: guestInfo.depositor,
-                    bank: bankStr
+                    bank: bankStr,
+                    name: guestInfo.name,
+                    phone: guestInfo.phone,
+                    email: guestInfo.email
                 });
 
                 router.push(`/public/checkout/success?${params.toString()}`);

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useServices } from '@/lib/ServiceContext';
 
 export default function Header() {
-    const { user, isAdmin, logout, logoutAdmin } = useServices();
+    const { user, isAdmin, logout } = useServices();
 
     return (
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -45,7 +45,7 @@ export default function Header() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => { logout(); if (isAdmin) logoutAdmin(); }}
+                                    onClick={() => logout()}
                                     className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3"
                                 >
                                     로그아웃

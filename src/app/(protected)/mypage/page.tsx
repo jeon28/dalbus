@@ -93,104 +93,106 @@ export default function MyPage() {
         }
     }, [user]);
 
+    const lastFetchTimeRef = useRef(0);
+
     const fetchData = useCallback(async () => {
-        if (!user || fetchingRef.current) return;
+        // Double check user existence and fetching state
+        if (!user?.id || fetchingRef.current) return;
+
+        // Rate limit: don't fetch more than once every 5 seconds
+        const now = Date.now();
+        if (now - lastFetchTimeRef.current < 5000) {
+            console.log('MyPage: Fetch debounced to prevent loop');
+            return;
+        }
+
+        lastFetchTimeRef.current = now;
         fetchingRef.current = true;
         setLoading(true);
 
         try {
-            // Get session token for authentication
+            // Use getSession but be aware it might trigger refreshes
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
 
             if (!token) {
-                setLoading(false);
+                if (isMounted.current) setLoading(false);
                 fetchingRef.current = false;
                 return;
             }
 
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', '/api/user/mypage', true);
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            console.log('MyPage: Starting data fetch for user:', user.id);
 
-            xhr.onload = function () {
-                if (!isMounted.current) return;
-                setLoading(false);
-                fetchingRef.current = false;
+            // Using fetch instead of XHR for cleaner logic if possible, 
+            // but keeping simple for compatibility
+            const res = await fetch('/api/user/mypage', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                cache: 'no-store'
+            });
 
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const { orders: orderData, assignments: accountData } = JSON.parse(xhr.responseText) as {
-                            orders: SupabaseOrder[],
-                            assignments: SupabaseAccountAssignment[]
-                        };
+            if (!isMounted.current) return;
 
-                        if (orderData) {
-                            const history: OrderHistoryItem[] = orderData.map(item => ({
-                                id: item.id,
-                                order_number: item.order_number,
-                                product_name: item.products?.name || 'Service',
-                                plan_name: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
-                                amount: item.amount,
-                                created_at: new Date(item.created_at).toLocaleDateString(),
-                                assignment_status: item.assignment_status
-                            }));
-                            setOrders(history);
+            if (res.ok) {
+                const data = await res.json();
+                const { orders: orderData, assignments: accountData } = data as {
+                    orders: SupabaseOrder[],
+                    assignments: SupabaseAccountAssignment[]
+                };
 
-                            // Derive active subscriptions from completed assignments
-                            const activeSubs: UserSubscription[] = orderData
-                                .filter(item => item.assignment_status === 'completed')
-                                .map(item => ({
-                                    service_name: item.products?.name || 'Service',
-                                    duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
-                                    start_date: '-',
-                                    end_date: '-',
-                                    account_id: '정보 확인 중',
-                                    account_pw: '정보 확인 중',
-                                    status: '이용 중'
-                                }));
+                if (orderData) {
+                    const history: OrderHistoryItem[] = orderData.map(item => ({
+                        id: item.id,
+                        order_number: item.order_number,
+                        product_name: item.products?.name || 'Service',
+                        plan_name: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
+                        amount: item.amount,
+                        created_at: new Date(item.created_at).toLocaleDateString(),
+                        assignment_status: item.assignment_status
+                    }));
+                    setOrders(history);
 
-                            if (accountData && accountData.length > 0) {
-                                const enrichedSubs: UserSubscription[] = accountData.map(acc => ({
-                                    service_name: acc.orders?.products?.name || 'Service',
-                                    duration: acc.orders?.product_plans?.duration_months ? `${acc.orders.product_plans.duration_months}개월` : '-',
-                                    start_date: acc.start_date || '-',
-                                    end_date: acc.end_date || '-',
-                                    account_id: acc.tidal_id || acc.account_id || '정보 없음',
-                                    account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
-                                    status: '이용 중'
-                                }));
-                                setSubscriptions(enrichedSubs);
-                            } else {
-                                setSubscriptions(activeSubs);
-                            }
-                        }
-                    } catch (e) {
-                        console.error('MyPage: JSON Parse error', e);
+                    const activeSubs: UserSubscription[] = orderData
+                        .filter(item => item.assignment_status === 'completed')
+                        .map(item => ({
+                            service_name: item.products?.name || 'Service',
+                            duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
+                            start_date: '-',
+                            end_date: '-',
+                            account_id: '정보 확인 중',
+                            account_pw: '정보 확인 중',
+                            status: '이용 중'
+                        }));
+
+                    if (accountData && accountData.length > 0) {
+                        const enrichedSubs: UserSubscription[] = accountData.map(acc => ({
+                            service_name: acc.orders?.products?.name || 'Service',
+                            duration: acc.orders?.product_plans?.duration_months ? `${acc.orders.product_plans.duration_months}개월` : '-',
+                            start_date: acc.start_date || '-',
+                            end_date: acc.end_date || '-',
+                            account_id: acc.tidal_id || acc.account_id || '정보 없음',
+                            account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
+                            status: '이용 중'
+                        }));
+                        setSubscriptions(enrichedSubs);
+                    } else {
+                        setSubscriptions(activeSubs);
                     }
-                } else {
-                    console.error('MyPage API responded with status:', xhr.status);
                 }
-            };
-
-            xhr.onerror = function () {
-                if (isMounted.current) {
-                    setLoading(false);
-                    fetchingRef.current = false;
-                }
-                console.error('MyPage API network error');
-            };
-
-            xhr.send();
-
+            } else {
+                console.error('MyPage API error:', res.status);
+            }
         } catch (error) {
             console.error('Error fetching MyPage data:', error);
+        } finally {
             if (isMounted.current) {
                 setLoading(false);
-                fetchingRef.current = false;
+                // Reset fetchingRef after a delay to allow for legitimate updates
+                setTimeout(() => {
+                    if (isMounted.current) fetchingRef.current = false;
+                }, 1000);
             }
         }
-    }, [user]);
+    }, [user?.id]); // Only depend on stable user ID
 
     useEffect(() => {
         if (isHydrated && user?.id) {
@@ -198,7 +200,9 @@ export default function MyPage() {
         } else if (isHydrated && !user) {
             setLoading(false);
         }
-    }, [isHydrated, user, fetchData]);
+    }, [isHydrated, user, user?.id, fetchData]); // Only depend on user.id to avoid reference-related loops
+
+    const [isEditing, setIsEditing] = useState(false);
 
     const handleUpdateProfile = async () => {
         if (!user) return;
@@ -216,6 +220,7 @@ export default function MyPage() {
 
             if (error) throw error;
             await refreshUser();
+            setIsEditing(false);
             alert('개인정보가 수정되었습니다.');
         } catch (error) {
             console.error('Profile update error:', error);
@@ -223,6 +228,18 @@ export default function MyPage() {
         } finally {
             setUpdating(false);
         }
+    };
+
+    const handleCancelEdit = () => {
+        if (user) {
+            setProfileForm({
+                name: user.name || '',
+                phone: user.phone || '',
+                email: user.email || '',
+                birth_date: user.birth_date || ''
+            });
+        }
+        setIsEditing(false);
     };
 
     if (!isHydrated || loading) return <div className="container py-20 text-center">Loading...</div>;
@@ -246,55 +263,102 @@ export default function MyPage() {
 
             <div className={`${styles.content} container max-w-4xl mx-auto py-10 px-4 space-y-12`}>
 
-                {/* 1. 개인정보 변경 */}
+                {/* 1. 개인정보 */}
                 <section className={`${styles.section} glass p-8 rounded-2xl shadow-sm`}>
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        👤 개인정보 변경
-                    </h3>
-                    <div className="space-y-4 max-w-md">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">이름</Label>
-                            <Input
-                                id="name"
-                                value={profileForm.name}
-                                onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="phone">연락처</Label>
-                            <Input
-                                id="phone"
-                                type="tel"
-                                value={profileForm.phone}
-                                onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="email">이메일</Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                value={profileForm.email}
-                                onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="birth_date">생년월일</Label>
-                            <Input
-                                id="birth_date"
-                                placeholder="YYYY.MM.DD"
-                                value={profileForm.birth_date}
-                                onChange={(e) => setProfileForm({ ...profileForm, birth_date: e.target.value })}
-                            />
-                        </div>
-                        <Button
-                            className="w-full mt-4"
-                            onClick={handleUpdateProfile}
-                            disabled={updating}
-                        >
-                            {updating ? '저장 중...' : '정보 수정하기'}
-                        </Button>
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            👤 개인정보
+                        </h3>
+                        {!isEditing && (
+                            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                                정보 수정하기
+                            </Button>
+                        )}
                     </div>
+
+                    {!isEditing ? (
+                        <div className="grid gap-6 sm:grid-cols-2 max-w-2xl">
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">이름</p>
+                                <p className="font-medium text-lg">{profileForm.name}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">생년월일</p>
+                                <p className="font-medium text-lg">{profileForm.birth_date || '-'}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">연락처</p>
+                                <p className="font-medium text-lg">{profileForm.phone || '-'}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">이메일</p>
+                                <p className="font-medium text-lg">{profileForm.email}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4 max-w-md">
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <Label htmlFor="name">이름</Label>
+                                    <span className="text-[10px] text-muted-foreground">변경 불가 (관리자 문의)</span>
+                                </div>
+                                <Input
+                                    id="name"
+                                    value={profileForm.name}
+                                    readOnly
+                                    className="bg-muted/30 cursor-not-allowed"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <Label htmlFor="birth_date">생년월일</Label>
+                                    <span className="text-[10px] text-muted-foreground">변경 불가 (관리자 문의)</span>
+                                </div>
+                                <Input
+                                    id="birth_date"
+                                    placeholder="YYYY.MM.DD"
+                                    value={profileForm.birth_date}
+                                    readOnly
+                                    className="bg-muted/30 cursor-not-allowed"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="phone">연락처</Label>
+                                <Input
+                                    id="phone"
+                                    type="tel"
+                                    value={profileForm.phone}
+                                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">이메일</Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    value={profileForm.email}
+                                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    className="flex-1"
+                                    onClick={handleUpdateProfile}
+                                    disabled={updating}
+                                >
+                                    {updating ? '저장 중...' : '저장'}
+                                </Button>
+                                <Button
+                                    className="flex-1"
+                                    variant="outline"
+                                    onClick={handleCancelEdit}
+                                    disabled={updating}
+                                >
+                                    취소
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 {/* 2. 내 구독 정보 */}

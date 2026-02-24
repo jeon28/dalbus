@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(request: NextRequest) {
     try {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if email exists in profiles table
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('profiles')
             .select('email')
             .eq('email', email)

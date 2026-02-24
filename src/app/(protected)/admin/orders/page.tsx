@@ -638,13 +638,20 @@ export default function OrderHistoryPage() {
                                 </td>
                                 <td>₩{o.amount?.toLocaleString()}</td>
                                 <td>
-                                    <span className={`px-2 py-1 rounded text-xs 
-                                        ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
-                                            status === '배정완료' ? 'bg-blue-100 text-blue-800' :
-                                                status === '입금확인' ? 'bg-green-100 text-green-800' :
-                                                    'bg-yellow-100 text-yellow-800'}`}>
-                                        {status}
-                                    </span>
+                                    <div className="flex flex-col items-center">
+                                        <span className={`px-2 py-1 rounded text-xs 
+                                            ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
+                                                status === '배정완료' ? 'bg-blue-100 text-blue-800' :
+                                                    status === '입금확인' ? 'bg-green-100 text-green-800' :
+                                                        'bg-yellow-100 text-yellow-800'}`}>
+                                            {status}
+                                        </span>
+                                        {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                            <div className="text-[10px] text-gray-400 mt-1 font-mono whitespace-nowrap">
+                                                {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                            </div>
+                                        )}
+                                    </div>
                                 </td>
                                 <td>
                                     <div className="flex flex-col gap-1">

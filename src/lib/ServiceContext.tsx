@@ -100,6 +100,17 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    // Optimized User state update
+    const safeSetUser = useCallback((newUser: User | null) => {
+        setUser(prevUser => {
+            if (!prevUser && !newUser) return null;
+            if (prevUser && newUser && JSON.stringify(prevUser) === JSON.stringify(newUser)) {
+                return prevUser; // Keep same reference
+            }
+            return newUser;
+        });
+    }, []);
+
     // Auth 초기화 및 세션 체크 로직을 별도 함수로 추출하여 재사용
     const fetchUserProfile = useCallback(async (userId: string) => {
         const { data: profile } = await supabase
@@ -129,11 +140,11 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     birth_date: profile?.birth_date || session.user.user_metadata.birthdate || '',
                     role: profile?.role
                 };
-                setUser(userObj);
+                safeSetUser(userObj);
                 localStorage.setItem('dalbus-user', JSON.stringify(userObj));
                 setIsAdmin(profile?.role === 'admin');
             } else {
-                setUser(null);
+                safeSetUser(null);
                 setIsAdmin(false);
                 localStorage.removeItem('dalbus-user');
             }
@@ -142,13 +153,14 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             if (err.name !== 'AbortError' && !err.message?.includes('aborted')) {
                 console.error('Failed to initialize auth:', error);
             }
-            setUser(null);
+            safeSetUser(null);
             setIsAdmin(false);
             localStorage.removeItem('dalbus-user');
         } finally {
             if (isMounted.current) setIsHydrated(true);
         }
-    }, [fetchUserProfile]);
+    }, [fetchUserProfile, safeSetUser]);
+
 
     const refreshUserProfile = useCallback(async () => {
         if (!user?.id) return;
@@ -164,10 +176,10 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 birth_date: profile.birth_date || '',
                 role: profile.role
             };
-            setUser(userObj);
+            safeSetUser(userObj);
             localStorage.setItem('dalbus-user', JSON.stringify(userObj));
         }
-    }, [user, fetchUserProfile]);
+    }, [user, fetchUserProfile, safeSetUser]);
 
     useEffect(() => {
         const init = async () => {
@@ -184,7 +196,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             if (!isMounted.current) return;
             try {
                 if (event === 'SIGNED_OUT') {
-                    setUser(null);
+                    safeSetUser(null);
                     setIsAdmin(false);
                     localStorage.removeItem('dalbus-user');
                 } else if (session?.user) {
@@ -200,11 +212,11 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                         birth_date: profile?.birth_date || session.user.user_metadata.birthdate || '',
                         role: profile?.role
                     };
-                    setUser(userObj);
+                    safeSetUser(userObj);
                     localStorage.setItem('dalbus-user', JSON.stringify(userObj));
                     setIsAdmin(profile?.role === 'admin');
                 } else {
-                    setUser(null);
+                    safeSetUser(null);
                     setIsAdmin(false);
                     localStorage.removeItem('dalbus-user');
                 }
@@ -219,9 +231,9 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         return () => {
             subscription.unsubscribe();
         };
-    }, [fetchServices, initializeAuth, fetchUserProfile]);
+    }, [fetchServices, initializeAuth, fetchUserProfile, safeSetUser]);
 
-    const updatePrice = async (id: string, newPrice: string) => {
+    const updatePrice = useCallback(async (id: string, newPrice: string) => {
         const numericPrice = parseInt(newPrice.replace(/,/g, ''));
         try {
             const { error } = await supabase
@@ -235,44 +247,58 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             console.error('Error updating price:', error);
             throw error;
         }
-    };
+    }, [fetchServices]);
 
-    const login = (id: string, name: string, email: string) => {
+    const login = useCallback((id: string, name: string, email: string) => {
         const userObj = { id, name, email };
-        setUser(userObj);
+        safeSetUser(userObj);
         localStorage.setItem('dalbus-user', JSON.stringify(userObj));
-    };
+    }, [safeSetUser]);
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
         try {
-            await supabase.auth.signOut();
-        } catch (error) {
-            console.error('Logout error (Supabase):', error);
-        } finally {
-            setUser(null);
+            console.log('ServiceContext: Starting logout...');
+
+            // 1. Clear local UI state immediately
+            safeSetUser(null);
             setIsAdmin(false);
             localStorage.removeItem('dalbus-user');
-            window.location.replace('/public');
-        }
-    };
 
-    const loginAdmin = () => setIsAdmin(true);
-    const logoutAdmin = () => setIsAdmin(false);
+            // 2. Clear Supabase session
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                console.error('ServiceContext: Supabase signOut error', error);
+            }
+
+            console.log('ServiceContext: Logout successful');
+        } catch (error) {
+            console.error('ServiceContext: Unexpected logout error', error);
+        } finally {
+            // 3. Final cleanup and redirect to clear any residual memory state
+            window.location.href = '/public';
+        }
+    }, [safeSetUser]);
+
+    const loginAdmin = useCallback(() => setIsAdmin(true), []);
+    const logoutAdmin = useCallback(() => setIsAdmin(false), []);
+
+    // Memoize the context value to avoid unnecessary re-renders of consuming components
+    const contextValue = React.useMemo(() => ({
+        services,
+        updatePrice,
+        isHydrated,
+        user,
+        login,
+        logout,
+        refreshServices: fetchServices,
+        isAdmin,
+        loginAdmin,
+        logoutAdmin,
+        refreshUser: refreshUserProfile
+    }), [services, updatePrice, isHydrated, user, login, logout, isAdmin, loginAdmin, logoutAdmin, fetchServices, refreshUserProfile]);
 
     return (
-        <ServiceContext.Provider value={{
-            services,
-            updatePrice,
-            isHydrated,
-            user,
-            login,
-            logout,
-            refreshServices: fetchServices,
-            isAdmin,
-            loginAdmin,
-            logoutAdmin,
-            refreshUser: refreshUserProfile
-        }}>
+        <ServiceContext.Provider value={contextValue}>
             {children}
         </ServiceContext.Provider>
     );
