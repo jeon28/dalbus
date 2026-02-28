@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import Image from 'next/image';
 import { Trash2, Edit } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface Product {
     id: string;
@@ -37,7 +38,7 @@ export default function ServiceListPage() {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/admin/products');
+            const response = await apiFetch('/api/admin/products');
             if (!response.ok) throw new Error('Failed to fetch products');
             const data = await response.json();
             setProducts(data);
@@ -51,7 +52,7 @@ export default function ServiceListPage() {
         if (!confirm('정말 삭제하시겠습니까? 관련 된 모든 주문과 데이터가 영향을 받을 수 있습니다.')) return;
 
         try {
-            const response = await fetch(`/api/admin/products/${id}`, {
+            const response = await apiFetch(`/api/admin/products/${id}`, {
                 method: 'DELETE',
             });
             if (response.ok) {

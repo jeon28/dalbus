@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession, isAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 // GET: Fetch all accounts
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const session = await getServerSession(req);
+        if (!isAdmin(session)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
         const { data, error } = await supabaseAdmin
             .from('accounts')
             .select(`
@@ -62,6 +68,11 @@ export async function GET() {
 // POST: Create a new shared account
 export async function POST(req: NextRequest) {
     try {
+        const session = await getServerSession(req);
+        if (!isAdmin(session)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
         const body = await req.json();
         // body: product_id, login_id, login_pw, payment_email, payment_day, max_slots, memo
 

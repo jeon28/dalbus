@@ -6,6 +6,7 @@ import styles from '../admin.module.css'; // Reusing admin styles
 import { useRouter } from 'next/navigation';
 import { Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { apiFetch } from '@/lib/api';
 import {
     Dialog,
     DialogContent,
@@ -71,7 +72,7 @@ export default function MemberListPage() {
     const fetchMembers = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/api/admin/members');
+            const response = await apiFetch('/api/admin/members');
             if (!response.ok) throw new Error('Failed to fetch members');
             const data = await response.json();
             setMembers(data);
@@ -87,7 +88,7 @@ export default function MemberListPage() {
         }
 
         try {
-            const response = await fetch(`/api/admin/members?id=${member.id}`, {
+            const response = await apiFetch(`/api/admin/members?id=${member.id}`, {
                 method: 'DELETE'
             });
 
@@ -115,7 +116,7 @@ export default function MemberListPage() {
         if (!selectedMember) return;
 
         try {
-            const response = await fetch('/api/admin/members', {
+            const response = await apiFetch('/api/admin/members', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: selectedMember.id, memo: memoInput })
@@ -146,7 +147,7 @@ export default function MemberListPage() {
         setMemberAccounts([]);
 
         try {
-            const res = await fetch(`/api/admin/members/${member.id}/accounts`);
+            const res = await apiFetch(`/api/admin/members/${member.id}/accounts`);
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setMemberAccounts(data);

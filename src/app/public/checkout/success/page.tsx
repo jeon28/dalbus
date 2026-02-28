@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, Home, UserPlus, Lock, Mail, User, Phone, Calendar, Eye, EyeOff } from 'lucide-react';
 import { useServices } from '@/lib/ServiceContext';
+import { apiFetch } from '@/lib/api';
 
 function SuccessContent() {
     const searchParams = useSearchParams();
@@ -68,9 +69,8 @@ function SuccessContent() {
 
         setIsCheckingEmail(true);
         try {
-            const response = await fetch('/api/auth/check-email', {
+            const response = await apiFetch('/api/auth/check-email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
             });
             const data = await response.json();
@@ -110,9 +110,8 @@ function SuccessContent() {
 
         setLoading(true);
         try {
-            const response = await fetch('/api/auth/guest-signup', {
+            const response = await apiFetch('/api/auth/guest-signup', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: email,
                     password,

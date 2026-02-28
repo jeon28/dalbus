@@ -7,6 +7,7 @@ import styles from './admin.module.css';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiFetch } from '@/lib/api';
 
 interface Order {
     id: string;
@@ -42,7 +43,7 @@ export default function AdminPage() {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('/api/admin/orders');
+            const response = await apiFetch('/api/admin/orders');
             if (!response.ok) throw new Error('Failed to fetch orders');
             const data = await response.json();
             setOrders(data);
@@ -52,7 +53,7 @@ export default function AdminPage() {
     };
 
     const fetchSettings = async () => {
-        const res = await fetch('/api/admin/settings');
+        const res = await apiFetch('/api/admin/settings');
         if (res.ok) {
             const data = await res.json();
             setSettings(data);
@@ -61,7 +62,7 @@ export default function AdminPage() {
     };
 
     const fetchBankAccounts = async () => {
-        const res = await fetch('/api/admin/bank-accounts');
+        const res = await apiFetch('/api/admin/bank-accounts');
         if (res.ok) {
             const data = await res.json();
             setBankAccounts(data);
@@ -92,7 +93,7 @@ export default function AdminPage() {
             return;
         }
 
-        const res = await fetch('/api/admin/settings', {
+        const res = await apiFetch('/api/admin/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
@@ -110,7 +111,7 @@ export default function AdminPage() {
             alert('모든 정보를 입력해주세요.');
             return;
         }
-        const res = await fetch('/api/admin/bank-accounts', {
+        const res = await apiFetch('/api/admin/bank-accounts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newBank)
@@ -123,7 +124,7 @@ export default function AdminPage() {
 
     const handleDeleteBank = async (id: string) => {
         if (!confirm('삭제하시겠습니까?')) return;
-        const res = await fetch(`/api/admin/bank-accounts/${id}`, { method: 'DELETE' });
+        const res = await apiFetch(`/api/admin/bank-accounts/${id}`, { method: 'DELETE' });
         if (res.ok) fetchBankAccounts();
     };
 

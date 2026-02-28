@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 import styles from './auth.module.css';
 import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 
@@ -25,9 +26,8 @@ export default function LoginPage() {
         console.log('Login: Attempting login for', id);
 
         try {
-            const response = await fetch('/api/auth/login', {
+            const response = await apiFetch('/api/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: id, password }),
                 cache: 'no-store'
             });

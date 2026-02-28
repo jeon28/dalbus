@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
     try {
-        // 1. Get Token from Authorization Header
-        const authHeader = req.headers.get('Authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 });
+        // 1. 세션 확인
+        const session = await getServerSession(req);
+        if (!session) {
+            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
         }
 
-        const token = authHeader.split(' ')[1];
-
-        // 2. Verify User with Token
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
-        }
+        const user = session;
 
         // 3. Fetch Data for the User
         // 3.1 Fetch Orders

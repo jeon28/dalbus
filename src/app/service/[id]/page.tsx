@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
+import { apiFetch } from '@/lib/api';
 import styles from './service.module.css';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,7 +46,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             setLoading(true);
 
             try {
-                const response = await fetch(`/api/public/products/${serviceId}`);
+                const response = await apiFetch(`/api/public/products/${serviceId}`);
                 if (!response.ok) throw new Error('Failed to fetch product detail');
 
                 const productData = await response.json();
@@ -120,7 +121,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     useEffect(() => {
         const fetchBanks = async () => {
             try {
-                const res = await fetch('/api/admin/bank-accounts');
+                const res = await apiFetch('/api/admin/bank-accounts');
                 if (res.ok) {
                     const data = await res.json();
                     const activeBanks = data.filter((b: BankAccount) => b.is_active);
@@ -210,9 +211,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
 
         try {
-            const response = await fetch('/api/orders', {
+            const response = await apiFetch('/api/orders', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     orderData,
                     product_name: product.name,
@@ -265,9 +265,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         setSelectedOrder(null);
 
         try {
-            const res = await fetch('/api/orders/lookup', {
+            const res = await apiFetch('/api/orders/lookup', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tidalId: guestInfo.tidalId })
             });
             const data = await res.json();

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
 import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -111,22 +112,9 @@ export default function MyPage() {
         setLoading(true);
 
         try {
-            // Use getSession but be aware it might trigger refreshes
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            if (!token) {
-                if (isMounted.current) setLoading(false);
-                fetchingRef.current = false;
-                return;
-            }
-
             console.log('MyPage: Starting data fetch for user:', user.id);
 
-            // Using fetch instead of XHR for cleaner logic if possible, 
-            // but keeping simple for compatibility
-            const res = await fetch('/api/user/mypage', {
-                headers: { 'Authorization': `Bearer ${token}` },
+            const res = await apiFetch('/api/user/mypage', {
                 cache: 'no-store'
             });
 
@@ -242,16 +230,16 @@ export default function MyPage() {
         setIsEditing(false);
     };
 
+    useEffect(() => {
+        if (isHydrated && !user) {
+            console.warn('Unauthorized access to MyPage. Redirecting to login...');
+            router.replace('/login');
+        }
+    }, [isHydrated, user, router]);
+
     if (!isHydrated || loading) return <div className="container py-20 text-center">Loading...</div>;
 
-    if (!user) {
-        return (
-            <div className="container py-20 text-center">
-                <p className="text-muted-foreground mb-4">로그인이 필요한 페이지입니다.</p>
-                <Button onClick={() => router.push('/login')}>로그인하러 가기</Button>
-            </div>
-        );
-    }
+    if (!user) return null;
 
     return (
         <main className={styles.main}>

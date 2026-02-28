@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import Link from 'next/link';
 import { ArrowLeft, Trash2, Plus } from 'lucide-react';
 import { Textarea } from "@/components/ui/textarea";
+import { apiFetch } from '@/lib/api';
 
 export default function EditServicePage() {
     const { isAdmin } = useServices();
@@ -55,7 +56,7 @@ export default function EditServicePage() {
     const fetchProduct = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/admin/products/${id}`);
+            const response = await apiFetch(`/api/admin/products/${id}`);
             if (!response.ok) throw new Error('Failed to fetch product');
             const data = await response.json();
             setProduct(data);
@@ -93,9 +94,8 @@ export default function EditServicePage() {
         setSaving(true);
         try {
             if (!product) return;
-            const response = await fetch(`/api/admin/products/${id}`, {
+            const response = await apiFetch(`/api/admin/products/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...product,
                     original_price: parseInt(product.original_price.toString()),
@@ -126,9 +126,8 @@ export default function EditServicePage() {
         if (!confirm('요금제를 추가하시겠습니까?')) return;
 
         try {
-            const response = await fetch('/api/admin/plans', {
+            const response = await apiFetch('/api/admin/plans', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     product_id: id,
                     duration_months: parseInt(newPlan.duration_months.toString()),
@@ -151,9 +150,8 @@ export default function EditServicePage() {
 
     const handleTogglePlan = async (plan: AdminPlan) => {
         try {
-            const response = await fetch(`/api/admin/plans/${plan.id}`, {
+            const response = await apiFetch(`/api/admin/plans/${plan.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     is_active: !plan.is_active
                 })
@@ -169,14 +167,21 @@ export default function EditServicePage() {
     const handleDeletePlan = async (planId: string) => {
         if (!confirm('정말 삭제하시겠습니까?\n이 기간권으로 결제된 내역이 있을 경우 삭제가 실패할 수 있습니다. (이 경우 \'비활성화\'를 권장합니다)')) return;
         try {
-            const response = await fetch(`/api/admin/plans/${planId}`, {
+            const response = await apiFetch(`/api/admin/plans/${planId}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
                 fetchProduct();
             } else {
                 const errorData = await response.json();
-                alert(`삭제 실패: ${errorData.error || '알 수 없는 오류'}`);
+                let errorMessage = errorData.error || '알 수 없는 오류';
+
+                // 외래 키 제약 조건 위반 (주문 내역 존재) 처리
+                if (errorMessage.includes('violates foreign key constraint') && errorMessage.includes('orders_plan_id_fkey')) {
+                    errorMessage = "해당 요금제로 구입한 주문 내역이 있어 삭제할 수 없습니다. 대신 'Active' 버튼을 눌러 'Inactive' 상태로 변경하여 더 이상 판매되지 않도록 하세요.";
+                }
+
+                alert(`삭제 실패: ${errorMessage}`);
             }
         } catch (error: unknown) {
             console.error('Error deleting plan:', error);

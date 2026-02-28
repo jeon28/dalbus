@@ -5,6 +5,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
+import { apiFetch } from '@/lib/api';
 import {
     Dialog,
     DialogContent,
@@ -170,7 +171,7 @@ export default function OrderHistoryPage() {
 
     const fetchOrders = async () => {
         try {
-            const response = await fetch('/api/admin/orders');
+            const response = await apiFetch('/api/admin/orders');
             if (!response.ok) throw new Error('Failed to fetch orders');
             const data = await response.json();
             setOrders(data);
@@ -235,7 +236,7 @@ export default function OrderHistoryPage() {
             try {
                 // Try finding by related_order_id first, then fallback to buyer_email
                 const lookupId = order.related_order_id || order.id;
-                const res = await fetch(`/api/admin/orders/${lookupId}/assignment`);
+                const res = await apiFetch(`/api/admin/orders/${lookupId}/assignment`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.assignment) {
@@ -251,7 +252,7 @@ export default function OrderHistoryPage() {
 
         // 2. Fetch available accounts
         try {
-            const res = await fetch('/api/admin/accounts');
+            const res = await apiFetch('/api/admin/accounts');
             if (res.ok) {
                 const data = await res.json();
 
@@ -413,7 +414,7 @@ export default function OrderHistoryPage() {
         }
 
         try {
-            const res = await fetch(`/api/admin/accounts/${selectedAccount}/assign`, {
+            const res = await apiFetch(`/api/admin/accounts/${selectedAccount}/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -452,7 +453,7 @@ export default function OrderHistoryPage() {
     const confirmPayment = async (orderId: string) => {
         if (!confirm('입금 확인 처리하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_status: 'paid' })
@@ -467,7 +468,7 @@ export default function OrderHistoryPage() {
     const handleRevertPayment = async (orderId: string) => {
         if (!confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_status: 'pending' })
@@ -489,7 +490,7 @@ export default function OrderHistoryPage() {
         if (!confirm('배정을 취소하고 "입금확인" 상태로 되돌리시겠습니까?')) return;
 
         try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
                 method: 'DELETE'
             });
             if (!res.ok) throw new Error('Unassign failed');
@@ -503,7 +504,7 @@ export default function OrderHistoryPage() {
     const markAsCompleted = async (orderId: string) => {
         if (!confirm('작업완료 하시겠습니까 ?')) return;
         try {
-            const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ assignment_status: 'completed' })
@@ -538,7 +539,7 @@ export default function OrderHistoryPage() {
         }
 
         try {
-            const res = await fetch(`/api/admin/orders/${order.id}`, {
+            const res = await apiFetch(`/api/admin/orders/${order.id}`, {
                 method: 'DELETE'
             });
 

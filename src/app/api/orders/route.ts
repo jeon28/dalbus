@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendAdminOrderNotification, sendUserOrderNotification } from '@/lib/email';
+import { getServerSession } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
     try {
+        // 1. 세션 확인
+        const session = await getServerSession(req);
+        if (!session) {
+            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+        }
+
         const body = await req.json();
         const { orderData, product_name, plan_name } = body;
 

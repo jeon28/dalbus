@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
@@ -200,7 +201,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     // --- Fetching Functions ---
     const fetchAccounts = async () => {
         try {
-            const res = await fetch('/api/admin/accounts', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/accounts', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
@@ -235,7 +236,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     const fetchPendingOrders = async () => {
         try {
-            const res = await fetch('/api/admin/orders', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/orders', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 const waiting = data.filter((o: Order) =>
@@ -511,7 +512,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
         try {
             if (data.assignment_id) {
-                const res = await fetch(`/api/admin/assignments/${data.assignment_id}`, {
+                const res = await apiFetch(`/api/admin/assignments/${data.assignment_id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -522,7 +523,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     alert('이름 또는 ID(이메일)를 입력해주세요.');
                     return;
                 }
-                const res = await fetch(`/api/admin/accounts/${accountId}/assign`, {
+                const res = await apiFetch(`/api/admin/accounts/${accountId}/assign`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ...data, slot_number: slotIdx })
@@ -540,7 +541,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleDelete = async (assignmentId: string) => {
         if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             fetchPendingOrders();
@@ -552,7 +553,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleDeactivate = async (assignmentId: string) => {
         if (!confirm('배정을 종료하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_active: false })
@@ -571,11 +572,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return;
         }
         try {
-            const prodRes = await fetch('/api/admin/products');
+            const prodRes = await apiFetch('/api/admin/products');
             const products = await prodRes.json();
             const tidal = products.find((p: { name: string }) => p.name.includes('Tidal')) || products[0];
 
-            const res = await fetch('/api/admin/accounts', {
+            const res = await apiFetch('/api/admin/accounts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...newAccount, product_id: tidal?.id })
@@ -598,7 +599,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleUpdateMasterAccount = async () => {
         if (!editingAccount) return;
         try {
-            const res = await fetch(`/api/admin/accounts/${editingAccount.id}`, {
+            const res = await apiFetch(`/api/admin/accounts/${editingAccount.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(editingAccount)
@@ -619,7 +620,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
         if (!confirm('그룹을 삭제하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             alert('삭제되었습니다.');
@@ -664,7 +665,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 const data = new Uint8Array(event.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                const res = await fetch('/api/admin/accounts/import', {
+                const res = await apiFetch('/api/admin/accounts/import', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ accounts: jsonData })
@@ -727,7 +728,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleMove = async () => {
         if (!selectedAssignment?.orders?.id) return;
         try {
-            const res = await fetch('/api/admin/accounts/move', {
+            const res = await apiFetch('/api/admin/accounts/move', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -790,7 +791,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 }))
                 .filter(r => !!r.email);
 
-            const res = await fetch('/api/admin/tidal/notify', {
+            const res = await apiFetch('/api/admin/tidal/notify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ recipients, messageTemplate: notificationMessage })

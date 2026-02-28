@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession, isAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-    // In production, valid session check is required.
+export async function GET(req: NextRequest) {
+    // 세션 확인 및 관리자 권한 체크
+    const session = await getServerSession(req);
+    if (!session || !isAdmin(session)) {
+        return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
+
     // Fetching profiles with role 'user'
     const { data, error } = await supabaseAdmin
         .from('profiles')
@@ -21,6 +27,12 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
     try {
+        // 세션 확인 및 관리자 권한 체크
+        const session = await getServerSession(request);
+        if (!session || !isAdmin(session)) {
+            return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+        }
+
         const body = await request.json();
         const { id, memo } = body;
 
@@ -46,6 +58,12 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
     try {
+        // 세션 확인 및 관리자 권한 체크
+        const session = await getServerSession(request);
+        if (!session || !isAdmin(session)) {
+            return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+        }
+
         const { searchParams } = new URL(request.url);
         const userId = searchParams.get('id');
 

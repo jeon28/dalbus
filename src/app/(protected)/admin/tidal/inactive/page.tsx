@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import styles from '../../admin.module.css';
 import * as XLSX from 'xlsx';
+import { apiFetch } from '@/lib/api';
 
 interface AssignmentHistory {
     id: string;
@@ -48,7 +49,7 @@ function InactiveAccountsContent() {
     const fetchInactiveAssignments = async () => {
         try {
             setIsLoading(true);
-            const res = await fetch('/api/admin/assignments/inactive', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/assignments/inactive', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
             setAssignments(data);
@@ -63,7 +64,7 @@ function InactiveAccountsContent() {
     const handleDelete = async (id: string) => {
         if (!confirm('정말 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
         try {
-            const res = await fetch(`/api/admin/assignments/${id}`, {
+            const res = await apiFetch(`/api/admin/assignments/${id}`, {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');

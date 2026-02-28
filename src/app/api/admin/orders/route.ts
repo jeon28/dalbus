@@ -1,14 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession, isAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-    // In a real app, we should verify the user is an admin session here.
-    // However, since we are using client-side "fake" auth for this request, 
-    // we will rely on the fact that this API is internal. 
-    // Ideally, we would pass a secret header or token. 
-    // For now, given the requirements, we'll just fetch.
+export async function GET(req: NextRequest) {
+    // 세션 확인 및 관리자 권한 체크
+    const session = await getServerSession(req);
+    if (!session || !isAdmin(session)) {
+        return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
 
     // Fetch orders with all necessary relations
     const { data, error } = await supabaseAdmin

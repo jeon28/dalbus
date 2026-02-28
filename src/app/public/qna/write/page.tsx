@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
+import { apiFetch } from '@/lib/api';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,9 +51,8 @@ export default function QnAWritePage() {
                 user_id: user?.id || null
             };
 
-            const res = await fetch('/api/qna', {
+            const res = await apiFetch('/api/qna', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
 

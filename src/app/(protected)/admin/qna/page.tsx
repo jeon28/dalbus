@@ -6,6 +6,7 @@ import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Lock } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface Question {
     id: string;
@@ -38,7 +39,7 @@ export default function AdminQnAPage() {
         setLoading(true);
         try {
             // Admin fetches all, including secrets
-            const res = await fetch('/api/qna?exclude_secret=false');
+            const res = await apiFetch('/api/qna?exclude_secret=false');
             if (res.ok) {
                 const data = await res.json();
                 setQnas(data);
@@ -54,9 +55,8 @@ export default function AdminQnAPage() {
         if (!answerContent.trim()) return;
 
         try {
-            const res = await fetch(`/api/admin/qna/${id}/answer`, {
+            const res = await apiFetch(`/api/admin/qna/${id}/answer`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ answer_content: answerContent })
             });
 
