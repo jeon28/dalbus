@@ -267,6 +267,10 @@ export default function MyPage() {
                     {!isEditing ? (
                         <div className="grid gap-6 sm:grid-cols-2 max-w-2xl">
                             <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">이메일</p>
+                                <p className="font-medium text-lg">{profileForm.email}</p>
+                            </div>
+                            <div className="space-y-1">
                                 <p className="text-xs text-muted-foreground">이름</p>
                                 <p className="font-medium text-lg">{profileForm.name}</p>
                             </div>
@@ -278,13 +282,22 @@ export default function MyPage() {
                                 <p className="text-xs text-muted-foreground">연락처</p>
                                 <p className="font-medium text-lg">{profileForm.phone || '-'}</p>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-xs text-muted-foreground">이메일</p>
-                                <p className="font-medium text-lg">{profileForm.email}</p>
-                            </div>
                         </div>
                     ) : (
                         <div className="space-y-4 max-w-md">
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <Label htmlFor="email">이메일</Label>
+                                    <span className="text-[10px] text-muted-foreground">변경 불가 (계정 ID)</span>
+                                </div>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    value={profileForm.email}
+                                    readOnly
+                                    className="bg-muted/30 cursor-not-allowed"
+                                />
+                            </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <Label htmlFor="name">이름</Label>
@@ -298,16 +311,12 @@ export default function MyPage() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <Label htmlFor="birth_date">생년월일</Label>
-                                    <span className="text-[10px] text-muted-foreground">변경 불가 (관리자 문의)</span>
-                                </div>
+                                <Label htmlFor="birth_date">생년월일</Label>
                                 <Input
                                     id="birth_date"
                                     placeholder="YYYY.MM.DD"
                                     value={profileForm.birth_date}
-                                    readOnly
-                                    className="bg-muted/30 cursor-not-allowed"
+                                    onChange={(e) => setProfileForm({ ...profileForm, birth_date: e.target.value })}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -317,15 +326,6 @@ export default function MyPage() {
                                     type="tel"
                                     value={profileForm.phone}
                                     onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email">이메일</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={profileForm.email}
-                                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                                 />
                             </div>
                             <div className="flex gap-2 pt-2">
