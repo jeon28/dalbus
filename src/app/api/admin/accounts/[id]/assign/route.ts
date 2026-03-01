@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { addMonths, format, parseISO } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const durationMonths = plan.duration_months || 1;
                     const now = new Date();
                     finalStartDate = finalStartDate || format(now, 'yyyy-MM-dd');
-                    finalEndDate = finalEndDate || format(addMonths(parseISO(finalStartDate), durationMonths), 'yyyy-MM-dd');
+                    finalEndDate = finalEndDate || format(addDays(parseISO(finalStartDate), durationMonths * 30), 'yyyy-MM-dd');
                 }
             }
 
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             const orderDate = ord.created_at ? new Date(ord.created_at) : new Date();
             finalStartDate = finalStartDate || format(orderDate, 'yyyy-MM-dd');
             const durationMonths = (ord.product_plans as { duration_months?: number } | null)?.duration_months || 1;
-            finalEndDate = finalEndDate || format(addMonths(parseISO(finalStartDate), durationMonths), 'yyyy-MM-dd');
+            finalEndDate = finalEndDate || format(addDays(parseISO(finalStartDate), durationMonths * 30), 'yyyy-MM-dd');
         }
 
         // 2. Validate Slot

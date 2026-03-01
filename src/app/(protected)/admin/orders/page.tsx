@@ -26,7 +26,7 @@ import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filte
 import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
-import { addMonths, differenceInMonths, format, parseISO } from 'date-fns';
+import { addDays, differenceInMonths, format, parseISO } from 'date-fns';
 
 interface Profile {
     name?: string;
@@ -160,6 +160,7 @@ export default function OrderHistoryPage() {
     const [newDuration, setNewDuration] = useState<number>(1);
     const [newBuyerName, setNewBuyerName] = useState('');
     const [newBuyerEmail, setNewBuyerEmail] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (isHydrated && !isAdmin) {
@@ -301,7 +302,7 @@ export default function OrderHistoryPage() {
                     if (prev.end_date || prev.orders?.end_date) {
                         try {
                             const currentEnd = parseISO(prev.end_date || prev.orders.end_date);
-                            const newEnd = format(addMonths(currentEnd, duration), 'yyyy-MM-dd');
+                            const newEnd = format(addDays(currentEnd, duration * 30), 'yyyy-MM-dd');
                             setExtEndDate(newEnd);
                         } catch (e) {
                             console.error('Date calculation error:', e);
@@ -320,7 +321,7 @@ export default function OrderHistoryPage() {
                     const phone = order.profiles?.phone || order.buyer_phone || '';
                     const duration = order.product_plans?.duration_months || 1;
                     const start = format(new Date(), 'yyyy-MM-dd');
-                    const end = format(addMonths(parseISO(start), duration), 'yyyy-MM-dd');
+                    const end = format(addDays(parseISO(start), duration * 30), 'yyyy-MM-dd');
 
                     setNewStartDate(start);
                     setNewEndDate(end);
@@ -400,7 +401,7 @@ export default function OrderHistoryPage() {
     };
 
     const confirmMatch = async () => {
-        if (!selectedOrder || !selectedAccount) return;
+        if (!selectedOrder || !selectedAccount || isProcessing) return;
 
         // 자동으로 가장 낮은 번호의 빈 슬롯 선택 (단, 연장인 경우 기존 슬롯 고수)
         let targetSlot = selectedSlot;
@@ -413,6 +414,7 @@ export default function OrderHistoryPage() {
             targetSlot = availableSlots[0]; // 가장 낮은 번호 선택
         }
 
+        setIsProcessing(true);
         try {
             const res = await apiFetch(`/api/admin/accounts/${selectedAccount}/assign`, {
                 method: 'POST',
@@ -447,11 +449,14 @@ export default function OrderHistoryPage() {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             alert(message);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const confirmPayment = async (orderId: string) => {
-        if (!confirm('입금 확인 처리하시겠습니까?')) return;
+        if (isProcessing || !confirm('입금 확인 처리하시겠습니까?')) return;
+        setIsProcessing(true);
         try {
             const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
@@ -462,11 +467,14 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('입금 확인 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const handleRevertPayment = async (orderId: string) => {
-        if (!confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
+        if (isProcessing || !confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
+        setIsProcessing(true);
         try {
             const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
@@ -477,6 +485,8 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('상태 변경 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -487,8 +497,9 @@ export default function OrderHistoryPage() {
             return;
         }
 
-        if (!confirm('배정을 취소하고 "입금확인" 상태로 되돌리시겠습니까?')) return;
+        if (isProcessing || !confirm('배정을 취소하고 "입금확인" 상태로 되돌리시겠습니까?')) return;
 
+        setIsProcessing(true);
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
                 method: 'DELETE'
@@ -498,11 +509,14 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('배정 취소 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const markAsCompleted = async (orderId: string) => {
-        if (!confirm('작업완료 하시겠습니까 ?')) return;
+        if (isProcessing || !confirm('작업완료 하시겠습니까 ?')) return;
+        setIsProcessing(true);
         try {
             const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
@@ -525,6 +539,8 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('상태 변경 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -534,10 +550,11 @@ export default function OrderHistoryPage() {
             return;
         }
 
-        if (!confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'}) 내역을 삭제하시겠습니까?`)) {
+        if (isProcessing || !confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'}) 내역을 삭제하시겠습니까?`)) {
             return;
         }
 
+        setIsProcessing(true);
         try {
             const res = await apiFetch(`/api/admin/orders/${order.id}`, {
                 method: 'DELETE'
@@ -553,6 +570,8 @@ export default function OrderHistoryPage() {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             alert(message);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -657,22 +676,22 @@ export default function OrderHistoryPage() {
                                 <td>
                                     <div className="flex flex-col gap-1">
                                         {status === '주문신청' && (
-                                            <Button size="sm" variant="secondary" onClick={() => confirmPayment(o.id)}>입금확인</Button>
+                                            <Button size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
                                         )}
                                         {status === '입금확인' && (
                                             <>
-                                                <Button size="sm" onClick={() => handleOpenMatchModal(o)}>계정배정</Button>
-                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleRevertPayment(o.id)}>입금취소</Button>
+                                                <Button size="sm" onClick={() => handleOpenMatchModal(o)} disabled={isProcessing}>계정배정</Button>
+                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleRevertPayment(o.id)} disabled={isProcessing}>입금취소</Button>
                                             </>
                                         )}
                                         {status === '배정완료' && (
                                             <>
-                                                <Button size="sm" variant="outline" onClick={() => markAsCompleted(o.id)}>작업완료</Button>
-                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)}>배정취소</Button>
+                                                <Button size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
+                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)} disabled={isProcessing}>배정취소</Button>
                                             </>
                                         )}
                                         {o.order_accounts?.length === 0 && (
-                                            <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)}>삭제</Button>
+                                            <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                                         )}
                                     </div>
                                 </td>
@@ -864,7 +883,7 @@ export default function OrderHistoryPage() {
                                                         const baseDate = previousAssignment.end_date;
                                                         if (baseDate) {
                                                             try {
-                                                                const newEnd = format(addMonths(parseISO(baseDate), val), 'yyyy-MM-dd');
+                                                                const newEnd = format(addDays(parseISO(baseDate), val * 30), 'yyyy-MM-dd');
                                                                 setExtEndDate(newEnd);
                                                             } catch (err) {
                                                                 console.error('Calc Error:', err);
@@ -955,7 +974,7 @@ export default function OrderHistoryPage() {
                                                             const start = e.target.value;
                                                             setNewStartDate(start);
                                                             try {
-                                                                const end = format(addMonths(parseISO(start), newDuration), 'yyyy-MM-dd');
+                                                                const end = format(addDays(parseISO(start), newDuration * 30), 'yyyy-MM-dd');
                                                                 setNewEndDate(end);
                                                             } catch (err) { console.error(err); }
                                                         }}
@@ -981,7 +1000,7 @@ export default function OrderHistoryPage() {
                                                                 const val = parseInt(e.target.value) || 0;
                                                                 setNewDuration(val);
                                                                 try {
-                                                                    const end = format(addMonths(parseISO(newStartDate), val), 'yyyy-MM-dd');
+                                                                    const end = format(addDays(parseISO(newStartDate), val * 30), 'yyyy-MM-dd');
                                                                     setNewEndDate(end);
                                                                 } catch (err) { console.error(err); }
                                                             }}
@@ -1002,7 +1021,9 @@ export default function OrderHistoryPage() {
                         )}
                     </div>
                     <DialogFooter>
-                        <Button onClick={confirmMatch} disabled={!selectedAccount}>배정 확인</Button>
+                        <Button onClick={confirmMatch} disabled={!selectedAccount || isProcessing}>
+                            {isProcessing ? '처리 중...' : '배정 확인'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
