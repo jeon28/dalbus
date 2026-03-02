@@ -83,7 +83,8 @@ export default function ServiceListPage() {
 
             <div className={`${styles.content} container`}>
                 <section className={styles.orderSection}>
-                    <div className={styles.tableWrapper}>
+                    {/* Desktop View: Table */}
+                    <div className={`${styles.tableWrapper} ${styles.desktopOnly}`}>
                         <table className={styles.table}>
                             <thead>
                                 <tr>
@@ -134,6 +135,7 @@ export default function ServiceListPage() {
                                                         </Button>
                                                     </Link>
                                                     <Button
+                                                        type="button"
                                                         variant="destructive"
                                                         size="icon"
                                                         className="h-8 w-8"
@@ -148,6 +150,65 @@ export default function ServiceListPage() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Mobile View: Cards */}
+                    <div className={`${styles.orderCards} ${styles.mobileOnly}`}>
+                        {loading ? (
+                            <div className="text-center py-8">로딩 중...</div>
+                        ) : products.length === 0 ? (
+                            <div className="text-center py-8">등록된 서비스가 없습니다.</div>
+                        ) : (
+                            products.sort((a, b) => a.sort_order - b.sort_order).map(p => (
+                                <div key={p.id} className={styles.orderCard}>
+                                    <div className={styles.orderCardHeader}>
+                                        <div className="flex items-center gap-3">
+                                            {p.image_url && (
+                                                <div className="relative w-10 h-10 flex-shrink-0">
+                                                    <Image src={p.image_url} alt={p.name} fill className="object-contain rounded bg-gray-50" />
+                                                </div>
+                                            )}
+                                            <div>
+                                                <div className={styles.productName}>{p.name}</div>
+                                                <div className="text-xs text-gray-500">Slug: {p.slug}</div>
+                                            </div>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold ${p.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                            {p.is_active ? '판매중' : '숨김'}
+                                        </span>
+                                    </div>
+                                    <div className={styles.orderCardContent}>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-500">기본 요금</span>
+                                            <span className="font-bold">₩{p.original_price.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-500">요금제 수</span>
+                                            <span>{p.product_plans?.length || 0}개</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-500">정렬 순서</span>
+                                            <span>{p.sort_order}</span>
+                                        </div>
+                                    </div>
+                                    <div className={styles.orderCardActions}>
+                                        <Link href={`/admin/services/${p.id}`} className="flex-1">
+                                            <Button variant="outline" className="w-full h-10 gap-2">
+                                                <Edit className="h-4 w-4" /> 수정 및 요금제 관리
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            className="h-10 px-3"
+                                            onClick={() => handleDelete(p.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </section>
             </div>

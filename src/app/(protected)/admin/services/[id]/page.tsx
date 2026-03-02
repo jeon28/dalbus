@@ -204,13 +204,13 @@ export default function EditServicePage() {
     return (
         <main className={styles.main}>
             <header className={`${styles.header} glass`}>
-                <div className="container flex items-center gap-4">
+                <div className="container flex items-center gap-2 sm:gap-4 overflow-hidden">
                     <Link href="/admin/services">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="flex-shrink-0">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
                     </Link>
-                    <h1 className={styles.title}>서비스 수정: {product.name}</h1>
+                    <h1 className={`${styles.title} truncate`}>서비스 수정: {product.name}</h1>
                 </div>
             </header>
 
@@ -229,7 +229,7 @@ export default function EditServicePage() {
                             <Input id="slug" name="slug" value={product.slug} onChange={handleProductChange} required />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="original_price">기본 가격</Label>
                                 <Input id="original_price" name="original_price" type="number" value={product.original_price} onChange={handleProductChange} required />
@@ -292,18 +292,20 @@ export default function EditServicePage() {
                             <p className="text-gray-500 text-sm">등록된 요금제가 없습니다.</p>
                         ) : (
                             [...product.product_plans].sort((a, b) => a.duration_months - b.duration_months).map((plan) => (
-                                <div key={plan.id} className="flex items-center justify-between p-4 bg-white rounded-lg border shadow-sm">
-                                    <div>
-                                        <div className="font-semibold">{plan.duration_months}개월권</div>
-                                        <div className="text-sm text-gray-500">
-                                            {plan.discount_rate}% 할인 ➜ ₩{plan.price.toLocaleString()}
+                                <div key={plan.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white rounded-lg border shadow-sm gap-4">
+                                    <div className="flex justify-between items-center sm:block">
+                                        <div>
+                                            <div className="font-semibold text-base sm:text-lg">{plan.duration_months}개월권</div>
+                                            <div className="text-xs sm:text-sm text-gray-500">
+                                                {plan.discount_rate}% 할인 ➜ ₩{plan.price.toLocaleString()}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-between sm:justify-end gap-2 border-t pt-3 sm:border-t-0 sm:pt-0">
                                         <button
                                             type="button"
                                             onClick={() => handleTogglePlan(plan)}
-                                            className={`px-3 py-1 rounded-full text-xs font-medium ${plan.is_active
+                                            className={`px-4 py-2 sm:px-3 sm:py-1 rounded-full text-xs font-bold sm:font-medium flex-1 sm:flex-none text-center ${plan.is_active
                                                 ? 'bg-green-100 text-green-700 hover:bg-green-200'
                                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                 }`}
@@ -318,7 +320,7 @@ export default function EditServicePage() {
                                                         type="button"
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="h-8 px-2 text-xs text-gray-500 underline"
+                                                        className="h-9 px-3 text-xs text-gray-500 underline sm:h-8 sm:px-2"
                                                         onClick={() => setDeleteErrorPlanId(null)}
                                                     >
                                                         닫기
@@ -328,15 +330,15 @@ export default function EditServicePage() {
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon"
-                                                    className={`h-8 w-8 ${deletingPlanId === plan.id ? 'animate-pulse' : ''}`}
+                                                    className={`h-10 w-10 sm:h-8 sm:w-8 ${deletingPlanId === plan.id ? 'animate-pulse' : ''}`}
                                                     onClick={() => handleDeletePlan(plan.id)}
                                                     disabled={deletingPlanId !== null}
                                                 >
-                                                    <Trash2 className={`h-4 w-4 ${deleteErrorPlanId === plan.id ? 'text-red-500' : 'text-red-500 opacity-60 hover:opacity-100'}`} />
+                                                    <Trash2 className={`h-5 w-5 sm:h-4 sm:w-4 ${deleteErrorPlanId === plan.id ? 'text-red-500' : 'text-red-500 opacity-60 hover:opacity-100'}`} />
                                                 </Button>
                                             </div>
                                             {deleteErrorPlanId === plan.id && (
-                                                <p className="text-[10px] text-red-500 text-right leading-tight max-w-[180px] bg-red-50 p-1 rounded border border-red-100 inline-block">
+                                                <p className="text-[10px] text-red-500 text-right leading-tight max-w-[200px] bg-red-50 p-2 rounded border border-red-100 inline-block">
                                                     이미 주문한 요금제는 삭제되지 않습니다.<br />
                                                     주문내역에서 먼저 삭제 후 시도하세요.
                                                 </p>
@@ -355,7 +357,7 @@ export default function EditServicePage() {
                             onSubmit={handleAddPlan}
                             className="space-y-3"
                         >
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <Label className="text-xs">개월 수</Label>
                                     <Input
@@ -364,7 +366,7 @@ export default function EditServicePage() {
                                         value={newPlan.duration_months}
                                         onChange={handleNewPlanChange}
                                         required
-                                        className="h-8 text-sm"
+                                        className="h-10 sm:h-8 text-sm"
                                     />
                                 </div>
                                 <div>
@@ -375,11 +377,11 @@ export default function EditServicePage() {
                                         value={newPlan.price}
                                         onChange={handleNewPlanChange}
                                         required
-                                        className="h-8 text-sm"
+                                        className="h-10 sm:h-8 text-sm"
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <Label className="text-xs">할인율 (%)</Label>
                                     <Input
@@ -389,26 +391,27 @@ export default function EditServicePage() {
                                         onChange={handleNewPlanChange}
                                         step="0.1"
                                         required
-                                        className="h-8 text-sm"
+                                        className="h-10 sm:h-8 text-sm"
                                     />
                                 </div>
                                 <div className="flex items-end pb-2">
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 bg-white p-2 rounded border sm:bg-transparent sm:p-0 sm:border-0 w-full">
                                         <input
                                             type="checkbox"
                                             name="is_active"
+                                            id="new_plan_active"
                                             checked={newPlan.is_active}
                                             onChange={handleNewPlanChange}
-                                            className="h-4 w-4"
+                                            className="h-5 w-5 sm:h-4 sm:w-4"
                                         />
-                                        <Label className="text-xs">활성화</Label>
+                                        <Label htmlFor="new_plan_active" className="text-sm sm:text-xs font-semibold sm:font-normal">활성화</Label>
                                     </div>
                                 </div>
                             </div>
                             <Button
                                 type="submit"
-                                size="sm"
-                                className="w-full"
+                                size="lg"
+                                className="w-full sm:size-sm h-12 sm:h-8 font-bold sm:font-medium"
                                 disabled={submittingPlan}
                             >
                                 {submittingPlan ? (

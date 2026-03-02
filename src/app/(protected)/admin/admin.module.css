@@ -197,6 +197,14 @@
     display: none !important;
 }
 
+.mobileOnly {
+    display: block;
+}
+
+.desktopOnly {
+    display: none;
+}
+
 @media (min-width: 768px) {
     .mobileOnly {
         display: none !important;
