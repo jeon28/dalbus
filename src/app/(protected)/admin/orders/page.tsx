@@ -592,8 +592,85 @@ export default function OrderHistoryPage() {
 
     if (!isAdmin) return null;
 
+    const renderCards = (list: Order[]) => (
+        <div className={`${styles.orderCards} ${styles.mobileOnly}`}>
+            {list.map(o => {
+                const status = getOrderStatus(o);
+                return (
+                    <div key={o.id} className={styles.orderCard}>
+                        <div className={styles.orderCardHeader}>
+                            <div className="flex flex-col">
+                                <span className={styles.orderId}>{o.order_number}</span>
+                                <span className={styles.orderDate}>{new Date(o.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-medium
+                                ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
+                                    status === '배정완료' ? 'bg-blue-100 text-blue-800' :
+                                        status === '입금확인' ? 'bg-green-100 text-green-800' :
+                                            'bg-yellow-100 text-yellow-800'}`}>
+                                {status}
+                            </span>
+                        </div>
+                        <div className={styles.orderCardContent}>
+                            <div className="flex justify-between items-center">
+                                <span className={styles.productName}>{o.products?.name || 'Product'}</span>
+                                <span className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold
+                                    ${o.order_type === 'NEW' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
+                                    {o.order_type === 'NEW' ? '신규' : '연장'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className={styles.memberInfo}>
+                                    <span className="font-bold">{o.profiles?.name || o.buyer_name || 'Unknown'}</span>
+                                    {o.depositor_name && o.depositor_name !== (o.profiles?.name || o.buyer_name) && (
+                                        <span className="text-xs text-orange-600 ml-1">({o.depositor_name})</span>
+                                    )}
+                                    <span className="text-gray-400 ml-2 text-xs">{o.is_guest ? '비회원' : '회원'}</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    {o.profiles?.phone || o.buyer_phone || '-'} | {o.profiles?.email || o.buyer_email || '-'}
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-end mt-2">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] text-gray-400">이용기간: {o.product_plans?.duration_months || '-'}개월</span>
+                                    <span className={styles.priceInfo}>₩{o.amount?.toLocaleString()}</span>
+                                </div>
+                                {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                    <div className="text-[10px] text-gray-400 font-mono bg-secondary px-2 py-1 rounded">
+                                        {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className={styles.orderCardActions}>
+                            {status === '주문신청' && (
+                                <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                            )}
+                            {status === '입금확인' && (
+                                <>
+                                    <Button className="flex-1" size="sm" onClick={() => handleOpenMatchModal(o)} disabled={isProcessing}>계정배정</Button>
+                                    <Button size="sm" variant="ghost" className="px-2" onClick={() => handleRevertPayment(o.id)} disabled={isProcessing}>취소</Button>
+                                </>
+                            )}
+                            {status === '배정완료' && (
+                                <>
+                                    <Button className="flex-1" size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
+                                    <Button size="sm" variant="ghost" className="px-2" onClick={() => handleUnassign(o)} disabled={isProcessing}>취소</Button>
+                                </>
+                            )}
+                            {o.order_accounts?.length === 0 && (
+                                <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+
     const renderTable = (list: Order[]) => (
-        <div className={styles.tableWrapper}>
+        <div className={`${styles.tableWrapper} ${styles.desktopOnly}`}>
             <table className={styles.table}>
                 <thead>
                     <tr>
@@ -761,37 +838,42 @@ export default function OrderHistoryPage() {
 
             <div className={`${styles.content} container`}>
                 <section className={styles.orderSection}>
-                    <div className="flex items-center gap-4 mb-4 justify-end">
-                        <Button onClick={exportToExcel} variant="outline" size="sm">
-                            <Download className="mr-2 h-4 w-4" />
-                            엑셀 다운로드
-                        </Button>
-                        <Input
-                            placeholder="전화번호 검색..."
-                            value={phoneSearch}
-                            onChange={(e) => setPhoneSearch(e.target.value)}
-                            className="max-w-xs"
-                        />
-                        <DataTableFacetedFilter
-                            title="구분"
-                            options={orderTypes}
-                            selectedValues={selectedOrderTypes}
-                            setFilter={setSelectedOrderTypes}
-                        />
-                        <DataTableFacetedFilter
-                            title="회원여부"
-                            options={guestTypes}
-                            selectedValues={selectedGuestTypes}
-                            setFilter={setSelectedGuestTypes}
-                        />
-                        <DataTableFacetedFilter
-                            title="Status"
-                            options={statuses}
-                            selectedValues={selectedStatuses}
-                            setFilter={setSelectedStatuses}
-                        />
+                    <div className={styles.headerActions}>
+                        <div className="flex gap-2 items-center flex-1">
+                            <Input
+                                placeholder="전화번호 검색..."
+                                value={phoneSearch}
+                                onChange={(e) => setPhoneSearch(e.target.value)}
+                                className="max-w-[200px]"
+                            />
+                            <Button onClick={exportToExcel} variant="outline" size="sm" className="shrink-0">
+                                <Download className="mr-1 h-4 w-4" />
+                                <span className="hidden sm:inline">엑셀</span>
+                            </Button>
+                        </div>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                            <DataTableFacetedFilter
+                                title="구분"
+                                options={orderTypes}
+                                selectedValues={selectedOrderTypes}
+                                setFilter={setSelectedOrderTypes}
+                            />
+                            <DataTableFacetedFilter
+                                title="회원"
+                                options={guestTypes}
+                                selectedValues={selectedGuestTypes}
+                                setFilter={setSelectedGuestTypes}
+                            />
+                            <DataTableFacetedFilter
+                                title="상태"
+                                options={statuses}
+                                selectedValues={selectedStatuses}
+                                setFilter={setSelectedStatuses}
+                            />
+                        </div>
                     </div>
                     {renderTable(filteredOrders)}
+                    {renderCards(filteredOrders)}
                 </section>
             </div>
 

@@ -20,6 +20,9 @@ export default function EditServicePage() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [submittingPlan, setSubmittingPlan] = useState(false);
+    const [deleteErrorPlanId, setDeleteErrorPlanId] = useState<string | null>(null);
+    const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
     interface AdminPlan {
         id: string;
@@ -123,7 +126,7 @@ export default function EditServicePage() {
 
     const handleAddPlan = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!confirm('요금제를 추가하시겠습니까?')) return;
+        setSubmittingPlan(true);
 
         try {
             const response = await apiFetch('/api/admin/plans', {
@@ -137,14 +140,18 @@ export default function EditServicePage() {
                 })
             });
 
-            if (!response.ok) throw new Error('Failed to add plan');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to add plan');
+            }
 
-            alert('요금제가 추가되었습니다.');
             setNewPlan({ duration_months: 1, price: 0, discount_rate: 0, is_active: true }); // Reset form
             fetchProduct(); // Refresh list
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             alert(`오류 발생: ${message}`);
+        } finally {
+            setSubmittingPlan(false);
         }
     };
 
@@ -165,7 +172,8 @@ export default function EditServicePage() {
     };
 
     const handleDeletePlan = async (planId: string) => {
-        if (!confirm('정말 삭제하시겠습니까?\n이 기간권으로 결제된 내역이 있을 경우 삭제가 실패할 수 있습니다. (이 경우 \'비활성화\'를 권장합니다)')) return;
+        setDeleteErrorPlanId(null);
+        setDeletingPlanId(planId);
         try {
             const response = await apiFetch(`/api/admin/plans/${planId}`, {
                 method: 'DELETE',
@@ -173,20 +181,21 @@ export default function EditServicePage() {
             if (response.ok) {
                 fetchProduct();
             } else {
-                const errorData = await response.json();
-                let errorMessage = errorData.error || '알 수 없는 오류';
-
-                // 외래 키 제약 조건 위반 (주문 내역 존재) 처리
-                if (errorMessage.includes('violates foreign key constraint') && errorMessage.includes('orders_plan_id_fkey')) {
-                    errorMessage = "해당 요금제로 구입한 주문 내역이 있어 삭제할 수 없습니다. 대신 'Active' 버튼을 눌러 'Inactive' 상태로 변경하여 더 이상 판매되지 않도록 하세요.";
+                setDeleteErrorPlanId(planId);
+                // Attempt to parse error data silently for logging, but don't blow up the console
+                // if the UI is already showing a friendly message.
+                try {
+                    const errorData = await response.json();
+                    console.log('[Plan Deletion] Failed with status:', response.status, errorData);
+                } catch {
+                    console.log('[Plan Deletion] Failed with status:', response.status);
                 }
-
-                alert(`삭제 실패: ${errorMessage}`);
             }
         } catch (error: unknown) {
             console.error('Error deleting plan:', error);
-            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-            alert(`삭제 실패: ${message}`);
+            setDeleteErrorPlanId(planId);
+        } finally {
+            setDeletingPlanId(null);
         }
     };
 
@@ -292,18 +301,47 @@ export default function EditServicePage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
+                                            type="button"
                                             onClick={() => handleTogglePlan(plan)}
-                                            className={`text-xs px-2 py-1 rounded cursor-pointer transition-colors ${plan.is_active
-                                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                            className={`px-3 py-1 rounded-full text-xs font-medium ${plan.is_active
+                                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                 }`}
                                             title="상태 변경 (Active/Inactive)"
                                         >
                                             {plan.is_active ? 'Active' : 'Inactive'}
                                         </button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeletePlan(plan.id)}>
-                                            <Trash2 className="h-4 w-4 text-red-500" />
-                                        </Button>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className="flex items-center gap-1">
+                                                {deleteErrorPlanId === plan.id && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 px-2 text-xs text-gray-500 underline"
+                                                        onClick={() => setDeleteErrorPlanId(null)}
+                                                    >
+                                                        닫기
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className={`h-8 w-8 ${deletingPlanId === plan.id ? 'animate-pulse' : ''}`}
+                                                    onClick={() => handleDeletePlan(plan.id)}
+                                                    disabled={deletingPlanId !== null}
+                                                >
+                                                    <Trash2 className={`h-4 w-4 ${deleteErrorPlanId === plan.id ? 'text-red-500' : 'text-red-500 opacity-60 hover:opacity-100'}`} />
+                                                </Button>
+                                            </div>
+                                            {deleteErrorPlanId === plan.id && (
+                                                <p className="text-[10px] text-red-500 text-right leading-tight max-w-[180px] bg-red-50 p-1 rounded border border-red-100 inline-block">
+                                                    이미 주문한 요금제는 삭제되지 않습니다.<br />
+                                                    주문내역에서 먼저 삭제 후 시도하세요.
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))
@@ -313,7 +351,10 @@ export default function EditServicePage() {
                     {/* Add Plan Form */}
                     <div className="bg-gray-50 p-4 rounded-lg border">
                         <h3 className="font-medium mb-3 text-sm">새 요금제 추가</h3>
-                        <form onSubmit={handleAddPlan} className="space-y-3">
+                        <form
+                            onSubmit={handleAddPlan}
+                            className="space-y-3"
+                        >
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <Label className="text-xs">개월 수</Label>
@@ -364,8 +405,19 @@ export default function EditServicePage() {
                                     </div>
                                 </div>
                             </div>
-                            <Button type="submit" size="sm" className="w-full">
-                                <Plus className="h-4 w-4 mr-1" /> 요금제 등록
+                            <Button
+                                type="submit"
+                                size="sm"
+                                className="w-full"
+                                disabled={submittingPlan}
+                            >
+                                {submittingPlan ? (
+                                    <>등록 중...</>
+                                ) : (
+                                    <>
+                                        <Plus className="h-4 w-4 mr-1" /> 요금제 등록
+                                    </>
+                                )}
                             </Button>
                         </form>
                     </div>

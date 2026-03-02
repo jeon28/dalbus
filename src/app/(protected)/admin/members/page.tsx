@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css'; // Reusing admin styles
 import { useRouter } from 'next/navigation';
-import { Trash2, FileText } from 'lucide-react';
+import { Trash2, FileText, Search, Download } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
 import {
@@ -51,6 +53,7 @@ export default function MemberListPage() {
     const [loading, setLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [memoInput, setMemoInput] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
 
     const [isMemoOpen, setIsMemoOpen] = useState(false);
 
@@ -159,6 +162,50 @@ export default function MemberListPage() {
         }
     };
 
+    const handleExportExcel = () => {
+        if (members.length === 0) {
+            alert('내보낼 데이터가 없습니다.');
+            return;
+        }
+
+        const exportData = members.map(m => ({
+            'ID': m.id,
+            '가입일': new Date(m.created_at).toLocaleDateString(),
+            '이름': m.name,
+            '생년월일': m.birth_date || '-',
+            '이메일': m.email,
+            '연락처': m.phone || '-',
+            '메모': m.memo || ''
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Members");
+
+        // Set column widths
+        const wscols = [
+            { wch: 15 }, // ID
+            { wch: 15 }, // 가입일
+            { wch: 15 }, // 이름
+            { wch: 15 }, // 생년월일
+            { wch: 30 }, // 이메일
+            { wch: 20 }, // 연락처
+            { wch: 40 }, // 메모
+        ];
+        worksheet['!cols'] = wscols;
+
+        XLSX.writeFile(workbook, `dalbus_members_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
+    const filteredMembers = members.filter(member => {
+        const search = searchTerm.toLowerCase();
+        return (
+            member.name.toLowerCase().includes(search) ||
+            member.email.toLowerCase().includes(search) ||
+            (member.phone && member.phone.toLowerCase().includes(search))
+        );
+    });
+
     if (!isAdmin) return null;
 
     return (
@@ -171,7 +218,40 @@ export default function MemberListPage() {
 
             <div className={`${styles.content} container`}>
                 <section className={styles.orderSection}>
-                    <div className={styles.tableWrapper}>
+                    <div className={styles.headerActions} style={{ marginBottom: '20px', justifyContent: 'space-between' }}>
+                        <div className="flex items-center gap-2 flex-1 max-w-md">
+                            <div className="relative w-full">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                <Input
+                                    placeholder="이름, 이메일, 연락처로 검색..."
+                                    className="pl-10"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <Button
+                            variant="outline"
+                            className="gap-2"
+                            onClick={handleExportExcel}
+                        >
+                            <Download size={18} />
+                            <span>엑셀 다운로드</span>
+                        </Button>
+                    </div>
+
+                    <div className="mb-4 flex items-center justify-between">
+                        <div className="text-sm text-gray-500">
+                            총 회원수: <span className="font-bold text-blue-600">{members.length}</span>명
+                            {searchTerm && (
+                                <span className="ml-2">
+                                    (검색 결과: <span className="font-bold">{filteredMembers.length}</span>명)
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className={`${styles.tableWrapper} ${styles.desktopOnly}`}>
                         <table className={styles.table}>
                             <thead>
                                 <tr>
@@ -188,14 +268,16 @@ export default function MemberListPage() {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-8">로딩 중...</td>
+                                        <td colSpan={8} className="text-center py-8">로딩 중...</td>
                                     </tr>
-                                ) : members.length === 0 ? (
+                                ) : filteredMembers.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-8">가입된 회원이 없습니다.</td>
+                                        <td colSpan={8} className="text-center py-8">
+                                            {searchTerm ? '검색 결과가 없습니다.' : '가입된 회원이 없습니다.'}
+                                        </td>
                                     </tr>
                                 ) : (
-                                    members.map(member => (
+                                    filteredMembers.map(member => (
                                         <tr key={member.id}>
                                             <td
                                                 className="cursor-pointer text-blue-600 hover:underline font-mono text-xs"
@@ -243,6 +325,74 @@ export default function MemberListPage() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Mobile Card Layout */}
+                    <div className={`${styles.orderCards} ${styles.mobileOnly}`}>
+                        {loading ? (
+                            <div className="text-center py-8">로딩 중...</div>
+                        ) : filteredMembers.length === 0 ? (
+                            <div className="text-center py-8">
+                                {searchTerm ? '검색 결과가 없습니다.' : '가입된 회원이 없습니다.'}
+                            </div>
+                        ) : (
+                            filteredMembers.map(member => (
+                                <div key={member.id} className={styles.orderCard}>
+                                    <div className={styles.orderCardHeader}>
+                                        <div>
+                                            <div className={styles.productName}>{member.name}</div>
+                                            <div className={styles.orderDate}>가입일: {new Date(member.created_at).toLocaleDateString()}</div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-9 w-9 p-0 bg-gray-50 border border-gray-200"
+                                                onClick={() => openMemoModal(member)}
+                                            >
+                                                <FileText size={16} />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-9 w-9 p-0 bg-gray-50 border border-gray-200 text-red-500"
+                                                onClick={() => handleDeleteMember(member)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className={styles.orderCardContent}>
+                                        <div className={styles.memberInfo}>
+                                            <div className="flex justify-between py-1 border-b border-gray-50">
+                                                <span className="text-gray-500">ID</span>
+                                                <span
+                                                    className="font-mono text-xs text-blue-600 cursor-pointer"
+                                                    onClick={() => handleOpenAccounts(member)}
+                                                >
+                                                    {member.id.substring(0, 8)}...
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-gray-50">
+                                                <span className="text-gray-500">이메일</span>
+                                                <span>{member.email}</span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-gray-50">
+                                                <span className="text-gray-500">연락처</span>
+                                                <span>{member.phone || '-'}</span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-gray-50">
+                                                <span className="text-gray-500">생년월일</span>
+                                                <span>{member.birth_date || '-'}</span>
+                                            </div>
+                                            <div className="mt-2 text-sm text-gray-600 italic">
+                                                <strong>메모:</strong> {member.memo || '없음'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </section>
             </div>

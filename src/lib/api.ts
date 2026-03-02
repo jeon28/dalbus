@@ -26,20 +26,23 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     const method = init?.method || 'GET';
     const body = init?.body;
 
+    console.log(`[apiFetch] Request start: ${method} ${url}`);
+
     try {
         // Use cached session if available to avoid awaiting
         let session = sessionCache;
 
         // If not cached and we are in the browser, try to wait for the initial promise
         if (!session && sessionPromise) {
-            // Only wait if it's not a public route or if we really need auth
-            // For now, let's try to get it once if not available
+            console.log('[apiFetch] Waiting for supabase session...');
             const result = await supabase.auth.getSession();
             session = result.data.session;
             sessionCache = session;
+            console.log('[apiFetch] Session retrieved:', session ? 'OK' : 'None');
         }
 
         const token = session?.access_token;
+        if (!token) console.log('[apiFetch] Warning: No access token found');
 
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();

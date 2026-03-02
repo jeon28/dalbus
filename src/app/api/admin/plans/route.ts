@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
         // 세션 확인 및 관리자 권한 체크
         const session = await getServerSession(req);
         if (!session || !isAdmin(session)) {
-            return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const body = await req.json();
