@@ -11,18 +11,57 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
-    // Fetching profiles with role 'user'
-    const { data, error } = await supabaseAdmin
+    // 1. Fetching profiles with role 'user'
+    const { data: profiles, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('id, name, email, phone, birth_date, created_at, memo')
         .eq('role', 'user')
         .order('created_at', { ascending: false });
 
-    if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    if (profileError) {
+        return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // 2. Fetch all orders and order_accounts to calculate active status
+    // Optimization: Only fetch active accounts (end_date > now)
+    const now = new Date().toISOString();
+
+    // Fetch all orders
+    const { data: orders, error: ordersError } = await supabaseAdmin
+        .from('orders')
+        .select('id, user_id, buyer_email');
+
+    if (ordersError) {
+        return NextResponse.json({ error: ordersError.message }, { status: 500 });
+    }
+
+    // Fetch active order_accounts
+    const { data: activeAccounts, error: accountsError } = await supabaseAdmin
+        .from('order_accounts')
+        .select('order_id')
+        .gt('end_date', now);
+
+    if (accountsError) {
+        return NextResponse.json({ error: accountsError.message }, { status: 500 });
+    }
+
+    // 3. Map status to profiles
+    const activeOrderIds = new Set(activeAccounts.map(aa => aa.order_id));
+
+    const dataWithStatus = profiles.map(profile => {
+        const userOrders = orders.filter(o =>
+            o.user_id === profile.id || o.buyer_email === profile.email
+        );
+        const orderIds = userOrders.map(o => o.id);
+        const isActive = orderIds.some(id => activeOrderIds.has(id));
+
+        return {
+            ...profile,
+            is_active: isActive
+        };
+    });
+
+    return NextResponse.json(dataWithStatus);
 }
 
 export async function PATCH(request: NextRequest) {

@@ -27,6 +27,7 @@ export interface Member {
     birth_date: string | null;
     created_at: string;
     memo?: string | null;
+    is_active: boolean;
 }
 
 interface MemberAccount {
@@ -54,6 +55,7 @@ export default function MemberListPage() {
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [memoInput, setMemoInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
 
     const [isMemoOpen, setIsMemoOpen] = useState(false);
 
@@ -61,6 +63,57 @@ export default function MemberListPage() {
     const [memberAccounts, setMemberAccounts] = useState<MemberAccount[]>([]);
     const [isAccountsOpen, setIsAccountsOpen] = useState(false);
     const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+    // Resizing logic
+    const [columnWidths, setColumnWidths] = useState({
+        email: 220,
+        joined: 120,
+        name: 100,
+        birth: 110,
+        status: 100,
+        phone: 150,
+        memo: 300,
+        action: 100
+    });
+    const [isResizing, setIsResizing] = useState<string | null>(null);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isResizing) return;
+
+            const tableElement = document.querySelector(`.${styles.resizableTable}`);
+            if (!tableElement) return;
+
+            const thElements = tableElement.querySelectorAll('th');
+            const columnKeys = ['email', 'joined', 'name', 'birth', 'status', 'phone', 'memo', 'action'];
+            const columnIndex = columnKeys.indexOf(isResizing);
+
+            if (columnIndex !== -1) {
+                const th = thElements[columnIndex];
+                const newWidth = e.clientX - th.getBoundingClientRect().left;
+                if (newWidth > 50) {
+                    setColumnWidths(prev => ({
+                        ...prev,
+                        [isResizing]: newWidth
+                    }));
+                }
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(null);
+        };
+
+        if (isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
 
     const router = useRouter();
 
@@ -169,12 +222,13 @@ export default function MemberListPage() {
         }
 
         const exportData = members.map(m => ({
-            'ID': m.id,
+            'ID': m.email,
             '가입일': new Date(m.created_at).toLocaleDateString(),
             '이름': m.name,
             '생년월일': m.birth_date || '-',
             '이메일': m.email,
             '연락처': m.phone || '-',
+            '상태': m.is_active ? '활성' : '비활성',
             '메모': m.memo || ''
         }));
 
@@ -184,12 +238,13 @@ export default function MemberListPage() {
 
         // Set column widths
         const wscols = [
-            { wch: 15 }, // ID
+            { wch: 30 }, // ID (email)
             { wch: 15 }, // 가입일
             { wch: 15 }, // 이름
             { wch: 15 }, // 생년월일
             { wch: 30 }, // 이메일
             { wch: 20 }, // 연락처
+            { wch: 10 }, // 상태
             { wch: 40 }, // 메모
         ];
         worksheet['!cols'] = wscols;
@@ -199,11 +254,15 @@ export default function MemberListPage() {
 
     const filteredMembers = members.filter(member => {
         const search = searchTerm.toLowerCase();
-        return (
+        const matchesSearch = (
             member.name.toLowerCase().includes(search) ||
             member.email.toLowerCase().includes(search) ||
             (member.phone && member.phone.toLowerCase().includes(search))
         );
+
+        if (statusFilter === 'active') return matchesSearch && member.is_active;
+        if (statusFilter === 'inactive') return matchesSearch && !member.is_active;
+        return matchesSearch;
     });
 
     if (!isAdmin) return null;
@@ -218,51 +277,86 @@ export default function MemberListPage() {
 
             <div className={`${styles.content} container`}>
                 <section className={styles.orderSection}>
-                    <div className={styles.headerActions} style={{ marginBottom: '20px', justifyContent: 'space-between' }}>
-                        <div className="flex items-center gap-2 flex-1 max-w-md">
-                            <div className="relative w-full">
+                    <div className={styles.headerActions} style={{ marginBottom: '20px', justifyContent: 'space-between', gap: '15px' }}>
+                        <div className="flex items-center gap-3 flex-1 max-w-2xl">
+                            <div className="relative w-full flex-1">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                                 <Input
                                     placeholder="이름, 이메일, 연락처로 검색..."
-                                    className="pl-10"
+                                    className="pl-10 h-10"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-600 whitespace-nowrap">상태 필터:</span>
+                                <select
+                                    className="h-10 px-3 py-1 border border-gray-200 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                >
+                                    <option value="all">전체</option>
+                                    <option value="active">활성</option>
+                                    <option value="inactive">비활성</option>
+                                </select>
+                            </div>
                         </div>
                         <Button
                             variant="outline"
-                            className="gap-2"
+                            className="gap-2 h-10"
                             onClick={handleExportExcel}
                         >
                             <Download size={18} />
-                            <span>엑셀 다운로드</span>
+                            <span>엑셀</span>
                         </Button>
                     </div>
 
                     <div className="mb-4 flex items-center justify-between">
                         <div className="text-sm text-gray-500">
                             총 회원수: <span className="font-bold text-blue-600">{members.length}</span>명
-                            {searchTerm && (
+                            {(searchTerm || statusFilter !== 'all') && (
                                 <span className="ml-2">
-                                    (검색 결과: <span className="font-bold">{filteredMembers.length}</span>명)
+                                    (검색/필터 결과: <span className="font-bold">{filteredMembers.length}</span>명)
                                 </span>
                             )}
                         </div>
                     </div>
 
                     <div className={`${styles.tableWrapper} ${styles.desktopOnly}`}>
-                        <table className={styles.table}>
+                        <table className={`${styles.table} ${styles.resizableTable}`}>
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>가입일</th>
-                                    <th>이름</th>
-                                    <th>생년월일</th>
-                                    <th>이메일</th>
-                                    <th>연락처</th>
-                                    <th>관리자 메모</th>
-                                    <th className="text-center" style={{ width: '100px' }}>관리</th>
+                                    <th style={{ width: `${columnWidths.email}px` }}>
+                                        ID (Email)
+                                        <div className={styles.resizer} onMouseDown={() => setIsResizing('email')} />
+                                    </th>
+                                    <th style={{ width: `${columnWidths.joined}px` }}>
+                                        가입일
+                                        <div className={styles.resizer} onMouseDown={() => setIsResizing('joined')} />
+                                    </th>
+                                    <th style={{ width: `${columnWidths.name}px` }}>
+                                        이름
+                                        <div className={styles.resizer} onMouseDown={() => setIsResizing('name')} />
+                                    </th>
+                                    <th style={{ width: `${columnWidths.birth}px` }}>
+                                        생년월일
+                                        <div className={styles.resizer} onMouseDown={() => setIsResizing('birth')} />
+                                    </th>
+                                    <th style={{ width: `${columnWidths.status}px` }}>
+                                        상태
+                                        <div className={styles.resizer} onMouseDown={() => setIsResizing('status')} />
+                                    </th>
+                                    <th style={{ width: `${columnWidths.phone}px` }}>
+                                        연락처
+                                        <div className={styles.resizer} onMouseDown={() => setIsResizing('phone')} />
+                                    </th>
+                                    <th style={{ width: `${columnWidths.memo}px` }}>
+                                        관리자 메모
+                                        <div className={styles.resizer} onMouseDown={() => setIsResizing('memo')} />
+                                    </th>
+                                    <th className="text-center" style={{ width: `${columnWidths.action}px` }}>
+                                        관리
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -273,31 +367,35 @@ export default function MemberListPage() {
                                 ) : filteredMembers.length === 0 ? (
                                     <tr>
                                         <td colSpan={8} className="text-center py-8">
-                                            {searchTerm ? '검색 결과가 없습니다.' : '가입된 회원이 없습니다.'}
+                                            {(searchTerm || statusFilter !== 'all') ? '검색/필터 결과가 없습니다.' : '가입된 회원이 없습니다.'}
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredMembers.map(member => (
                                         <tr key={member.id}>
                                             <td
-                                                className="cursor-pointer text-blue-600 hover:underline font-mono text-xs"
+                                                className="cursor-pointer text-blue-600 hover:underline text-xs truncate max-w-[220px]"
                                                 onClick={() => handleOpenAccounts(member)}
-                                                title="클릭하여 주문 계정 보기"
+                                                title={`UUID: ${member.id}\n클릭하여 주문 계정 보기`}
                                             >
-                                                {member.id.substring(0, 8)}...
+                                                {member.email}
                                             </td>
                                             <td>{new Date(member.created_at).toLocaleDateString()}</td>
                                             <td className="font-medium">{member.name}</td>
                                             <td className="text-sm">{member.birth_date || '-'}</td>
-                                            <td>{member.email}</td>
-                                            <td>{member.phone || '-'}</td>
+                                            <td>
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${member.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                    {member.is_active ? '활성' : '비활성'}
+                                                </span>
+                                            </td>
+                                            <td className="text-sm">{member.phone || '-'}</td>
                                             <td>
                                                 <div
-                                                    className="max-w-[200px] truncate cursor-pointer hover:text-blue-600"
+                                                    className="w-full truncate cursor-pointer hover:text-blue-600 text-sm"
                                                     onClick={() => openMemoModal(member)}
                                                     title={member.memo || "메모 없음 (클릭하여 추가)"}
                                                 >
-                                                    {member.memo || <span className="text-gray-400 text-sm">Empty</span>}
+                                                    {member.memo || <span className="text-gray-300">Empty</span>}
                                                 </div>
                                             </td>
                                             <td className="text-center flex items-center justify-center gap-2">
@@ -365,17 +463,23 @@ export default function MemberListPage() {
                                     <div className={styles.orderCardContent}>
                                         <div className={styles.memberInfo}>
                                             <div className="flex justify-between py-1 border-b border-gray-50">
-                                                <span className="text-gray-500">ID</span>
+                                                <span className="text-gray-500">ID (Email)</span>
                                                 <span
-                                                    className="font-mono text-xs text-blue-600 cursor-pointer"
+                                                    className="text-xs text-blue-600 cursor-pointer truncate max-w-[150px]"
                                                     onClick={() => handleOpenAccounts(member)}
                                                 >
-                                                    {member.id.substring(0, 8)}...
+                                                    {member.email}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between py-1 border-b border-gray-50">
-                                                <span className="text-gray-500">이메일</span>
-                                                <span>{member.email}</span>
+                                                <span className="text-gray-500">이름</span>
+                                                <span>{member.name}</span>
+                                            </div>
+                                            <div className="flex justify-between py-1 border-b border-gray-50">
+                                                <span className="text-gray-500">상태</span>
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${member.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                    {member.is_active ? '활성' : '비활성'}
+                                                </span>
                                             </div>
                                             <div className="flex justify-between py-1 border-b border-gray-50">
                                                 <span className="text-gray-500">연락처</span>
@@ -402,7 +506,7 @@ export default function MemberListPage() {
                     <DialogHeader>
                         <DialogTitle>관리자 메모 편집</DialogTitle>
                         <DialogDescription>
-                            {selectedMember?.name} ({selectedMember?.email}) 회원의 메모를 수정합니다.
+                            {selectedMember?.name} 회원의 메모를 수정합니다. (ID: {selectedMember?.email})
                             이 내용은 관리자에게만 보여집니다.
                         </DialogDescription>
                     </DialogHeader>
@@ -411,7 +515,7 @@ export default function MemberListPage() {
                             placeholder="메모를 입력하세요..."
                             value={memoInput}
                             onChange={(e) => setMemoInput(e.target.value)}
-                            rows={5}
+                            rows={10}
                         />
                     </div>
                     <DialogFooter>

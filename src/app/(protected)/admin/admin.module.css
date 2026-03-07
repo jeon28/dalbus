@@ -299,3 +299,40 @@
         justify-content: space-between;
     }
 }
+
+.resizableTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.resizableTable th {
+    position: relative;
+    user-select: none;
+    background-color: var(--secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 5px;
+    background: rgba(0, 0, 0, 0.05);
+    cursor: col-resize;
+    z-index: 1;
+}
+
+.resizer:hover,
+.resizing {
+    background: var(--primary);
+    width: 2px;
+}
+
+.resizableTable td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
