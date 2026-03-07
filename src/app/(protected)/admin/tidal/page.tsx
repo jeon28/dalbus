@@ -150,6 +150,7 @@ function TidalAccountsContent() {
         'tidal_id': 200,
         'tidal_password': 120,
         'buyer_name': 100,
+        'buyer_email': 150,
         'buyer_phone': 140,
         'order_number': 120,
         'start_date': 120,
@@ -337,9 +338,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 const query = searchQuery.toLowerCase().trim();
                 if (query) {
                     const buyerName = (assignment.buyer_name || assignment.orders?.buyer_name || '').toLowerCase();
+                    const buyerEmail = (assignment.buyer_email || assignment.orders?.buyer_email || '').toLowerCase();
                     const tidalId = (assignment.tidal_id || '').toLowerCase();
                     const buyerPhone = (assignment.buyer_phone || assignment.orders?.buyer_phone || '').toLowerCase();
-                    if (!buyerName.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) return;
+                    if (!buyerName.includes(query) && !buyerEmail.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) return;
                 }
 
                 // Expired Filter
@@ -397,10 +399,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 // Apply Search Filter
                 if (query) {
                     const buyerName = (val.buyer_name || '').toLowerCase();
+                    const buyerEmail = (val.buyer_email || '').toLowerCase();
                     const tidalId = (val.tidal_id || '').toLowerCase();
                     const buyerPhone = (val.buyer_phone || '').toLowerCase();
 
                     if (!buyerName.includes(query) &&
+                        !buyerEmail.includes(query) &&
                         !tidalId.includes(query) &&
                         !buyerPhone.includes(query)) {
                         continue;
@@ -444,6 +448,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 if (sortConfig.key === 'period') {
                     valA = getPeriodMonths(a.start_date, a.end_date);
                     valB = getPeriodMonths(b.start_date, b.end_date);
+                } else if (sortConfig.key === 'buyer_email') {
+                    valA = a.buyer_email || '';
+                    valB = b.buyer_email || '';
                 }
 
                 if (valA === undefined || valA === null) valA = '';
@@ -696,6 +703,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 '메모': item.accountMemo ?? '',
                 'Slot': `Slot ${item.slotIdx + 1}`,
                 '고객명': item.buyer_name || '',
+                '이메일': item.buyer_email || '',
                 '전화번호': item.buyer_phone || '',
                 '주문번호': item.order_number || '',
                 '소속 ID': item.tidal_id || '',
@@ -1025,6 +1033,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         고객명
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_name', e)} />
                                     </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_email'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('buyer_email')}>
+                                            이메일 {sortConfig?.key === 'buyer_email' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_email', e)} />
+                                    </th>
                                     <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_phone'] }}>
                                         전화번호
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_phone', e)} />
@@ -1115,6 +1129,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     aVal = a.account.login_id;
                                                     bVal = b.account.login_id;
                                                     break;
+                                                case 'buyer_email':
+                                                    aVal = a.assignment.buyer_email || a.assignment.orders?.buyer_email || '';
+                                                    bVal = b.assignment.buyer_email || b.assignment.orders?.buyer_email || '';
+                                                    break;
                                                 default:
                                                     return 0;
                                             }
@@ -1164,6 +1182,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-1 border-r" style={{ width: columnWidths['buyer_name'] }}>
                                                             <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
                                                         </td>
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['buyer_email'] }}>
+                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} />
+                                                        </td>
                                                         <td className="p-1 border-r" style={{ width: columnWidths['buyer_phone'] }}>
                                                             <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
                                                         </td>
@@ -1184,6 +1205,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined} style={{ width: columnWidths['tidal_password'] }}>{assignment.tidal_password || '-'}</td>
                                                         <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
                                                             {assignment.buyer_name || assignment.orders?.buyer_name || '-'}
+                                                        </td>
+                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.buyer_email || assignment.orders?.buyer_email || undefined} style={{ width: columnWidths['buyer_email'] }}>
+                                                            {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
                                                         </td>
                                                         <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
                                                             {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
