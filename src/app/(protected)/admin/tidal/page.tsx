@@ -5,7 +5,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -142,6 +142,49 @@ function TidalAccountsContent() {
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
 
+    // --- DAL-20: Column Resizing and Filter States ---
+    const [expiredDays, setExpiredDays] = useState(7);
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+        'checkbox': 40,
+        'login_id': 100,
+        'tidal_id': 200,
+        'tidal_password': 120,
+        'buyer_name': 100,
+        'buyer_phone': 140,
+        'order_number': 120,
+        'start_date': 120,
+        'end_date': 120,
+        'period': 60,
+        'type': 80,
+        'payment_email': 200,
+        'payment_day': 80,
+        'manage': 140
+    });
+    const [resizingCol, setResizingCol] = useState<string | null>(null);
+
+    const startResizing = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        setResizingCol(id);
+
+        const startX = e.pageX;
+        const startWidth = columnWidths[id];
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            const currentX = moveEvent.pageX;
+            const newWidth = Math.max(40, startWidth + (currentX - startX));
+            setColumnWidths((prev: Record<string, number>) => ({ ...prev, [id]: newWidth }));
+        };
+
+        const onMouseUp = () => {
+            setResizingCol(null);
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
+
     const defaultTemplate = React.useMemo(() => `{buyer_name}님 
 {tidal_id} 서비스가 {end_date}에 만료됩니다.
 
@@ -189,13 +232,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             accounts.forEach(acc => {
                 const hasExpired = acc.order_accounts?.some(oa => {
                     if (!oa.end_date) return false;
-                    return parseISO(oa.end_date) < today;
+                    const endDate = parseISO(oa.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays <= expiredDays;
                 });
                 if (hasExpired) newExpanded.add(acc.id);
             });
             setExpandedRows(newExpanded);
         }
-    }, [showExpiredOnly, accounts]);
+    }, [showExpiredOnly, accounts, expiredDays]);
 
 
     // --- Fetching Functions ---
@@ -300,7 +346,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 if (showExpiredOnly && assignment.end_date) {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    if (parseISO(assignment.end_date) >= today) return;
+                    const endDate = parseISO(assignment.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays > expiredDays) return;
                 } else if (showExpiredOnly && !assignment.end_date) {
                     return;
                 }
@@ -362,7 +411,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 if (showExpiredOnly) {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    if (!val.end_date || parseISO(val.end_date) >= today) {
+                    if (!val.end_date) {
+                        continue;
+                    }
+                    const endDate = parseISO(val.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays > expiredDays) {
                         continue;
                     }
                 }
@@ -848,7 +903,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="flex gap-2 items-center">
                         {/* 1. 검색창 */}
                         <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
-                            <Filter size={14} className="text-gray-400" />
+                            <Search size={14} className="text-gray-400" />
                             <Input
                                 type="text"
                                 placeholder="고객명, Tidal ID, 전화번호 검색..."
@@ -858,60 +913,83 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             />
                         </div>
 
-                        {/* 2. 만료된 배정만 보기 */}
-                        <Button
-                            variant={showExpiredOnly ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setShowExpiredOnly(!showExpiredOnly)}
-                            className={showExpiredOnly ? "bg-red-600 hover:bg-red-700 text-white h-8" : "text-gray-600 h-8"}
-                        >
-                            만료된 배정만 보기
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 bg-white border rounded-md px-2 py-1">
+                                <span className="text-xs text-gray-500 whitespace-nowrap">잔여</span>
+                                <Input
+                                    type="number"
+                                    value={expiredDays}
+                                    onChange={(e) => setExpiredDays(parseInt(e.target.value) || 0)}
+                                    className="w-12 h-7 px-1 text-center text-sm border-none focus-visible:ring-0"
+                                />
+                                <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
+                            </div>
+                            <Button
+                                variant={showExpiredOnly ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <Filter className="w-4 h-4" />
+                                잔여일 조회
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push('/admin/tidal/inactive')}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <History className="w-4 h-4" />
+                                내역
+                            </Button>
+                            <div className="h-4 w-px bg-gray-200" />
+                            <div className="relative">
+                                <input
+                                    id="excel-import"
+                                    type="file"
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                    onChange={handleImportExcel}
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => document.getElementById('excel-import')?.click()}
+                                    className="flex items-center gap-2 h-8"
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    엑셀
+                                </Button>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={exportToExcel}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <Download className="w-4 h-4" />
+                                엑셀
+                            </Button>
 
-                        {/* 3. 지난 내역 */}
-                        <Button onClick={() => router.push('/admin/tidal/inactive')} variant="outline" className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50 h-8">
-                            <History size={16} /> 지난 내역
-                        </Button>
+                            {isGridView && (
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    disabled={selectedAssignmentIds.size === 0}
+                                    onClick={() => {
+                                        setNotificationMessage(defaultTemplate);
+                                        setIsNotifyModalOpen(true);
+                                    }}
+                                    className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}
+                                >
+                                    <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
+                                </Button>
+                            )}
 
-                        {/* 4. 엑셀 임포트 */}
-                        <div className="relative">
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                onChange={handleImportExcel}
-                            />
-                            <Button variant="outline" className="flex items-center gap-2 h-8">
-                                <Upload className="w-4 h-4" />
-                                엑셀 임포트
+                            <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8" size="sm">
+                                <Plus size={16} /> 그룹 추가
                             </Button>
                         </div>
-
-                        {/* 5. 엑셀 다운로드 */}
-                        <Button onClick={exportToExcel} variant="outline" className="gap-2 h-8">
-                            <Download size={16} /> 엑셀 다운로드
-                        </Button>
-
-                        {/* 6. 알림 보내기 */}
-                        {isGridView && (
-                            <Button
-                                variant="default"
-                                size="sm"
-                                disabled={selectedAssignmentIds.size === 0}
-                                onClick={() => {
-                                    setNotificationMessage(defaultTemplate);
-                                    setIsNotifyModalOpen(true);
-                                }}
-                                className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}
-                            >
-                                <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
-                            </Button>
-                        )}
-
-                        {/* 7. 그룹 추가 */}
-                        <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8">
-                            <Plus size={16} /> 그룹 추가
-                        </Button>
                     </div>
                 </div>
             </header>
@@ -922,50 +1000,79 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <table className="w-full text-xs min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100 border-b">
-                                    <th className="w-10 text-center py-2 border-r border-gray-200">
+                                    <th className="text-center py-2 border-r border-gray-200" style={{ width: columnWidths['checkbox'] }}>
                                         <input
                                             type="checkbox"
                                             checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length}
                                             onChange={() => toggleSelectAll(getFlattenedAssignments())}
                                         />
                                     </th>
-                                    <th className="w-[100px] text-center text-[10px] font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('login_id')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative text-center text-[10px] font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['login_id'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('login_id')}>
                                             GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('login_id', e)} />
                                     </th>
-                                    <th className="p-2 text-left border-r w-32">Tidal ID</th>
-                                    <th className="p-2 text-left border-r w-24">PW</th>
-                                    <th className="p-2 text-left border-r w-20">고객명</th>
-                                    <th className="p-2 text-left border-r w-24">전화번호</th>
-                                    <th className="p-2 text-center border-r w-24">주문번호</th>
-                                    <th className="p-2 text-center border-r w-24 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('start_date')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_id'] }}>
+                                        Tidal ID
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_id', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_password'] }}>
+                                        PW
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_password', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_name'] }}>
+                                        고객명
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_name', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_phone'] }}>
+                                        전화번호
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_phone', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['order_number'] }}>
+                                        주문번호
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('order_number', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['start_date'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('start_date')}>
                                             시작일 {sortConfig?.key === 'start_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('start_date', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-24 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('end_date')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['end_date'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('end_date')}>
                                             종료일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('end_date', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-12 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('period')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['period'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('period')}>
                                             개월 {sortConfig?.key === 'period' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('period', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-16">타입</th>
-                                    <th className="p-2 text-left border-r w-32 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('payment_email')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
+                                            타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('type', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['payment_email'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('payment_email')}>
                                             결제계정 {sortConfig?.key === 'payment_email' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('payment_email', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-16 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('payment_day')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['payment_day'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('payment_day')}>
                                             결제일 {sortConfig?.key === 'payment_day' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('payment_day', e)} />
                                     </th>
-                                    <th className="p-2 text-center w-32">관리</th>
+                                    <th className="relative p-2 text-center" style={{ width: columnWidths['manage'] }}>
+                                        관리
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('manage', e)} />
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1000,6 +1107,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     aVal = a.account.payment_day;
                                                     bVal = b.account.payment_day;
                                                     break;
+                                                case 'type':
+                                                    aVal = a.assignment.type || '';
+                                                    bVal = b.assignment.type || '';
+                                                    break;
                                                 case 'login_id':
                                                     aVal = a.account.login_id;
                                                     bVal = b.account.login_id;
@@ -1032,52 +1143,52 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                         return (
                                             <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
-                                                <td className="text-center py-1 border-r border-gray-100 bg-gray-50/10">
+                                                <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedAssignmentIds.has(assignment.id)}
                                                         onChange={() => handleToggleSelection(assignment.id)}
                                                     />
                                                 </td>
-                                                <td className="text-center text-[10px] py-1 border-r border-gray-100 bg-gray-50/50 font-medium">
+                                                <td className="text-center text-[10px] py-1 border-r border-gray-100 bg-gray-50/50 font-medium" style={{ width: columnWidths['login_id'] }}>
                                                     {item.account.login_id}
                                                 </td>
                                                 {isEditing ? (
                                                     <>
-                                                        <td className="p-1 border-r">
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['tidal_id'] }}>
                                                             <Input className="h-7 text-[10px] bg-white px-1" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['tidal_password'] }}>
                                                             <Input className="h-7 text-[10px] bg-white px-1" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['buyer_name'] }}>
                                                             <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['buyer_phone'] }}>
                                                             <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r text-center text-[10px]">{val.order_number || '-'}</td>
-                                                        <td className="p-1 border-r">
+                                                        <td className="p-1 border-r text-center text-[10px]" style={{ width: columnWidths['order_number'] }}>{val.order_number || '-'}</td>
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['start_date'] }}>
                                                             <Input type="date" className="h-7 text-[10px] bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['end_date'] }}>
                                                             <Input type="date" className="h-7 text-[10px] bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r w-12">
+                                                        <td className="p-1 border-r w-12" style={{ width: columnWidths['period'] }}>
                                                             <Input type="number" className="h-7 text-[10px] bg-white px-1" placeholder="개월" value={val.period_months !== undefined ? val.period_months : (item.period || '')} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
                                                         </td>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined}>{assignment.tidal_id || '-'}</td>
-                                                        <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined}>{assignment.tidal_password || '-'}</td>
-                                                        <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined}>
+                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>{assignment.tidal_id || '-'}</td>
+                                                        <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined} style={{ width: columnWidths['tidal_password'] }}>{assignment.tidal_password || '-'}</td>
+                                                        <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
                                                             {assignment.buyer_name || assignment.orders?.buyer_name || '-'}
                                                         </td>
-                                                        <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined}>
+                                                        <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
                                                             {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono text-[10px]">
+                                                        <td className="p-2 text-center border-r font-mono text-[10px]" style={{ width: columnWidths['order_number'] }}>
                                                             {assignment.order_number || assignment.orders?.order_number ? (
                                                                 <button
                                                                     className="text-blue-600 font-bold underline hover:text-blue-800"
@@ -1087,23 +1198,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 </button>
                                                             ) : '-'}
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono">{assignment.start_date ? format(parseISO(assignment.start_date), 'yyyy-MM-dd') : '-'}</td>
-                                                        <td className="p-2 text-center border-r font-mono">
+                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yyyy-MM-dd') : '-'}</td>
+                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['end_date'] }}>
                                                             <span className={isExpired ? "text-red-600 font-bold" : ""}>
                                                                 {assignment.end_date ? format(parseISO(assignment.end_date), 'yyyy-MM-dd') : '-'}
                                                             </span>
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono">{item.period}</td>
+                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                     </>
                                                 )}
-                                                <td className="p-2 text-center border-r">
+                                                <td className="p-2 text-center border-r" style={{ width: columnWidths['type'] }}>
                                                     <span className={`px-1 rounded text-[10px] ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
                                                         {assignment.type === 'master' ? 'Master' : 'User'}
                                                     </span>
                                                 </td>
-                                                <td className="p-2 border-r truncate max-w-[150px]" title={acc.payment_email}>{acc.payment_email}</td>
-                                                <td className="p-2 text-center border-r font-mono">{acc.payment_day}일</td>
-                                                <td className="p-2 text-center">
+                                                <td className="p-2 border-r truncate max-w-[150px]" title={acc.payment_email} style={{ width: columnWidths['payment_email'] }}>{acc.payment_email}</td>
+                                                <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['payment_day'] }}>{acc.payment_day}일</td>
+                                                <td className="p-2 text-center" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
                                                         {isEditing ? (
                                                             <>
@@ -1111,7 +1222,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <Save size={12} />
                                                                 </Button>
                                                                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, sIdx)}>
-                                                                    <Plus size={12} className="rotate-45" />
+                                                                    <X size={12} />
                                                                 </Button>
                                                             </>
                                                         ) : (

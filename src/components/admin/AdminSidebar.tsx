@@ -12,6 +12,7 @@ export const menuItems = [
     { title: "FAQ 관리", href: "/admin/faqs" },
     { title: "Q&A 관리", href: "/admin/qna" },
     { title: "Tidal 계정", href: "/admin/tidal" },
+    { title: "메일 발송 이력", href: "/admin/mail-history" },
 ];
 
 export function AdminSidebar() {
