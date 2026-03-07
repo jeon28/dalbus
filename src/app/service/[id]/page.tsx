@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
@@ -127,7 +127,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     useEffect(() => {
         const mode = searchParams.get('mode');
         const tidalId = searchParams.get('tidalId');
-        const orderId = searchParams.get('orderId');
+        // const orderId = searchParams.get('orderId');
 
         if (mode === 'EXT') {
             setOrderMode('EXT');
@@ -135,8 +135,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         if (tidalId) {
             setGuestInfo(prev => ({ ...prev, tidalId }));
         }
-        // If we have orderId, we could potentially fetch it directly, 
-        // but for now let's rely on tidalId lookup or search results.
     }, [searchParams]);
 
     // Pre-fill user info if logged in
@@ -152,12 +150,47 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     }, [user]);
 
+    const handleLookup = useCallback(async () => {
+        if (!guestInfo.tidalId) {
+            alert('Tidal ID를 입력해주세요.');
+            return;
+        }
+
+        setLookupLoading(true);
+        setLookupMessage('');
+        setLookupResults([]);
+        setSelectedOrder(null);
+
+        try {
+            const res = await apiFetch('/api/orders/lookup', {
+                method: 'POST',
+                body: JSON.stringify({ tidalId: guestInfo.tidalId })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                const filtered = (data.orders || []).filter((o: ExtensionOrder) => o.products?.name === product?.name);
+                setLookupResults(filtered);
+                if (filtered.length === 0) {
+                    setLookupMessage('연장 가능한 주문 내역이 없습니다.');
+                }
+            } else {
+                setLookupMessage('조회 중 오류가 발생했습니다.');
+            }
+        } catch (err) {
+            console.error('Lookup failed:', err);
+            setLookupMessage('조회에 실패했습니다.');
+        } finally {
+            setLookupLoading(false);
+        }
+    }, [guestInfo.tidalId, product?.name]);
+
     // Auto lookup when tidalId is pre-filled and mode is EXT
     useEffect(() => {
         if (orderMode === 'EXT' && guestInfo.tidalId && product && lookupResults.length === 0 && !lookupLoading && !selectedOrder) {
             handleLookup();
         }
-    }, [orderMode, guestInfo.tidalId, product]);
+    }, [orderMode, guestInfo.tidalId, product, handleLookup, lookupLoading, lookupResults.length, selectedOrder]);
 
     const toggleAllAgreements = (checked: boolean) => {
         setAgreements({ all: checked, privacy: checked, terms: checked });
@@ -245,40 +278,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     };
 
-    const handleLookup = async () => {
-        if (!guestInfo.tidalId) {
-            alert('Tidal ID를 입력해주세요.');
-            return;
-        }
-
-        setLookupLoading(true);
-        setLookupMessage('');
-        setLookupResults([]);
-        setSelectedOrder(null);
-
-        try {
-            const res = await apiFetch('/api/orders/lookup', {
-                method: 'POST',
-                body: JSON.stringify({ tidalId: guestInfo.tidalId })
-            });
-            const data = await res.json();
-
-            if (res.ok) {
-                const filtered = (data.orders || []).filter((o: ExtensionOrder) => o.products?.name === product?.name);
-                setLookupResults(filtered);
-                if (filtered.length === 0) {
-                    setLookupMessage('연장 가능한 주문 내역이 없습니다.');
-                }
-            } else {
-                setLookupMessage('조회 중 오류가 발생했습니다.');
-            }
-        } catch (err) {
-            console.error('Lookup failed:', err);
-            setLookupMessage('조회에 실패했습니다.');
-        } finally {
-            setLookupLoading(false);
-        }
-    };
 
     if (!product) return <div className="container py-20 text-center">Loading...</div>;
 
