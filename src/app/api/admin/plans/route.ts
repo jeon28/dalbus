@@ -28,6 +28,10 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (error) {
+            console.error('Error creating plan:', error);
+            if (error.code === '23505') {
+                return NextResponse.json({ error: '이미 동일한 개월 수의 활성 요금제가 존재합니다.' }, { status: 400 });
+            }
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
