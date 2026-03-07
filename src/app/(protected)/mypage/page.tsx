@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import styles from './mypage.module.css';
 
 interface UserSubscription {
+    service_id: string;
     service_name: string;
     duration: string;
     start_date: string;
@@ -18,6 +19,7 @@ interface UserSubscription {
     account_id: string;
     account_pw: string;
     status: string;
+    order_id: string;
 }
 
 interface OrderHistoryItem {
@@ -36,12 +38,14 @@ interface SupabaseOrder {
     amount: number;
     created_at: string;
     assignment_status: string;
+    product_id: string;
     products: { name: string } | null;
     product_plans: { duration_months: number } | null;
 }
 
 interface SupabaseAccountAssignment {
     id: string;
+    order_id: string;
     account_id: string;
     tidal_id?: string;
     tidal_password?: string;
@@ -49,6 +53,7 @@ interface SupabaseAccountAssignment {
     start_date: string | null;
     end_date: string | null;
     orders: {
+        product_id: string;
         products: {
             name: string;
         } | null;
@@ -139,30 +144,33 @@ export default function MyPage() {
                     }));
                     setOrders(history);
 
-                    const activeSubs: UserSubscription[] = orderData
-                        .filter(item => item.assignment_status === 'completed')
-                        .map(item => ({
-                            service_name: item.products?.name || 'Service',
-                            duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
-                            start_date: '-',
-                            end_date: '-',
-                            account_id: '정보 확인 중',
-                            account_pw: '정보 확인 중',
-                            status: '이용 중'
-                        }));
-
                     if (accountData && accountData.length > 0) {
                         const enrichedSubs: UserSubscription[] = accountData.map(acc => ({
+                            service_id: acc.orders?.product_id || '',
                             service_name: acc.orders?.products?.name || 'Service',
                             duration: acc.orders?.product_plans?.duration_months ? `${acc.orders.product_plans.duration_months}개월` : '-',
                             start_date: acc.start_date || '-',
                             end_date: acc.end_date || '-',
                             account_id: acc.tidal_id || acc.account_id || '정보 없음',
                             account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
-                            status: '이용 중'
+                            status: '이용 중',
+                            order_id: acc.order_id
                         }));
                         setSubscriptions(enrichedSubs);
                     } else {
+                        const activeSubs: UserSubscription[] = orderData
+                            .filter(item => item.assignment_status === 'completed')
+                            .map(item => ({
+                                service_id: item.product_id,
+                                service_name: item.products?.name || 'Service',
+                                duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
+                                start_date: '-',
+                                end_date: '-',
+                                account_id: '정보 확인 중',
+                                account_pw: '정보 확인 중',
+                                status: '이용 중',
+                                order_id: item.id
+                            }));
                         setSubscriptions(activeSubs);
                     }
                 }
@@ -376,6 +384,20 @@ export default function MyPage() {
                                             <span className="font-bold">{sub.account_pw}</span>
                                         </div>
                                     </div>
+                                    <Button
+                                        className="w-full mt-2 text-xs h-9 font-bold"
+                                        variant="default"
+                                        onClick={() => {
+                                            const params = new URLSearchParams({
+                                                mode: 'EXT',
+                                                tidalId: sub.account_id,
+                                                orderId: sub.order_id
+                                            });
+                                            router.push(`/service/${sub.service_id}?${params.toString()}`);
+                                        }}
+                                    >
+                                        서비스 연장하기
+                                    </Button>
                                 </div>
                             ))}
                         </div>

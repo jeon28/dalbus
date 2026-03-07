@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
 import { apiFetch } from '@/lib/api';
 import styles from './service.module.css';
@@ -11,132 +11,58 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
-    const resolvedParams = React.use(params);
-    const serviceId = resolvedParams.id;
-    const { services, user } = useServices();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const { user } = useServices();
+    const [id, setId] = useState<string | null>(null);
 
-    /* We need to fetch the full product details including 'detail_content' which might not be in context */
-    interface ServiceProduct {
+    // interfaces
+    interface Plan {
         id: string;
-        name: string;
-        image_url?: string;
-        description?: string;
-        detail_content?: string;
-        original_price: number;
-    }
-
-    interface ProductPlan {
-        id: string;
-        duration_months: number;
         price: number;
+        duration_months: number;
         discount_rate: number;
-        is_active: boolean;
     }
 
-    const [serviceDetail, setServiceDetail] = useState<ServiceProduct | null>(null);
-    const [plans, setPlans] = useState<ProductPlan[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
-
-    useEffect(() => {
-        let isMounted = true;
-
-        const fetchDetail = async () => {
-            if (!serviceId) return;
-            setLoading(true);
-
-            try {
-                const response = await apiFetch(`/api/public/products/${serviceId}`);
-                if (!response.ok) throw new Error('Failed to fetch product detail');
-
-                const productData = await response.json();
-
-                if (isMounted && productData) {
-                    setServiceDetail(productData);
-                    const plansData = productData.product_plans || [];
-                    setPlans(plansData);
-                    if (plansData.length > 0) {
-                        setSelectedPeriod(plansData[0].duration_months);
-                    }
-                }
-            } catch (error: unknown) {
-                if (error instanceof Error) {
-                    if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('signal is aborted')) {
-                        return;
-                    }
-                }
-                if (isMounted) {
-                    console.error('Unexpected error in fetchDetail:', error);
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        fetchDetail();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [serviceId]);
-
-    // Fallback to context if detail fetch is pending or failed
-    const basicService = services.find(s => s.id === serviceId);
-    const product: ServiceProduct | null = serviceDetail || (basicService ? {
-        ...basicService,
-        image_url: basicService.icon,
-        detail_content: undefined,
-        original_price: parseInt(basicService.price.toString().replace(/,/g, ''))
-    } : null);
-
-    // Bank Accounts State
     interface BankAccount {
         id: string;
         bank_name: string;
         account_number: string;
         account_holder: string;
-        is_active: boolean;
     }
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-    const [selectedBankId, setSelectedBankId] = useState<string>('');
 
-    // Extension Flow State
+    interface Product {
+        id: string;
+        name: string;
+        description: string | null;
+        detail_content: string | null;
+        original_price: number;
+        image_url: string | null;
+    }
+
     interface ExtensionOrder {
         id: string;
         order_number: string;
-        products?: { name: string };
-        end_date?: string;
-        buyer_name?: string;
-        buyer_phone?: string;
-        buyer_email?: string;
+        end_date: string | null;
+        buyer_name: string | null;
+        buyer_phone: string | null;
+        buyer_email: string | null;
+        products: {
+            name: string;
+        };
     }
+
+    const [product, setProduct] = useState<Product | null>(null);
+    const [plans, setPlans] = useState<Plan[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+    const [loading, setLoading] = useState(false);
+    const [selectedBankId, setSelectedBankId] = useState('');
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
+    const [selectedOrder, setSelectedOrder] = useState<ExtensionOrder | null>(null);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupResults, setLookupResults] = useState<ExtensionOrder[]>([]);
-    const [selectedOrder, setSelectedOrder] = useState<ExtensionOrder | null>(null);
     const [lookupMessage, setLookupMessage] = useState('');
-
-    useEffect(() => {
-        const fetchBanks = async () => {
-            try {
-                const res = await apiFetch('/api/admin/bank-accounts');
-                if (res.ok) {
-                    const data = await res.json();
-                    const activeBanks = data.filter((b: BankAccount) => b.is_active);
-                    setBankAccounts(activeBanks);
-                    if (activeBanks.length > 0) setSelectedBankId(activeBanks[0].id);
-                }
-            } catch (err) {
-                const e = err as Error;
-                if (e.name !== 'AbortError' && !e.message?.includes('aborted') && !e.message?.includes('signal is aborted')) {
-                    console.error('Failed to fetch bank accounts:', err);
-                }
-            }
-        };
-        fetchBanks();
-    }, []);
 
     const [guestInfo, setGuestInfo] = useState({
         name: '',
@@ -145,25 +71,93 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         depositor: '',
         tidalId: ''
     });
+
     const [agreements, setAgreements] = useState({
         all: false,
         privacy: false,
         terms: false
     });
 
+    // Unpack params
+    useEffect(() => {
+        params.then(p => setId(p.id));
+    }, [params]);
+
+    // Fetch data when ID is available
+    useEffect(() => {
+        if (!id) return;
+
+        const fetchData = async () => {
+            try {
+                // Fetch product details
+                const prodRes = await apiFetch(`/api/public/products/${id}`);
+                if (prodRes.ok) {
+                    const prodData = await prodRes.json();
+                    setProduct(prodData);
+                }
+
+                // Fetch plans
+                const plansRes = await apiFetch(`/api/public/plans?product_id=${id}`);
+                if (plansRes.ok) {
+                    const plansData = await plansRes.json();
+                    setPlans(plansData);
+                    if (plansData.length > 0) {
+                        setSelectedPeriod(plansData[0].duration_months);
+                    }
+                }
+
+                // Fetch bank accounts
+                const bankRes = await apiFetch('/api/public/banks');
+                if (bankRes.ok) {
+                    const banksData = await bankRes.json();
+                    setBankAccounts(banksData);
+                    if (banksData.length > 0) {
+                        setSelectedBankId(banksData[0].id);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch product data:', err);
+            }
+        };
+
+        fetchData();
+    }, [id]);
+
+    // Handle initial parameters from URL
+    useEffect(() => {
+        const mode = searchParams.get('mode');
+        const tidalId = searchParams.get('tidalId');
+        const orderId = searchParams.get('orderId');
+
+        if (mode === 'EXT') {
+            setOrderMode('EXT');
+        }
+        if (tidalId) {
+            setGuestInfo(prev => ({ ...prev, tidalId }));
+        }
+        // If we have orderId, we could potentially fetch it directly, 
+        // but for now let's rely on tidalId lookup or search results.
+    }, [searchParams]);
+
+    // Pre-fill user info if logged in
     useEffect(() => {
         if (user) {
             setGuestInfo(prev => ({
                 ...prev,
                 name: user.name || '',
-                email: user.email || '',
                 phone: user.phone || '',
+                email: user.email || '',
                 depositor: prev.depositor || user.name || ''
             }));
         }
     }, [user]);
 
-    const router = useRouter();
+    // Auto lookup when tidalId is pre-filled and mode is EXT
+    useEffect(() => {
+        if (orderMode === 'EXT' && guestInfo.tidalId && product && lookupResults.length === 0 && !lookupLoading && !selectedOrder) {
+            handleLookup();
+        }
+    }, [orderMode, guestInfo.tidalId, product]);
 
     const toggleAllAgreements = (checked: boolean) => {
         setAgreements({ all: checked, privacy: checked, terms: checked });
@@ -251,8 +245,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     };
 
-    if (!product) return <div className="container py-20 text-center">Loading...</div>;
-
     const handleLookup = async () => {
         if (!guestInfo.tidalId) {
             alert('Tidal ID를 입력해주세요.');
@@ -272,7 +264,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             const data = await res.json();
 
             if (res.ok) {
-                const filtered = (data.orders || []).filter((o: ExtensionOrder) => o.products?.name === product.name);
+                const filtered = (data.orders || []).filter((o: ExtensionOrder) => o.products?.name === product?.name);
                 setLookupResults(filtered);
                 if (filtered.length === 0) {
                     setLookupMessage('연장 가능한 주문 내역이 없습니다.');
@@ -287,6 +279,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             setLookupLoading(false);
         }
     };
+
+    if (!product) return <div className="container py-20 text-center">Loading...</div>;
 
     const handleSelectOrderForExtension = (order: ExtensionOrder) => {
         setSelectedOrder(order);

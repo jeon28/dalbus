@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
                 amount,
                 created_at,
                 assignment_status,
+                product_id,
                 products(name),
                 product_plans(duration_months)
             `)
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
         // 3.2 Fetch Account Assignments
         const { data: assignments, error: assignmentError } = await supabaseAdmin
             .from('order_accounts')
-            .select('*, orders(products(name), product_plans(duration_months))')
+            .select('*, order_id, orders(product_id, products(name), product_plans(duration_months))')
             .in('order_id', orders?.map(o => o.id) || []);
 
         if (assignmentError) throw assignmentError;
