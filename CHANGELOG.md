@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## v1.5.7 - 2026-03-07
+- **Vercel 빌드 오류 수정**: 미사용 변수(`orderId`, `req`) 제거 및 `useEffect` 의존성 누락 문제(`useCallback` 적용)를 해결하여 배포 안정성을 확보했습니다.
+
+
 ## v1.5.6 - 2026-03-07
 
 ### 🔄 서비스 연장(Service Extension) 기능 구현
