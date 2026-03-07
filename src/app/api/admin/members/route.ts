@@ -11,14 +11,30 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get('search');
+    const sort = searchParams.get('sort') || 'created_at';
+    const direction = searchParams.get('direction') === 'asc';
+
     // 1. Fetching profiles with role 'user'
-    const { data: profiles, error: profileError } = await supabaseAdmin
+    let query = supabaseAdmin
         .from('profiles')
         .select('id, name, email, phone, birth_date, created_at, memo')
-        .eq('role', 'user')
-        .order('created_at', { ascending: false });
+        .eq('role', 'user');
+
+    if (search) {
+        // Use a more robust way to handle the OR filter
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    }
+
+    // Map frontend sort keys to DB columns if necessary
+    const sortColumn = sort === 'joined' ? 'created_at' : sort;
+
+    const { data: profiles, error: profileError } = await query
+        .order(sortColumn, { ascending: direction });
 
     if (profileError) {
+        console.error('Member profile fetch error:', profileError);
         return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 

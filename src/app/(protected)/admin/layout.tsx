@@ -25,9 +25,9 @@ export default function AdminLayout({
     if (!isAdmin) return null;
 
     return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen overflow-x-hidden">
             <AdminSidebar />
-            <div className="flex-1 flex flex-col min-h-screen">
+            <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
                 <AdminMobileMenu />
                 <main className="flex-1 w-full bg-slate-50/50">
                     {children}

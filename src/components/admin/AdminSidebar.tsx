@@ -19,7 +19,7 @@ export function AdminSidebar() {
     const pathname = usePathname();
 
     return (
-        <div className="hidden md:flex flex-col w-64 bg-gray-50 border-r min-h-screen">
+        <div className="hidden md:flex flex-col w-[256px] min-w-[256px] max-w-[256px] bg-gray-50 border-r min-h-screen flex-shrink-0">
             <div className="p-6 border-b">
                 <h2 className="text-xl font-bold">Admin Menu</h2>
             </div>
