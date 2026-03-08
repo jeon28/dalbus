@@ -67,13 +67,13 @@ export default function MemberListPage() {
 
     // Resizing logic
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-        email: 300,
+        email: 200,
         joined: 150,
         name: 150,
         birth: 150,
         status: 100,
         phone: 200,
-        memo: 250,
+        memo: 350,
         action: 100
     });
     const startResizing = (id: string, e: React.MouseEvent) => {
