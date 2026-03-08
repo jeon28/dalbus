@@ -679,7 +679,7 @@ export default function OrderHistoryPage() {
                         </th>
                         <th style={{ width: '60px' }}>구분</th>
                         <th style={{ width: '70px' }}>회원여부</th>
-                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '100px' }}>
+                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '120px' }}>
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
                         <th style={{ width: '120px' }}>연락처/이메일</th>
