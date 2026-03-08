@@ -147,6 +147,7 @@ function TidalAccountsContent() {
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         'checkbox': 40,
         'login_id': 100,
+        'type': 60,
         'tidal_id': 200,
         'tidal_password': 120,
         'buyer_name': 100,
@@ -156,9 +157,6 @@ function TidalAccountsContent() {
         'start_date': 120,
         'end_date': 120,
         'period': 60,
-        'type': 80,
-        'payment_email': 200,
-        'payment_day': 80,
         'manage': 140
     });
     const [resizingCol, setResizingCol] = useState<string | null>(null);
@@ -1021,6 +1019,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         </div>
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('login_id', e)} />
                                     </th>
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
+                                            타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('type', e)} />
+                                    </th>
                                     <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_id'] }}>
                                         Tidal ID
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_id', e)} />
@@ -1160,6 +1164,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 <td className="text-center text-[10px] py-1 border-r border-gray-100 bg-gray-50/50 font-medium" style={{ width: columnWidths['login_id'] }}>
                                                     {item.account.login_id}
                                                 </td>
+                                                <td className="p-2 text-center border-r" style={{ width: columnWidths['type'] }}>
+                                                    <span className={`px-1 rounded text-[10px] ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
+                                                        {assignment.type === 'master' ? 'Master' : 'User'}
+                                                    </span>
+                                                </td>
                                                 {isEditing ? (
                                                     <>
                                                         <td className="p-1 border-r" style={{ width: columnWidths['tidal_id'] }}>
@@ -1220,11 +1229,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                     </>
                                                 )}
-                                                <td className="p-2 text-center border-r" style={{ width: columnWidths['type'] }}>
-                                                    <span className={`px-1 rounded text-[10px] ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
-                                                        {assignment.type === 'master' ? 'Master' : 'User'}
-                                                    </span>
-                                                </td>
+
 
                                                 <td className="p-2 text-center" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
