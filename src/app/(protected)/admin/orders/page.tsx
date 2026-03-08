@@ -683,7 +683,7 @@ export default function OrderHistoryPage() {
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
                         <th style={{ width: '120px' }}>연락처/이메일</th>
-                        <th style={{ width: '150px' }}>서비스</th>
+
                         <th style={{ width: '40px' }}>이용기간</th>
                         <th style={{ width: '150px' }}>금액</th>
                         <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
@@ -727,9 +727,7 @@ export default function OrderHistoryPage() {
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
                                     <div className="text-xs text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
-                                <td>
-                                    <div>{o.products?.name || 'Product'}</div>
-                                </td>
+
                                 <td>
                                     <div className="font-mono">{o.product_plans?.duration_months || '-'}</div>
                                 </td>
