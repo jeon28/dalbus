@@ -683,9 +683,9 @@ export default function OrderHistoryPage() {
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
                         <th style={{ width: '120px' }}>연락처/이메일</th>
-                        <th>서비스</th>
-                        <th>이용기간</th>
-                        <th>금액</th>
+                        <th style={{ width: '150px' }}>서비스</th>
+                        <th style={{ width: '60px' }}>이용기간</th>
+                        <th style={{ width: '150px' }}>금액</th>
                         <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors">
                             <div className="flex items-center">상태 {getSortIcon('status')}</div>
                         </th>
