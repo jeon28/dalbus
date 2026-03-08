@@ -1071,18 +1071,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         </div>
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('type', e)} />
                                     </th>
-                                    <th className="relative p-2 text-left border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['payment_email'] }}>
-                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('payment_email')}>
-                                            결제계정 {sortConfig?.key === 'payment_email' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                                        </div>
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('payment_email', e)} />
-                                    </th>
-                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['payment_day'] }}>
-                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('payment_day')}>
-                                            결제일 {sortConfig?.key === 'payment_day' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                                        </div>
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('payment_day', e)} />
-                                    </th>
+
                                     <th className="relative p-2 text-center" style={{ width: columnWidths['manage'] }}>
                                         관리
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('manage', e)} />
@@ -1222,10 +1211,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 </button>
                                                             ) : '-'}
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yyyy-MM-dd') : '-'}</td>
+                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['end_date'] }}>
                                                             <span className={isExpired ? "text-red-600 font-bold" : ""}>
-                                                                {assignment.end_date ? format(parseISO(assignment.end_date), 'yyyy-MM-dd') : '-'}
+                                                                {assignment.end_date ? format(parseISO(assignment.end_date), 'yy-MM-dd') : '-'}
                                                             </span>
                                                         </td>
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
@@ -1236,8 +1225,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         {assignment.type === 'master' ? 'Master' : 'User'}
                                                     </span>
                                                 </td>
-                                                <td className="p-2 border-r truncate max-w-[150px]" title={acc.payment_email} style={{ width: columnWidths['payment_email'] }}>{acc.payment_email}</td>
-                                                <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['payment_day'] }}>{acc.payment_day}일</td>
+
                                                 <td className="p-2 text-center" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
                                                         {isEditing ? (
