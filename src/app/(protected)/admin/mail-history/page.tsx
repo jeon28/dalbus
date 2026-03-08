@@ -74,11 +74,11 @@ export default function MailHistoryPage() {
 
     const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({
         sent_at: 220,
-        mail_type: 160,
-        recipient: 200,
-        subject: 300,
+        mail_type: 200,
+        recipient: 280,
+        subject: 400,
         status: 100,
-        actions: 180
+        actions: 200
     });
 
     const [resizingCol, setResizingCol] = useState<string | null>(null);
@@ -254,7 +254,7 @@ export default function MailHistoryPage() {
 
             {/* Table */}
             <div className={styles.tableWrapper}>
-                <table className={styles.table}>
+                <table className={`${styles.table} ${styles.resizableTable} text-xs mx-auto`} style={{ width: '1400px', minWidth: '1400px' }}>
                     <thead>
                         <tr>
                             <th
