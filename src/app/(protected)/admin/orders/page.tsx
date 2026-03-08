@@ -677,12 +677,12 @@ export default function OrderHistoryPage() {
                         <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '140px' }}>
                             <div className="flex items-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
-                        <th>구분</th>
-                        <th>회원여부</th>
-                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors">
+                        <th style={{ width: '40px' }}>구분</th>
+                        <th style={{ width: '40px' }}>회원여부</th>
+                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '100px' }}>
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
-                        <th>연락처/이메일</th>
+                        <th style={{ width: '120px' }}>연락처/이메일</th>
                         <th>서비스</th>
                         <th>이용기간</th>
                         <th>금액</th>
