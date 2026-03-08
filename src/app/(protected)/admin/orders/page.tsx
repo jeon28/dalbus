@@ -678,18 +678,18 @@ export default function OrderHistoryPage() {
                             <div className="flex items-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
                         <th style={{ width: '60px' }}>구분</th>
-                        <th style={{ width: '60px' }}>회원여부</th>
+                        <th style={{ width: '70px' }}>회원여부</th>
                         <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '100px' }}>
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
                         <th style={{ width: '120px' }}>연락처/이메일</th>
                         <th style={{ width: '150px' }}>서비스</th>
-                        <th style={{ width: '60px' }}>이용기간</th>
+                        <th style={{ width: '40px' }}>이용기간</th>
                         <th style={{ width: '150px' }}>금액</th>
-                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center">상태 {getSortIcon('status')}</div>
+                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                            <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
                         </th>
-                        <th>관리</th>
+                        <th className="text-center">관리</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -734,7 +734,7 @@ export default function OrderHistoryPage() {
                                     <div className="font-mono">{o.product_plans?.duration_months || '-'}</div>
                                 </td>
                                 <td>₩{o.amount?.toLocaleString()}</td>
-                                <td>
+                                <td className="text-center">
                                     <div className="flex flex-col items-center">
                                         <span className={`px-2 py-1 rounded text-xs 
                                             ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
@@ -750,20 +750,20 @@ export default function OrderHistoryPage() {
                                         )}
                                     </div>
                                 </td>
-                                <td>
-                                    <div className="flex flex-col gap-1">
+                                <td className="text-center">
+                                    <div className="flex flex-col gap-1 items-center">
                                         {status === '주문신청' && (
-                                            <Button size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                            <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
                                         )}
                                         {status === '입금확인' && (
                                             <>
-                                                <Button size="sm" onClick={() => handleOpenMatchModal(o)} disabled={isProcessing}>계정배정</Button>
+                                                <Button size="sm" className="w-20" onClick={() => handleOpenMatchModal(o)} disabled={isProcessing}>계정배정</Button>
                                                 <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleRevertPayment(o.id)} disabled={isProcessing}>입금취소</Button>
                                             </>
                                         )}
                                         {status === '배정완료' && (
                                             <>
-                                                <Button size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
+                                                <Button size="sm" variant="outline" className="w-20" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
                                                 <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)} disabled={isProcessing}>배정취소</Button>
                                             </>
                                         )}
