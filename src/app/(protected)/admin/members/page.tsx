@@ -71,9 +71,9 @@ export default function MemberListPage() {
         joined: 100,
         name: 100,
         birth: 100,
-        status: 80,
+        status: 60,
         phone: 120,
-        memo: 600,
+        memo: 620,
         action: 100
     });
     const startResizing = (id: string, e: React.MouseEvent) => {
