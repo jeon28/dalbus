@@ -315,7 +315,7 @@ export default function MemberListPage() {
             <div className="flex-1 overflow-x-auto p-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className={`${styles.table} ${styles.resizableTable} w-[1400px] text-xs`}>
+                        <table className={`${styles.table} ${styles.resizableTable} w-max min-w-[1400px] text-xs`}>
                             <thead className="bg-gray-100 border-b">
                                 <tr>
                                     <th style={{ width: columnWidths.email }} className="relative group p-3 text-xs font-bold text-gray-600 uppercase">
