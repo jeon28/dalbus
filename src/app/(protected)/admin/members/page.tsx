@@ -67,13 +67,13 @@ export default function MemberListPage() {
 
     // Resizing logic
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-        email: 220,
-        joined: 120,
-        name: 100,
-        birth: 110,
-        status: 80,
-        phone: 130,
-        memo: 125,
+        email: 300,
+        joined: 150,
+        name: 150,
+        birth: 150,
+        status: 100,
+        phone: 200,
+        memo: 250,
         action: 100
     });
     const startResizing = (id: string, e: React.MouseEvent) => {
@@ -315,7 +315,7 @@ export default function MemberListPage() {
             <div className="flex-1 overflow-x-auto p-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className={`${styles.table} ${styles.resizableTable} w-[1000px] min-w-[1000px]`}>
+                        <table className={`${styles.table} ${styles.resizableTable} w-[1400px] text-xs min-w-[1400px]`}>
                             <thead className="bg-gray-100 border-b">
                                 <tr>
                                     <th style={{ width: columnWidths.email }} className="relative group p-3 text-xs font-bold text-gray-600 uppercase">
@@ -398,19 +398,19 @@ export default function MemberListPage() {
                                 ) : (
                                     filteredMembers.map((member) => (
                                         <tr key={member.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-3 text-sm text-blue-600 hover:underline cursor-pointer truncate" onClick={() => handleOpenAccounts(member)}>
+                                            <td className="p-3 text-xs text-blue-600 hover:underline cursor-pointer truncate" onClick={() => handleOpenAccounts(member)}>
                                                 {member.email}
                                             </td>
-                                            <td className="p-3 text-sm text-slate-600">
+                                            <td className="p-3 text-xs text-slate-600">
                                                 {new Date(member.created_at).toLocaleDateString()}
                                             </td>
-                                            <td className="p-3 text-sm font-medium text-slate-800">
+                                            <td className="p-3 text-xs font-medium text-slate-800">
                                                 {member.name}
                                             </td>
-                                            <td className="p-3 text-sm text-slate-600">
+                                            <td className="p-3 text-xs text-slate-600">
                                                 {member.birth_date || '-'}
                                             </td>
-                                            <td className="p-3 text-sm text-slate-600">
+                                            <td className="p-3 text-xs text-slate-600">
                                                 {member.phone || '-'}
                                             </td>
                                             <td className="p-3 text-center">
