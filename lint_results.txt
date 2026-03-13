@@ -1,0 +1,23 @@
+
+> dalbus@1.5.8 lint
+> next lint
+
+`next lint` is deprecated and will be removed in Next.js 16.
+For new projects, use create-next-app to choose your preferred linter.
+For existing projects, migrate to the ESLint CLI:
+npx @next/codemod@canary next-lint-to-eslint-cli .
+
+
+./src/app/(protected)/admin/mail-history/page.tsx
+117:8  Warning: React Hook useCallback has an unnecessary dependency: 'apiFetch'. Either exclude it or remove the dependency array. Outer scope values like 'apiFetch' aren't valid dependencies because mutating them doesn't re-render the component.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/admin/members/page.tsx
+159:8  Warning: React Hook useCallback has an unnecessary dependency: 'apiFetch'. Either exclude it or remove the dependency array. Outer scope values like 'apiFetch' aren't valid dependencies because mutating them doesn't re-render the component.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/admin/orders/page.tsx
+190:8  Warning: React Hook useCallback has an unnecessary dependency: 'apiFetch'. Either exclude it or remove the dependency array. Outer scope values like 'apiFetch' aren't valid dependencies because mutating them doesn't re-render the component.  react-hooks/exhaustive-deps
+
+./src/app/(protected)/admin/tidal/page.tsx
+1425:101  Error: 'index' is defined but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

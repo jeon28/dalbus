@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
@@ -166,27 +166,7 @@ export default function OrderHistoryPage() {
     const [newBuyerEmail, setNewBuyerEmail] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
-    useEffect(() => {
-        if (isHydrated && !isAdmin) {
-            router.push('/admin');
-        } else if (isHydrated && isAdmin) {
-            fetchOrders();
-        }
-    }, [isAdmin, isHydrated, page, limit, selectedStatuses, selectedOrderTypes, selectedGuestTypes]);
-
-    // Reset to page 1 when filters or limit change
-    useEffect(() => {
-        setPage(1);
-    }, [selectedStatuses, selectedOrderTypes, selectedGuestTypes, limit]);
-
-    const handleSearchClick = () => {
-        setPage(1);
-        if (page === 1) {
-            fetchOrders();
-        }
-    };
-
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         setIsLoading(true);
         try {
             const params = new URLSearchParams();
@@ -207,7 +187,27 @@ export default function OrderHistoryPage() {
         } finally {
             setIsLoading(false);
         }
+    }, [page, limit, selectedStatuses, selectedOrderTypes, selectedGuestTypes, phoneSearch]);
+
+    const handleSearchClick = () => {
+        setPage(1);
+        if (page === 1) {
+            fetchOrders();
+        }
     };
+
+    // Reset to page 1 when filters or limit change
+    useEffect(() => {
+        setPage(1);
+    }, [selectedStatuses, selectedOrderTypes, selectedGuestTypes, limit]);
+
+    useEffect(() => {
+        if (isHydrated && !isAdmin) {
+            router.push('/admin');
+        } else if (isHydrated && isAdmin) {
+            fetchOrders();
+        }
+    }, [isAdmin, isHydrated, fetchOrders, router]);
 
     const getOrderStatus = (order: Order) => {
         if (order.assignment_status === 'completed') return '작업완료';
@@ -920,14 +920,14 @@ export default function OrderHistoryPage() {
                                                 const totalPages = pagination.totalPages;
                                                 const maxButtons = 5;
                                                 let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
-                                                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                                                const endPageShown = Math.min(totalPages, startPage + maxButtons - 1);
 
-                                                if (endPage - startPage + 1 < maxButtons) {
-                                                    startPage = Math.max(1, endPage - maxButtons + 1);
+                                                if (endPageShown - startPage + 1 < maxButtons) {
+                                                    startPage = Math.max(1, endPageShown - maxButtons + 1);
                                                 }
 
                                                 const pages = [];
-                                                for (let i = startPage; i <= endPage; i++) {
+                                                for (let i = startPage; i <= endPageShown; i++) {
                                                     pages.push(i);
                                                 }
 

@@ -1417,12 +1417,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <th className="py-2 text-left w-24">가입일</th>
                                                                     <th className="py-2 text-left w-24">종료일</th>
                                                                     <th className="py-2 text-center w-16">개월</th>
+```
                                                                     <th className="py-2 text-center w-24">주문번호</th>
                                                                     <th className="py-2 text-center w-40">관리</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {sortedAssignments.map((assignment, index) => {
+                                                                {sortedAssignments.map((assignment) => {
                                                                     const sIdx = assignment.slot_number;
                                                                     const key = `${acc.id}_${sIdx}`;
                                                                     const val = gridValues[key] || {}; // Current Input Values

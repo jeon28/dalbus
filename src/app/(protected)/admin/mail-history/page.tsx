@@ -114,7 +114,7 @@ export default function MailHistoryPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [filterType, filterStatus, page, limit, sortConfig]); // Removed searchRecipient from dependencies
+    }, [filterType, filterStatus, page, limit, sortConfig, searchRecipient]);
 
     const handleSearchClick = () => {
         setPage(1);
@@ -494,14 +494,14 @@ export default function MailHistoryPage() {
                                 const totalPages = pagination.totalPages;
                                 const maxButtons = 5;
                                 let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
-                                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                                const endPageShown = Math.min(totalPages, startPage + maxButtons - 1);
 
-                                if (endPage - startPage + 1 < maxButtons) {
-                                    startPage = Math.max(1, endPage - maxButtons + 1);
+                                if (endPageShown - startPage + 1 < maxButtons) {
+                                    startPage = Math.max(1, endPageShown - maxButtons + 1);
                                 }
 
                                 const pages = [];
-                                for (let i = startPage; i <= endPage; i++) {
+                                for (let i = startPage; i <= endPageShown; i++) {
                                     pages.push(i);
                                 }
 
