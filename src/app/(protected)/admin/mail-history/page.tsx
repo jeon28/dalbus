@@ -67,6 +67,7 @@ export default function MailHistoryPage() {
     const [filterType, setFilterType] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
     const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(25);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({
         key: 'sent_at',
         direction: 'desc'
@@ -95,7 +96,7 @@ export default function MailHistoryPage() {
             if (filterType !== 'all') params.append('type', filterType);
             if (filterStatus !== 'all') params.append('status', filterStatus);
             params.append('page', page.toString());
-            params.append('limit', '20');
+            params.append('limit', limit.toString());
             params.append('sort', sortConfig.key);
             params.append('order', sortConfig.direction);
 
@@ -113,7 +114,14 @@ export default function MailHistoryPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [searchRecipient, filterType, filterStatus, page, sortConfig]);
+    }, [filterType, filterStatus, page, limit, sortConfig]); // Removed searchRecipient from dependencies
+
+    const handleSearchClick = () => {
+        setPage(1);
+        if (page === 1) {
+            fetchHistory();
+        }
+    };
 
     const handleSort = (key: string) => {
         setSortConfig(prev => ({
@@ -151,6 +159,11 @@ export default function MailHistoryPage() {
             fetchHistory();
         }
     }, [isAdmin, isHydrated, router, fetchHistory]);
+
+    // Reset page when filters or limit change
+    useEffect(() => {
+        setPage(1);
+    }, [filterType, filterStatus, limit]);
 
     const handleResend = async (id: string) => {
         if (isProcessing) return;
@@ -202,7 +215,7 @@ export default function MailHistoryPage() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border mb-6 flex flex-wrap gap-4 items-end">
+            <div className="bg-white p-4 rounded-lg shadow-sm border mb-6 flex flex-wrap gap-3 items-end">
                 <div className="flex-1 min-w-[200px]">
                     <label className="text-xs font-medium text-gray-500 mb-1 block">수신자 (이름/이메일)</label>
                     <div className="relative">
@@ -210,14 +223,14 @@ export default function MailHistoryPage() {
                             placeholder="수신자 검색..."
                             value={searchRecipient}
                             onChange={(e) => setSearchRecipient(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearchClick()}
                             className="pl-9"
                         />
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     </div>
                 </div>
 
-                <div className="w-[180px]">
+                <div className="w-full sm:w-[180px]">
                     <label className="text-xs font-medium text-gray-500 mb-1 block">메일 유형</label>
                     <Select value={filterType} onValueChange={(v) => { setFilterType(v); setPage(1); }}>
                         <SelectTrigger>
@@ -232,7 +245,7 @@ export default function MailHistoryPage() {
                     </Select>
                 </div>
 
-                <div className="w-[140px]">
+                <div className="w-full sm:w-[140px]">
                     <label className="text-xs font-medium text-gray-500 mb-1 block">발송 상태</label>
                     <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setPage(1); }}>
                         <SelectTrigger>
@@ -246,15 +259,15 @@ export default function MailHistoryPage() {
                     </Select>
                 </div>
 
-                <Button variant="secondary" onClick={() => { setPage(1); fetchHistory(); }}>
+                <Button variant="secondary" onClick={handleSearchClick} className="w-full sm:w-auto h-10 px-6">
                     <Search className="h-4 w-4 mr-2" />
                     검색
                 </Button>
             </div>
 
-            {/* Table */}
-            <div className={styles.tableWrapper}>
-                <table className={`${styles.table} ${styles.resizableTable} text-xs mx-auto`} style={{ width: '1400px', minWidth: '1400px' }}>
+            {/* Desktop Table View */}
+            <div className={`${styles.tableWrapper} ${styles.desktopOnly}`}>
+                <table className={`${styles.table} ${styles.resizableTable} text-xs mx-auto`} style={{ minWidth: '1400px' }}>
                     <thead>
                         <tr>
                             <th
@@ -387,28 +400,157 @@ export default function MailHistoryPage() {
                 </table>
             </div>
 
-            {/* Pagination */}
-            {pagination && pagination.totalPages > 1 && (
-                <div className="flex justify-center items-center gap-4 mt-6">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={page === 1}
-                        onClick={() => setPage(p => p - 1)}
-                    >
-                        <ChevronLeft className="h-4 w-4 mr-1" /> 이전
-                    </Button>
-                    <span className="text-sm font-medium">
-                        {pagination.page} / {pagination.totalPages}
-                    </span>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={page === pagination.totalPages}
-                        onClick={() => setPage(p => p + 1)}
-                    >
-                        다음 <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
+            {/* Mobile Card View */}
+            <div className={`${styles.orderCards} ${styles.mobileOnly}`}>
+                {isLoading ? (
+                    <div className="text-center py-10 text-gray-500">데이터를 불러오는 중...</div>
+                ) : history.length === 0 ? (
+                    <div className="text-center py-10 text-gray-500">발송 이력이 없습니다.</div>
+                ) : (
+                    history.map((item) => (
+                        <div key={item.id} className={styles.orderCard}>
+                            <div className={styles.orderCardHeader}>
+                                <div className={styles.orderId}>
+                                    {format(new Date(item.sent_at), 'yyyy-MM-dd HH:mm:ss')}
+                                </div>
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${item.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {item.status === 'success' ? '성공' : '실패'}
+                                </span>
+                            </div>
+
+                            <div className={styles.orderCardContent}>
+                                <div className="text-xs text-blue-600 font-bold mb-1">{item.mail_type}</div>
+                                <div className="font-bold text-sm line-clamp-2 mb-2">{item.subject}</div>
+                                <div className="flex justify-between items-center text-xs text-gray-400">
+                                    <span>{item.recipient_name || '-'} ({item.recipient_email})</span>
+                                </div>
+                            </div>
+
+                            <div className={styles.orderCardActions}>
+                                <Button size="sm" variant="outline" className="flex-1" onClick={() => handleViewDetail(item)}>
+                                    <Eye className="h-3 w-3 mr-1" /> 상세 보기
+                                </Button>
+                                <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleResend(item.id)} disabled={isProcessing}>
+                                    <RefreshCcw className={`h-3 w-3 mr-1 ${isProcessing ? 'animate-spin' : ''}`} /> 재발송
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Pagination & Limit Selector */}
+            {pagination && (
+                <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 py-6 px-6 bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 shadow-sm">
+                    {/* Left: Limit Selector */}
+                    <div className="flex-1 flex items-center gap-2 justify-start">
+                        <span className="text-xs text-gray-500 font-medium whitespace-nowrap">페이지당 표시:</span>
+                        <Select
+                            value={limit.toString()}
+                            onValueChange={(value) => {
+                                setLimit(parseInt(value));
+                                setPage(1); // Reset to page 1 when limit changes
+                            }}
+                        >
+                            <SelectTrigger className="h-8 w-[80px] text-xs bg-white border-gray-200">
+                                <SelectValue placeholder="25" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="25">25개</SelectItem>
+                                <SelectItem value="50">50개</SelectItem>
+                                <SelectItem value="100">100개</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Center: Pagination Buttons */}
+                    <div className="flex items-center justify-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setPage(1)}
+                            disabled={page === 1}
+                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                            title="첫 페이지"
+                        >
+                            <div className="flex -space-x-2">
+                                <ChevronLeft className="h-4 w-4" />
+                                <ChevronLeft className="h-4 w-4" />
+                            </div>
+                        </Button>
+
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                            disabled={page === 1}
+                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+
+                        <div className="flex items-center gap-1">
+                            {(() => {
+                                const totalPages = pagination.totalPages;
+                                const maxButtons = 5;
+                                let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+                                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+                                if (endPage - startPage + 1 < maxButtons) {
+                                    startPage = Math.max(1, endPage - maxButtons + 1);
+                                }
+
+                                const pages = [];
+                                for (let i = startPage; i <= endPage; i++) {
+                                    pages.push(i);
+                                }
+
+                                return pages.map(p => (
+                                    <Button
+                                        key={p}
+                                        variant={page === p ? "outline" : "ghost"}
+                                        onClick={() => setPage(p)}
+                                        className={`h-9 w-9 rounded-md text-sm font-medium transition-all ${
+                                            page === p
+                                                ? "border-blue-500 text-blue-600 bg-white"
+                                                : "text-gray-400 hover:text-gray-900 hover:bg-gray-100"
+                                        }`}
+                                    >
+                                        {p}
+                                    </Button>
+                                ));
+                            })()}
+                        </div>
+
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setPage(prev => Math.min(pagination.totalPages, prev + 1))}
+                            disabled={page === pagination.totalPages}
+                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setPage(pagination.totalPages)}
+                            disabled={page === pagination.totalPages}
+                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                            title="마지막 페이지"
+                        >
+                            <div className="flex -space-x-2">
+                                <ChevronRight className="h-4 w-4" />
+                                <ChevronRight className="h-4 w-4" />
+                            </div>
+                        </Button>
+                    </div>
+
+                    {/* Right: Total Items */}
+                    <div className="flex-1 flex justify-end text-xs text-gray-400 whitespace-nowrap font-medium">
+                        전체 <span className="text-gray-900 mx-1">{pagination.total}</span>개의 항목
+                    </div>
                 </div>
             )}
 

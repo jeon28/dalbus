@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
 import { addDays, differenceInMonths, format, parseISO } from 'date-fns';
@@ -89,6 +89,10 @@ interface Account {
 export default function OrderHistoryPage() {
     const { isAdmin, isHydrated } = useServices();
     const [orders, setOrders] = useState<Order[]>([]);
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(25);
+    const [pagination, setPagination] = useState<{ total: number; page: number; limit: number; totalPages: number } | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [selectedOrderTypes, setSelectedOrderTypes] = useState<string[]>([]);
     const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([]);
@@ -168,16 +172,40 @@ export default function OrderHistoryPage() {
         } else if (isHydrated && isAdmin) {
             fetchOrders();
         }
-    }, [isAdmin, isHydrated, router]);
+    }, [isAdmin, isHydrated, page, limit, selectedStatuses, selectedOrderTypes, selectedGuestTypes]);
+
+    // Reset to page 1 when filters or limit change
+    useEffect(() => {
+        setPage(1);
+    }, [selectedStatuses, selectedOrderTypes, selectedGuestTypes, limit]);
+
+    const handleSearchClick = () => {
+        setPage(1);
+        if (page === 1) {
+            fetchOrders();
+        }
+    };
 
     const fetchOrders = async () => {
+        setIsLoading(true);
         try {
-            const response = await apiFetch('/api/admin/orders');
+            const params = new URLSearchParams();
+            params.append('page', page.toString());
+            params.append('limit', limit.toString());
+            if (selectedStatuses.length > 0) params.append('status', selectedStatuses[0]);
+            if (selectedOrderTypes.length > 0) params.append('order_type', selectedOrderTypes[0]);
+            if (selectedGuestTypes.length > 0) params.append('guest_type', selectedGuestTypes[0]);
+            if (phoneSearch) params.append('search', phoneSearch);
+
+            const response = await apiFetch(`/api/admin/orders?${params.toString()}`);
             if (!response.ok) throw new Error('Failed to fetch orders');
-            const data = await response.json();
-            setOrders(data);
+            const result = await response.json();
+            setOrders(result.data);
+            setPagination(result.pagination);
         } catch (error) {
             console.error('Error fetching orders:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -189,7 +217,7 @@ export default function OrderHistoryPage() {
     };
 
     const exportToExcel = () => {
-        const data = filteredOrders.map(order => ({
+        const data = orders.map(order => ({
             '날짜': new Date(order.created_at).toLocaleDateString(),
             '주문번호': order.order_number,
             '구분': order.order_type === 'NEW' ? '신규' : '연장',
@@ -778,53 +806,6 @@ export default function OrderHistoryPage() {
         </div>
     );
 
-    const filteredOrders = orders.filter(order => {
-        // Status filter
-        if (selectedStatuses.length > 0) {
-            const status = getOrderStatus(order);
-            if (!selectedStatuses.includes(status)) return false;
-        }
-
-        // Order Type filter
-        if (selectedOrderTypes.length > 0) {
-            const type = order.order_type || 'NEW';
-            if (!selectedOrderTypes.includes(type)) return false;
-        }
-
-        // Guest filter
-        if (selectedGuestTypes.length > 0) {
-            const guestType = order.is_guest ? 'guest' : 'member';
-            if (!selectedGuestTypes.includes(guestType)) return false;
-        }
-
-        // Phone number filter
-        if (phoneSearch) {
-            const phone = order.profiles?.phone || order.buyer_phone || '';
-            if (!phone.includes(phoneSearch)) return false;
-        }
-
-        return true;
-    }).sort((a, b) => {
-        if (!sortConfig.direction || !sortConfig.key) return 0;
-
-        let aValue: string | number = '';
-        let bValue: string | number = '';
-
-        if (sortConfig.key === 'created_at') {
-            aValue = new Date(a.created_at).getTime();
-            bValue = new Date(b.created_at).getTime();
-        } else if (sortConfig.key === 'name') {
-            aValue = a.profiles?.name || a.buyer_name || '';
-            bValue = b.profiles?.name || b.buyer_name || '';
-        } else if (sortConfig.key === 'status') {
-            aValue = getOrderStatus(a);
-            bValue = getOrderStatus(b);
-        }
-
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
 
     return (
         <main className={styles.main}>
@@ -839,12 +820,16 @@ export default function OrderHistoryPage() {
                     <div className={styles.headerActions}>
                         <div className="flex gap-2 items-center flex-1">
                             <Input
-                                placeholder="전화번호 검색..."
+                                placeholder="고객명/이메일/번호..."
                                 value={phoneSearch}
                                 onChange={(e) => setPhoneSearch(e.target.value)}
-                                className="max-w-[200px]"
+                                className="max-w-[200px] h-9"
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearchClick()}
                             />
-                            <Button onClick={exportToExcel} variant="outline" size="sm" className="shrink-0">
+                            <Button onClick={handleSearchClick} size="sm" className="shrink-0 h-9 px-4">
+                                검색
+                            </Button>
+                            <Button onClick={exportToExcel} variant="outline" size="sm" className="shrink-0 h-9">
                                 <Download className="mr-1 h-4 w-4" />
                                 <span className="hidden sm:inline">엑셀</span>
                             </Button>
@@ -870,8 +855,132 @@ export default function OrderHistoryPage() {
                             />
                         </div>
                     </div>
-                    {renderTable(filteredOrders)}
-                    {renderCards(filteredOrders)}
+
+                    {isLoading ? (
+                        <div className="flex justify-center py-20">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : (
+                        <>
+                            {renderTable(orders)}
+                            {renderCards(orders)}
+
+                            {/* Pagination & Limit Selector */}
+                            {pagination && (
+                                <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 py-6 px-6 bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 shadow-sm">
+                                    {/* Left: Limit Selector */}
+                                    <div className="flex-1 flex items-center gap-2 justify-start">
+                                        <span className="text-xs text-gray-500 font-medium whitespace-nowrap">페이지당 표시:</span>
+                                        <Select
+                                            value={limit.toString()}
+                                            onValueChange={(value) => {
+                                                setLimit(parseInt(value));
+                                                setPage(1); // Reset to page 1 when limit changes
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-8 w-[80px] text-xs bg-white border-gray-200">
+                                                <SelectValue placeholder="25" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="25">25개</SelectItem>
+                                                <SelectItem value="50">50개</SelectItem>
+                                                <SelectItem value="100">100개</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/* Center: Pagination Buttons */}
+                                    <div className="flex items-center justify-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(1)}
+                                            disabled={page === 1}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                            title="첫 페이지"
+                                        >
+                                            <div className="flex -space-x-2">
+                                                <ChevronLeft className="h-4 w-4" />
+                                                <ChevronLeft className="h-4 w-4" />
+                                            </div>
+                                        </Button>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                            disabled={page === 1}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+
+                                        <div className="flex items-center gap-1">
+                                            {(() => {
+                                                const totalPages = pagination.totalPages;
+                                                const maxButtons = 5;
+                                                let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+                                                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+                                                if (endPage - startPage + 1 < maxButtons) {
+                                                    startPage = Math.max(1, endPage - maxButtons + 1);
+                                                }
+
+                                                const pages = [];
+                                                for (let i = startPage; i <= endPage; i++) {
+                                                    pages.push(i);
+                                                }
+
+                                                return pages.map(p => (
+                                                    <Button
+                                                        key={p}
+                                                        variant={page === p ? "outline" : "ghost"}
+                                                        onClick={() => setPage(p)}
+                                                        className={`h-9 w-9 rounded-md text-sm font-medium transition-all ${
+                                                            page === p
+                                                                ? "border-blue-500 text-blue-600 bg-white"
+                                                                : "text-gray-400 hover:text-gray-900 hover:bg-gray-100"
+                                                        }`}
+                                                    >
+                                                        {p}
+                                                    </Button>
+                                                ));
+                                            })()}
+                                        </div>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(prev => Math.min(pagination.totalPages, prev + 1))}
+                                            disabled={page === pagination.totalPages}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(pagination.totalPages)}
+                                            disabled={page === pagination.totalPages}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                            title="마지막 페이지"
+                                        >
+                                            <div className="flex -space-x-2">
+                                                <ChevronRight className="h-4 w-4" />
+                                                <ChevronRight className="h-4 w-4" />
+                                            </div>
+                                        </Button>
+                                    </div>
+
+                                    {/* Right: Total Items */}
+                                    <div className="flex-1 flex justify-end text-xs text-gray-400 whitespace-nowrap font-medium">
+                                        전체 <span className="text-gray-900 mx-1">{pagination.total}</span>개의 항목
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </section>
             </div>
 

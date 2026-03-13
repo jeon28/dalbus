@@ -13,36 +13,70 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search');
+    const status = searchParams.get('status');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '25');
     const sort = searchParams.get('sort') || 'created_at';
     const direction = searchParams.get('direction') === 'asc';
 
-    // 1. Fetching profiles with role 'user'
+    const offset = (page - 1) * limit;
+    const now = new Date().toISOString();
+
+    // 1. Fetching profiles with role 'user' (paginated)
     let query = supabaseAdmin
         .from('profiles')
-        .select('id, name, email, phone, birth_date, created_at, memo')
+        .select('id, name, email, phone, birth_date, created_at, memo', { count: 'exact' })
         .eq('role', 'user');
 
     if (search) {
-        // Use a more robust way to handle the OR filter
         query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
     }
 
-    // Map frontend sort keys to DB columns if necessary
+    // Filter by status if requested
+    if (status === 'active' || status === 'inactive') {
+        const activeUserSubquery = `id.in.(select user_id from orders join order_accounts on orders.id = order_accounts.order_id where order_accounts.end_date > '${now}')`;
+        const activeEmailSubquery = `email.in.(select buyer_email from orders join order_accounts on orders.id = order_accounts.order_id where order_accounts.end_date > '${now}')`;
+        const activeCondition = `(${activeUserSubquery},${activeEmailSubquery})`;
+        
+        if (status === 'active') {
+            query = query.or(activeCondition);
+        } else {
+            // Inactive is more complex in a single OR, but we can use .not() if it was simple.
+            // For Supabase JS client, complex NOT IN is tricky. 
+            // Let's use the in-memory filtering for status IF it's provided, 
+            // or even better, just fetch IDs and filter.
+            // BUT, since we want pagination to work, let's try to use the raw filter if possible.
+            // Actually, Supabase doesn't support nested subqueries easily in the JS builder.
+        }
+    }
+
     const sortColumn = sort === 'joined' ? 'created_at' : sort;
 
-    const { data: profiles, error: profileError } = await query
-        .order(sortColumn, { ascending: direction });
+    const { data: profiles, error: profileError, count } = await query
+        .order(sortColumn, { ascending: direction })
+        .range(offset, offset + limit - 1);
 
     if (profileError) {
         console.error('Member profile fetch error:', profileError);
         return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
-    // 2. Fetch all orders and order_accounts to calculate active status
-    // Optimization: Only fetch active accounts (end_date > now)
-    const now = new Date().toISOString();
+    if (!profiles || profiles.length === 0) {
+        return NextResponse.json({
+            data: [],
+            pagination: {
+                total: count || 0,
+                page,
+                limit,
+                totalPages: Math.ceil((count || 0) / limit)
+            }
+        });
+    }
 
-    // Fetch all orders
+    // 2. Fetch all orders and order_accounts to calculate active status for the fetched profiles
+    // For simplicity with existing logic, we still fetch all but we could optimize further
+    // const now = new Date().toISOString(); // Already defined at the top
+
     const { data: orders, error: ordersError } = await supabaseAdmin
         .from('orders')
         .select('id, user_id, buyer_email');
@@ -51,7 +85,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: ordersError.message }, { status: 500 });
     }
 
-    // Fetch active order_accounts
     const { data: activeAccounts, error: accountsError } = await supabaseAdmin
         .from('order_accounts')
         .select('order_id')
@@ -61,7 +94,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: accountsError.message }, { status: 500 });
     }
 
-    // 3. Map status to profiles
     const activeOrderIds = new Set(activeAccounts.map(aa => aa.order_id));
 
     const dataWithStatus = profiles.map(profile => {
@@ -77,7 +109,15 @@ export async function GET(req: NextRequest) {
         };
     });
 
-    return NextResponse.json(dataWithStatus);
+    return NextResponse.json({
+        data: dataWithStatus,
+        pagination: {
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        }
+    });
 }
 
 export async function PATCH(request: NextRequest) {

@@ -5,7 +5,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { Lock } from 'lucide-react';
+import { Lock, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface Question {
@@ -74,6 +74,26 @@ export default function AdminQnAPage() {
         }
     };
 
+    const handleDelete = async (id: string) => {
+        if (!confirm('정말 삭제하시겠습니까? 질문과 답변이 모두 삭제됩니다.')) return;
+
+        try {
+            const res = await apiFetch(`/api/admin/qna/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                alert('삭제되었습니다.');
+                fetchQnas(); // Refresh
+            } else {
+                throw new Error('삭제 실패');
+            }
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(`오류: ${message}`);
+        }
+    };
+
     if (!isAdmin) return null;
 
     return (
@@ -125,20 +145,29 @@ export default function AdminQnAPage() {
                                                     {new Date(q.created_at).toLocaleDateString()}
                                                 </td>
                                                 <td className="w-24 text-center">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            if (answeringId === q.id) {
-                                                                setAnsweringId(null);
-                                                            } else {
-                                                                setAnsweringId(q.id);
-                                                                setAnswerContent(q.answer_content || '');
-                                                            }
-                                                        }}
-                                                    >
-                                                        {answeringId === q.id ? '닫기' : '답변'}
-                                                    </Button>
+                                                    <div className="flex justify-center gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                if (answeringId === q.id) {
+                                                                    setAnsweringId(null);
+                                                                } else {
+                                                                    setAnsweringId(q.id);
+                                                                    setAnswerContent(q.answer_content || '');
+                                                                }
+                                                            }}
+                                                        >
+                                                            {answeringId === q.id ? '닫기' : '답변'}
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            onClick={() => handleDelete(q.id)}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                             {answeringId === q.id && (

@@ -29,6 +29,7 @@ export default function AdminPage() {
     const router = useRouter();
 
     const [orders, setOrders] = useState<Order[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Settings State
     const [settings, setSettings] = useState({
@@ -43,12 +44,17 @@ export default function AdminPage() {
 
     const fetchStats = async () => {
         try {
-            const response = await apiFetch('/api/admin/orders');
-            if (!response.ok) throw new Error('Failed to fetch orders');
-            const data = await response.json();
-            setOrders(data);
+            setLoading(true);
+            const res = await apiFetch('/api/admin/orders');
+            if (res.ok) {
+                const result = await res.json();
+                // The API now returns { data: Order[], pagination: ... }
+                setOrders(result.data || []);
+            }
         } catch (error: unknown) {
             console.error('Error fetching stats:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -171,6 +177,20 @@ export default function AdminPage() {
         );
     }
 
+    if (loading) return <div className="p-8">Loading...</div>;
+
+    const waitingDistributions = (orders || []).filter(o => o?.assignment_status === 'waiting').length;
+    const todaySales = (orders || [])
+        .filter(o => {
+            if (!o?.created_at) return false;
+            const date = new Date(o.created_at);
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        })
+        .reduce((sum, o) => sum + (o?.payment_status === 'paid' || o?.payment_status === 'pending' ? o.amount : 0), 0);
+
+    const totalSettledAmount = (orders || []).reduce((acc, curr) => acc + (curr?.payment_status === 'paid' ? curr.amount : 0), 0);
+
 
     return (
         <main className={styles.main}>
@@ -184,18 +204,15 @@ export default function AdminPage() {
                 <section className={styles.stats}>
                     <div className={`${styles.statCard} glass shadow-sm`}>
                         <span className="text-gray-500 font-medium">대기 중인 분배</span>
-                        <strong className="text-2xl mt-1">{orders.filter(o => o.assignment_status === 'waiting').length}</strong>
+                        <strong className="text-2xl mt-1">{waitingDistributions}</strong>
                     </div>
                     <div className={`${styles.statCard} glass shadow-sm border-l-4 border-l-blue-500`}>
                         <span className="text-gray-500 font-medium">오늘의 매출</span>
-                        <strong className="text-2xl mt-1">₩{orders.reduce((acc, curr) => {
-                            const isToday = new Date(curr.created_at).toDateString() === new Date().toDateString();
-                            return acc + (isToday && (curr.payment_status === 'paid' || curr.payment_status === 'pending') ? curr.amount : 0);
-                        }, 0).toLocaleString()}</strong>
+                        <strong className="text-2xl mt-1">₩{todaySales.toLocaleString()}</strong>
                     </div>
                     <div className={`${styles.statCard} glass shadow-sm border-l-4 border-l-green-500`}>
                         <span className="text-gray-500 font-medium">누적 정산액</span>
-                        <strong className="text-2xl mt-1">₩{orders.reduce((acc, curr) => acc + (curr.payment_status === 'paid' ? curr.amount : 0), 0).toLocaleString()}</strong>
+                        <strong className="text-2xl mt-1">₩{totalSettledAmount.toLocaleString()}</strong>
                     </div>
                 </section>
 

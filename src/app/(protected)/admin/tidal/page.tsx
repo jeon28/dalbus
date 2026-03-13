@@ -147,6 +147,7 @@ function TidalAccountsContent() {
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         'checkbox': 40,
         'login_id': 100,
+        'slot': 60,
         'type': 60,
         'tidal_id': 200,
         'tidal_password': 120,
@@ -1019,6 +1020,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         </div>
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('login_id', e)} />
                                     </th>
+                                    <th className="relative text-center text-[10px] font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['slot'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('slot_number')}>
+                                            Slot {sortConfig?.key === 'slot_number' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('slot', e)} />
+                                    </th>
                                     <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
                                         <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
                                             타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
@@ -1164,6 +1171,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 <td className="text-center text-[10px] py-1 border-r border-gray-100 bg-gray-50/50 font-medium" style={{ width: columnWidths['login_id'] }}>
                                                     {item.account.login_id}
                                                 </td>
+                                                <td className="text-center text-[11px] py-1 border-r border-gray-100 bg-gray-50/30 font-bold text-gray-400" style={{ width: columnWidths['slot'] }}>
+                                                    #{assignment.slot_number + 1}
+                                                </td>
                                                 <td className="p-2 text-center border-r" style={{ width: columnWidths['type'] }}>
                                                     <span className={`px-1 rounded text-[10px] ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
                                                         {assignment.type === 'master' ? 'Master' : 'User'}
@@ -1296,7 +1306,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 let sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => {
                                     if (a.type === 'master') return -1;
                                     if (b.type === 'master') return 1;
-                                    return (a.end_date || '').localeCompare(b.end_date || '');
+                                    return (a.slot_number || 0) - (b.slot_number || 0);
                                 });
 
                                 // --- Expired Filter Functionality ---
@@ -1437,7 +1447,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                                                     return (
                                                                         <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
-                                                                            <td className="text-center font-bold text-gray-400">#{index + 1}</td>
+                                                                            <td className="text-center font-bold text-gray-400">#{assignment.slot_number + 1}</td>
 
                                                                             {isEditing ? (
                                                                                 <>
@@ -1569,7 +1579,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                                                 {sortedAssignments.length < 6 && availableSlotNum !== -1 && (
                                                                     <tr className="border-b last:border-0 h-10 bg-blue-50/30">
-                                                                        <td className="text-center font-bold text-gray-300">#{sortedAssignments.length + 1}</td>
+                                                                        <td className="text-center font-bold text-gray-300">#{availableSlotNum + 1}</td>
                                                                         <td colSpan={10} className="px-4 py-1">
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className="text-gray-400 italic">신규 슬롯을 추가하려면 우측 &apos;배정&apos; 버튼을 클릭하세요.</span>

@@ -20,6 +20,7 @@ interface UserSubscription {
     account_pw: string;
     status: string;
     order_id: string;
+    slot_number?: number;
 }
 
 interface OrderHistoryItem {
@@ -61,6 +62,7 @@ interface SupabaseAccountAssignment {
             duration_months: number;
         } | null;
     } | null;
+    slot_number?: number;
 }
 
 export default function MyPage() {
@@ -154,7 +156,8 @@ export default function MyPage() {
                             account_id: acc.tidal_id || acc.account_id || '정보 없음',
                             account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
                             status: '이용 중',
-                            order_id: acc.order_id
+                            order_id: acc.order_id,
+                            slot_number: acc.slot_number
                         }));
                         setSubscriptions(enrichedSubs);
                     } else {
@@ -373,6 +376,9 @@ export default function MyPage() {
                                     <div className="text-sm space-y-1 text-muted-foreground">
                                         <p>기간: {sub.start_date} ~ {sub.end_date} ({sub.duration})</p>
                                         <p>만료일: {sub.end_date}</p>
+                                        {sub.slot_number !== undefined && (
+                                            <p className="font-bold text-primary">배정 슬롯: #{sub.slot_number + 1}</p>
+                                        )}
                                     </div>
                                     <div className="bg-white/50 p-3 rounded-lg text-sm font-mono space-y-1 border border-white/20">
                                         <div className="flex justify-between">

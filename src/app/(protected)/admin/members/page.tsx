@@ -4,7 +4,18 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css'; // Reusing admin styles
 import { useRouter } from 'next/navigation';
-import { Trash2, FileText, Search, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+    Trash2, 
+    FileText, 
+    Search, 
+    Download, 
+    ChevronLeft, 
+    ChevronRight, 
+    ChevronsLeft, 
+    ChevronsRight,
+    ChevronDown, 
+    ChevronUp 
+} from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
@@ -17,6 +28,13 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 export interface Member {
     id: string;
@@ -59,6 +77,16 @@ export default function MemberListPage() {
 
     const [isMemoOpen, setIsMemoOpen] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+    // Pagination State
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(25);
+    const [pagination, setPagination] = useState({
+        total: 0,
+        page: 1,
+        limit: 25,
+        totalPages: 0
+    });
 
     // Accounts Modal State
     const [memberAccounts, setMemberAccounts] = useState<MemberAccount[]>([]);
@@ -108,28 +136,32 @@ export default function MemberListPage() {
     const fetchMembers = useCallback(async () => {
         setLoading(true);
         try {
-            let url = '/api/admin/members';
             const params = new URLSearchParams();
             if (searchTerm) params.append('search', searchTerm);
             if (statusFilter !== 'all') params.append('status', statusFilter);
+            params.append('page', page.toString());
+            params.append('limit', limit.toString());
             if (sortConfig) {
                 params.append('sort', sortConfig.key);
                 params.append('direction', sortConfig.direction);
             }
 
-            const queryString = params.toString();
-            if (queryString) url += `?${queryString}`;
-
-            const response = await apiFetch(url);
+            const response = await apiFetch(`/api/admin/members?${params.toString()}`);
             if (response.ok) {
-                const data = await response.json();
-                setMembers(data);
+                const result = await response.json();
+                setMembers(result.data);
+                setPagination(result.pagination);
             }
         } catch (error: unknown) {
             console.error('Error fetching members:', error);
         }
         setLoading(false);
-    }, [searchTerm, statusFilter, sortConfig]);
+    }, [searchTerm, statusFilter, sortConfig, page, limit]);
+
+    // Reset page to 1 when search or filter changes
+    useEffect(() => {
+        setPage(1);
+    }, [searchTerm, statusFilter]);
 
     useEffect(() => {
         if (isAdmin) {
@@ -224,56 +256,67 @@ export default function MemberListPage() {
         }
     };
 
-    const handleExportExcel = () => {
-        if (members.length === 0) {
-            alert('내보낼 데이터가 없습니다.');
-            return;
+    const handleExportExcel = async () => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+            if (statusFilter !== 'all') params.append('status', statusFilter);
+            params.append('page', '1');
+            params.append('limit', '10000'); // Fetch enough for general export
+            if (sortConfig) {
+                params.append('sort', sortConfig.key);
+                params.append('direction', sortConfig.direction);
+            }
+
+            const response = await apiFetch(`/api/admin/members?${params.toString()}`);
+            if (!response.ok) throw new Error('Failed to fetch data for export');
+            
+            const result = await response.json();
+            const allMembers = result.data;
+
+            if (!allMembers || allMembers.length === 0) {
+                alert('내보낼 데이터가 없습니다.');
+                return;
+            }
+
+            const exportData = allMembers.map((m: Member) => ({
+                'ID': m.email,
+                '가입일': new Date(m.created_at).toLocaleDateString(),
+                '이름': m.name,
+                '생년월일': m.birth_date || '-',
+                '이메일': m.email,
+                '연락처': m.phone || '-',
+                '상태': m.is_active ? '활성' : '비활성',
+                '메모': m.memo || ''
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Members");
+
+            const wscols = [
+                { wch: 30 }, // ID (email)
+                { wch: 15 }, // 가입일
+                { wch: 15 }, // 이름
+                { wch: 15 }, // 생년월일
+                { wch: 30 }, // 이메일
+                { wch: 20 }, // 연락처
+                { wch: 10 }, // 상태
+                { wch: 40 }, // 메모
+            ];
+            worksheet['!cols'] = wscols;
+
+            XLSX.writeFile(workbook, `dalbus_members_${new Date().toISOString().split('T')[0]}.xlsx`);
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('엑셀 내보내기 중 오류가 발생했습니다.');
+        } finally {
+            setLoading(false);
+            fetchMembers(); // Refresh current page view
         }
-
-        const exportData = members.map(m => ({
-            'ID': m.email,
-            '가입일': new Date(m.created_at).toLocaleDateString(),
-            '이름': m.name,
-            '생년월일': m.birth_date || '-',
-            '이메일': m.email,
-            '연락처': m.phone || '-',
-            '상태': m.is_active ? '활성' : '비활성',
-            '메모': m.memo || ''
-        }));
-
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Members");
-
-        const wscols = [
-            { wch: 30 }, // ID (email)
-            { wch: 15 }, // 가입일
-            { wch: 15 }, // 이름
-            { wch: 15 }, // 생년월일
-            { wch: 30 }, // 이메일
-            { wch: 20 }, // 연락처
-            { wch: 10 }, // 상태
-            { wch: 40 }, // 메모
-        ];
-        worksheet['!cols'] = wscols;
-
-        XLSX.writeFile(workbook, `dalbus_members_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
-    const filteredMembers = useMemo(() => {
-        return members.filter(member => {
-            const search = searchTerm.toLowerCase();
-            const matchesSearch = (
-                member.name.toLowerCase().includes(search) ||
-                member.email.toLowerCase().includes(search) ||
-                (member.phone && member.phone.toLowerCase().includes(search))
-            );
-
-            if (statusFilter === 'active') return matchesSearch && member.is_active;
-            if (statusFilter === 'inactive') return matchesSearch && !member.is_active;
-            return matchesSearch;
-        });
-    }, [members, searchTerm, statusFilter]);
 
     if (!isAdmin) return null;
 
@@ -396,7 +439,7 @@ export default function MemberListPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredMembers.map((member) => (
+                                    members.map((member) => (
                                         <tr key={member.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-3 text-xs text-blue-600 hover:underline cursor-pointer truncate" onClick={() => handleOpenAccounts(member)}>
                                                 {member.email}
@@ -420,11 +463,17 @@ export default function MemberListPage() {
                                             </td>
                                             <td className="p-3">
                                                 <div
-                                                    className="w-full truncate cursor-pointer hover:text-blue-600 text-[11px] text-gray-500"
+                                                    className="w-full cursor-pointer hover:text-blue-600 text-[11px] text-gray-500"
                                                     onClick={() => openMemoModal(member)}
                                                     title={member.memo || ''}
                                                 >
-                                                    {member.memo || <span className="text-slate-300 italic">메모 없음</span>}
+                                                    {member.memo ? (
+                                                        member.memo.length > 40 
+                                                            ? `${member.memo.substring(0, 40)}...` 
+                                                            : member.memo
+                                                    ) : (
+                                                        <span className="text-slate-300 italic">메모 없음</span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="p-3 text-center">
@@ -442,6 +491,103 @@ export default function MemberListPage() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Pagination UI */}
+                    <div className="px-6 py-4 bg-gray-50/50 border-t flex flex-col sm:grid sm:grid-cols-3 items-center gap-4 sm:gap-0">
+                        {/* Limit Selector (Left) */}
+                        <div className="flex items-center gap-2 justify-self-start">
+                            <span className="text-xs text-gray-500 whitespace-nowrap">페이지당 표시:</span>
+                            <Select
+                                value={limit.toString()}
+                                onValueChange={(val) => {
+                                    setLimit(parseInt(val));
+                                    setPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="h-8 w-[70px] bg-white border-gray-200">
+                                    <SelectValue placeholder={limit.toString()} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="25">25</SelectItem>
+                                    <SelectItem value="50">50</SelectItem>
+                                    <SelectItem value="100">100</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Navigation Buttons (Center) */}
+                        <div className="flex items-center gap-1 justify-self-center">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(1)}
+                                disabled={page === 1}
+                                className="h-8 w-8 p-0 bg-white border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                                title="첫 페이지"
+                            >
+                                <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                disabled={page === 1}
+                                className="h-8 w-8 p-0 bg-white border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            
+                            {/* Page Numbers */}
+                            <div className="flex items-center gap-1 mx-2">
+                                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                                    let pageNum;
+                                    if (pagination.totalPages <= 5) {
+                                        pageNum = i + 1;
+                                    } else {
+                                        const start = Math.max(1, Math.min(page - 2, pagination.totalPages - 4));
+                                        pageNum = start + i;
+                                    }
+                                    
+                                    return (
+                                        <Button
+                                            key={pageNum}
+                                            variant={page === pageNum ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setPage(pageNum)}
+                                            className={`h-8 w-8 p-0 text-xs ${page === pageNum ? "bg-blue-600 hover:bg-blue-700" : "bg-white border-gray-200 hover:bg-gray-50"}`}
+                                        >
+                                            {pageNum}
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(prev => Math.min(pagination.totalPages, prev + 1))}
+                                disabled={page === pagination.totalPages || pagination.totalPages === 0}
+                                className="h-8 w-8 p-0 bg-white border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(pagination.totalPages)}
+                                disabled={page === pagination.totalPages || pagination.totalPages === 0}
+                                className="h-8 w-8 p-0 bg-white border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                                title="마지막 페이지"
+                            >
+                                <ChevronsRight className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        {/* Total Count Label (Right) */}
+                        <div className="text-xs text-gray-500 justify-self-end">
+                            전체 <span className="font-medium text-gray-900">{pagination.total}</span>개의 항목
+                        </div>
                     </div>
                 </div>
             </div>
@@ -494,6 +640,7 @@ export default function MemberListPage() {
                                             <th className="px-4 py-2 text-center">개월수</th>
                                             <th className="px-4 py-2 text-center">시작일</th>
                                             <th className="px-4 py-2 text-center">종료일</th>
+                                            <th className="px-4 py-2 text-center">Slot</th>
                                             <th className="px-4 py-2 text-center">상태</th>
                                         </tr>
                                     </thead>
@@ -514,6 +661,9 @@ export default function MemberListPage() {
                                                     </td>
                                                     <td className="px-4 py-3 text-center text-gray-500">
                                                         {account.end_date ? new Date(account.end_date).toLocaleDateString() : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center font-bold text-gray-400">
+                                                        #{account.slot_number + 1}
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
                                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
