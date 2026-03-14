@@ -141,6 +141,7 @@ function TidalAccountsContent() {
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
+    const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
 
     // --- DAL-20: Column Resizing and Filter States ---
     const [expiredDays, setExpiredDays] = useState(7);
@@ -600,6 +601,27 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
     const handleDelete = async (assignmentId: string) => {
+        let isMaster = false;
+        let hasUsers = false;
+
+        for (const acc of accounts) {
+            const accAssignments = acc.order_accounts || [];
+            const found = accAssignments.find(oa => oa.id === assignmentId);
+            if (found) {
+                if (found.type === 'master') {
+                    isMaster = true;
+                    hasUsers = accAssignments.some(oa => oa.type === 'user' && oa.id !== assignmentId);
+                }
+                break;
+            }
+        }
+
+        if (isMaster && hasUsers) {
+            alert('그룹원이 존재하여 마스터 삭제 불가능 합니다');
+            setPendingDeleteIds(prev => new Set(prev).add(assignmentId));
+            return;
+        }
+
         if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
@@ -1209,10 +1231,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>{assignment.tidal_id || '-'}</td>
+                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
+                                                            <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.tidal_id || '-'}</span>
+                                                        </td>
                                                         <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined} style={{ width: columnWidths['tidal_password'] }}>{assignment.tidal_password || '-'}</td>
                                                         <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
-                                                            {assignment.buyer_name || assignment.orders?.buyer_name || '-'}
+                                                            <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</span>
                                                         </td>
                                                         <td className="p-2 border-r truncate max-w-[120px]" title={assignment.buyer_email || assignment.orders?.buyer_email || undefined} style={{ width: columnWidths['buyer_email'] }}>
                                                             {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
@@ -1504,9 +1528,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                             {val.type === 'master' ? 'Master' : 'User'}
                                                                                         </span>
                                                                                     </td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>{val.tidal_id || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>
+                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.tidal_id || '-'}</span>
+                                                                                    </td>
                                                                                     <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password || undefined}>{val.tidal_password || '-'}</td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>{val.buyer_name || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>
+                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.buyer_name || '-'}</span>
+                                                                                    </td>
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
                                                                                     <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
