@@ -20,7 +20,7 @@ export function AdminMobileMenu() {
     const [open, setOpen] = React.useState(false);
 
     return (
-        <div className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-50">
+        <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-50">
             <h2 className="text-lg font-bold">Admin Portal</h2>
 
             <Sheet open={open} onOpenChange={setOpen}>

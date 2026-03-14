@@ -707,17 +707,23 @@ export default function OrderHistoryPage() {
                         </th>
                         <th style={{ width: '60px' }}>구분</th>
                         <th style={{ width: '70px' }}>회원여부</th>
-                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '120px' }}>
+                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '90px' }}>
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
-                        <th style={{ width: '120px' }}>연락처/이메일</th>
-
+                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '110px' }}>
+                            <div className="flex items-center">연락처 {getSortIcon('phone')}</div>
+                        </th>
+                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '130px' }}>
+                            <div className="flex items-center">이메일 {getSortIcon('email')}</div>
+                        </th>
                         <th style={{ width: '40px' }}>이용기간</th>
-                        <th style={{ width: '150px' }}>금액</th>
+                        <th style={{ width: '90px' }}>금액</th>
                         <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
                             <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
                         </th>
-                        <th className="text-center">관리</th>
+                        <th className="text-center" style={{ width: '80px' }}>
+                            <div className="flex items-center justify-center">관리</div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -753,6 +759,8 @@ export default function OrderHistoryPage() {
                                 </td>
                                 <td>
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
+                                </td>
+                                <td>
                                     <div className="text-xs text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
 
@@ -862,8 +870,44 @@ export default function OrderHistoryPage() {
                         </div>
                     ) : (
                         <>
-                            {renderTable(orders)}
-                            {renderCards(orders)}
+                            {(() => {
+                                const sortedOrders = [...orders].sort((a, b) => {
+                                    if (!sortConfig.direction) return 0;
+                                    const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
+                                    
+                                    if (sortConfig.key === 'created_at') {
+                                        return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * multiplier;
+                                    }
+                                    if (sortConfig.key === 'name') {
+                                        const nameA = a.profiles?.name || a.buyer_name || '';
+                                        const nameB = b.profiles?.name || b.buyer_name || '';
+                                        return nameA.localeCompare(nameB, 'ko') * multiplier;
+                                    }
+                                    if (sortConfig.key === 'phone') {
+                                        const phoneA = a.profiles?.phone || a.buyer_phone || '';
+                                        const phoneB = b.profiles?.phone || b.buyer_phone || '';
+                                        return phoneA.localeCompare(phoneB, 'ko') * multiplier;
+                                    }
+                                    if (sortConfig.key === 'email') {
+                                        const emailA = a.profiles?.email || a.buyer_email || '';
+                                        const emailB = b.profiles?.email || b.buyer_email || '';
+                                        return emailA.localeCompare(emailB, 'ko') * multiplier;
+                                    }
+                                    if (sortConfig.key === 'status') {
+                                        const statusA = getOrderStatus(a);
+                                        const statusB = getOrderStatus(b);
+                                        return statusA.localeCompare(statusB, 'ko') * multiplier;
+                                    }
+                                    return 0;
+                                });
+
+                                return (
+                                    <>
+                                        {renderTable(sortedOrders)}
+                                        {renderCards(sortedOrders)}
+                                    </>
+                                );
+                            })()}
 
                             {/* Pagination & Limit Selector */}
                             {pagination && (
