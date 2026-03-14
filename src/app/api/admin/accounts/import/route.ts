@@ -151,47 +151,36 @@ export async function POST(req: NextRequest) {
                             order_id: orderId
                         };
 
-                        // Strategy: Use different upsert methods based on data availability
-                        if (slot.tidal_id && slot.tidal_id.trim()) {
-                            // Case 1: tidal_id exists - Use tidal_id as conflict target
-                            const { error: slotError } = await supabaseAdmin
-                                .from('order_accounts')
-                                .upsert(slotData, {
-                                    onConflict: 'tidal_id',
-                                    ignoreDuplicates: false
-                                });
+                        // Strategy: Always manually check existing slot to avoid ON CONFLICT errors
+                        // since migrations might differ between environments
 
-                            if (slotError) throw slotError;
+                        // Check if slot already exists
+                        const { data: existing } = await supabaseAdmin
+                            .from('order_accounts')
+                            .select('id')
+                            .eq('account_id', masterAccountId)
+                            .eq('slot_number', slot.slot_number)
+                            .maybeSingle();
+
+                        if (existing) {
+                            // UPDATE existing slot
+                            const { error: updateError } = await supabaseAdmin
+                                .from('order_accounts')
+                                .update({
+                                    tidal_password: slotData.tidal_password,
+                                    order_id: slotData.order_id,
+                                    tidal_id: slotData.tidal_id
+                                })
+                                .eq('id', existing.id);
+
+                            if (updateError) throw updateError;
                         } else {
-                            // Case 2: No tidal_id - Use (account_id, slot_number) as identifier
-                            // Check if slot already exists
-                            const { data: existing } = await supabaseAdmin
+                            // INSERT new slot
+                            const { error: insertError } = await supabaseAdmin
                                 .from('order_accounts')
-                                .select('id')
-                                .eq('account_id', masterAccountId)
-                                .eq('slot_number', slot.slot_number)
-                                .maybeSingle();
+                                .insert(slotData);
 
-                            if (existing) {
-                                // UPDATE existing slot
-                                const { error: updateError } = await supabaseAdmin
-                                    .from('order_accounts')
-                                    .update({
-                                        tidal_password: slotData.tidal_password,
-                                        order_id: slotData.order_id,
-                                        tidal_id: slotData.tidal_id
-                                    })
-                                    .eq('id', existing.id);
-
-                                if (updateError) throw updateError;
-                            } else {
-                                // INSERT new slot
-                                const { error: insertError } = await supabaseAdmin
-                                    .from('order_accounts')
-                                    .insert(slotData);
-
-                                if (insertError) throw insertError;
-                            }
+                            if (insertError) throw insertError;
                         }
 
                         results.success.slots++;
