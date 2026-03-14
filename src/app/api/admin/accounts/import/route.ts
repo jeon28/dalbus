@@ -18,36 +18,41 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const masterMap = new Map<string, any>();
         importData.forEach((row) => {
-            const masterId = row['마스터 ID'];
+            const masterId = row['마스터 ID'] || row['그룹 ID'];
+            
+            let currentMaster;
+
             if (masterId) {
                 if (!masterMap.has(masterId)) {
                     masterMap.set(masterId, {
                         login_id: masterId,
-                        payment_email: row['결제 계정'],
+                        payment_email: row['결제 계정'] || '',
                         payment_day: parseInt(row['결제일']?.toString().replace('일', '') || '1'),
                         login_pw: '', // Default to empty string to satisfy NOT NULL constraint
-                        memo: row['메모'],
+                        memo: row['메모'] || '',
                         slots: []
                     });
                 }
+                currentMaster = masterMap.get(masterId);
             } else if (masterMap.size > 0) {
-                // It's a slot row for the last seen master
-                const lastMaster = Array.from(masterMap.values()).pop();
-                if (lastMaster && row['Slot']) {
-                    const slotNumber = parseInt(row['Slot'].replace('Slot ', '')) - 1;
+                // It's a slot row for the last seen master (legacy format support)
+                currentMaster = Array.from(masterMap.values()).pop();
+            }
 
-                    // Validate slot_number
-                    if (isNaN(slotNumber) || slotNumber < 0 || slotNumber > 5) {
-                        console.warn(`Invalid slot number: ${row['Slot']}, skipping`);
-                        return;
-                    }
+            if (currentMaster && row['Slot']) {
+                const slotText = String(row['Slot']).replace('Slot ', '').replace('#', '').trim();
+                const slotNumber = parseInt(slotText) - 1;
 
-                    lastMaster.slots.push({
+                // Validate slot_number
+                if (!isNaN(slotNumber) && slotNumber >= 0 && slotNumber <= 5) {
+                    currentMaster.slots.push({
                         slot_number: slotNumber,
-                        tidal_id: row['소속 ID']?.trim() || '',
-                        tidal_password: row['소속 PW']?.trim() || '',
-                        order_number: row['주문번호']?.trim() || ''
+                        tidal_id: String(row['소속 ID'] || '')?.trim() || '',
+                        tidal_password: String(row['소속 PW'] || '')?.trim() || '',
+                        order_number: String(row['주문번호'] || '')?.trim() || ''
                     });
+                } else {
+                    console.warn(`Invalid slot number: ${row['Slot']}, skipping`);
                 }
             }
         });
