@@ -285,15 +285,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         try {
             const res = await apiFetch('/api/admin/orders', { cache: 'no-store' });
             if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    const waiting = data.filter((o: Order) =>
+                const responseData = await res.json();
+                const ordersArray = Array.isArray(responseData) ? responseData : responseData.data;
+                
+                if (Array.isArray(ordersArray)) {
+                    const waiting = ordersArray.filter((o: Order) =>
                         o.payment_status === 'paid' &&
                         o.assignment_status === 'waiting'
                     );
                     setPendingOrders(waiting);
                 } else {
-                    console.error('Expected array from /api/admin/orders, got:', data);
+                    console.error('Expected array from /api/admin/orders, got:', responseData);
                     setPendingOrders([]);
                 }
             }
