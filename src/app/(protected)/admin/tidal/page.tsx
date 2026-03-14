@@ -286,11 +286,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             const res = await apiFetch('/api/admin/orders', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
-                const waiting = data.filter((o: Order) =>
-                    o.payment_status === 'paid' &&
-                    o.assignment_status === 'waiting'
-                );
-                setPendingOrders(waiting);
+                if (Array.isArray(data)) {
+                    const waiting = data.filter((o: Order) =>
+                        o.payment_status === 'paid' &&
+                        o.assignment_status === 'waiting'
+                    );
+                    setPendingOrders(waiting);
+                } else {
+                    console.error('Expected array from /api/admin/orders, got:', data);
+                    setPendingOrders([]);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -1441,7 +1446,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <th className="py-2 text-left w-24">가입일</th>
                                                                     <th className="py-2 text-left w-24">종료일</th>
                                                                     <th className="py-2 text-center w-16">개월</th>
-```
                                                                     <th className="py-2 text-center w-24">주문번호</th>
                                                                     <th className="py-2 text-center w-40">관리</th>
                                                                 </tr>

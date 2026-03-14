@@ -722,7 +722,7 @@ export default function OrderHistoryPage() {
                             <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
                         </th>
                         <th className="text-center" style={{ width: '120px' }}>
-                            배정번호
+                            <div className="flex items-center justify-center">배정번호</div>
                         </th>
                         <th className="text-center" style={{ width: '80px' }}>
                             <div className="flex items-center justify-center">관리</div>
