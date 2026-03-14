@@ -26,7 +26,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (tidal_password !== undefined) oaUpdates.tidal_password = tidal_password;
         if (body.tidal_id !== undefined) oaUpdates.tidal_id = body.tidal_id || null;
         if (body.order_number !== undefined) oaUpdates.order_number = body.order_number;
-        if (type !== undefined) oaUpdates.type = type;
+        if (type !== undefined) {
+            oaUpdates.type = type;
+            if (type === 'master') {
+                oaUpdates.slot_number = 0;
+            }
+        }
         if (buyer_name !== undefined) oaUpdates.buyer_name = buyer_name;
         if (buyer_phone !== undefined) oaUpdates.buyer_phone = buyer_phone;
         if (buyer_email !== undefined) oaUpdates.buyer_email = buyer_email;
