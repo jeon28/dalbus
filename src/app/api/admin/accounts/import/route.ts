@@ -158,34 +158,15 @@ export async function POST(req: NextRequest) {
                             order_id: orderId
                         };
 
-                        // Check if slot already exists
-                        const { data: existing } = await supabaseAdmin
+                        // INSERT with UPSERT to prevent unique constraint conflicts on (account_id, slot_number)
+                        const { error: upsertError } = await supabaseAdmin
                             .from('order_accounts')
-                            .select('id')
-                            .eq('account_id', masterAccountId)
-                            .eq('slot_number', slot.slot_number)
-                            .maybeSingle();
+                            .upsert(slotData, { 
+                                onConflict: 'account_id, slot_number',
+                                ignoreDuplicates: false 
+                            });
 
-                        if (existing) {
-                            // UPDATE existing slot
-                            const { error: updateError } = await supabaseAdmin
-                                .from('order_accounts')
-                                .update({
-                                    tidal_password: slotData.tidal_password,
-                                    order_id: slotData.order_id,
-                                    tidal_id: slotData.tidal_id
-                                })
-                                .eq('id', existing.id);
-
-                            if (updateError) throw updateError;
-                        } else {
-                            // INSERT new slot
-                            const { error: insertError } = await supabaseAdmin
-                                .from('order_accounts')
-                                .insert(slotData);
-
-                            if (insertError) throw insertError;
-                        }
+                        if (upsertError) throw upsertError;
 
                         results.success.slots++;
                     } catch (slotError: unknown) {
