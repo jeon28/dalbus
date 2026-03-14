@@ -218,7 +218,7 @@ export default function OrderHistoryPage() {
 
     const exportToExcel = () => {
         const data = orders.map(order => ({
-            '날짜': new Date(order.created_at).toLocaleDateString(),
+            '날짜': format(new Date(order.created_at), 'yy.MM.dd'),
             '주문번호': order.order_number,
             '구분': order.order_type === 'NEW' ? '신규' : '연장',
             '회원여부': order.is_guest ? '비회원' : '회원',
@@ -629,7 +629,7 @@ export default function OrderHistoryPage() {
                         <div className={styles.orderCardHeader}>
                             <div className="flex flex-col">
                                 <span className={styles.orderId}>{o.order_number}</span>
-                                <span className={styles.orderDate}>{new Date(o.created_at).toLocaleDateString()}</span>
+                                <span className={styles.orderDate}>{format(new Date(o.created_at), 'yy.MM.dd')}</span>
                             </div>
                             <span className={`px-2 py-1 rounded text-xs font-medium
                                 ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
@@ -661,11 +661,11 @@ export default function OrderHistoryPage() {
                             </div>
                             <div className="flex justify-between items-end mt-2">
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] text-gray-400">이용기간: {o.product_plans?.duration_months || '-'}개월</span>
+                                    <span className="text-[10px] text-gray-400">기간: {o.product_plans?.duration_months || '-'}개월</span>
                                     <span className={styles.priceInfo}>₩{o.amount?.toLocaleString()}</span>
                                 </div>
                                 {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
-                                    <div className="text-[10px] text-gray-400 font-mono bg-secondary px-2 py-1 rounded">
+                                    <div className="text-sm font-bold text-gray-800 bg-secondary px-2 py-1 rounded">
                                         {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
                                     </div>
                                 )}
@@ -706,7 +706,7 @@ export default function OrderHistoryPage() {
                             <div className="flex items-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
                         <th style={{ width: '60px' }}>구분</th>
-                        <th style={{ width: '70px' }}>회원여부</th>
+                        <th style={{ width: '70px' }}>회원</th>
                         <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '90px' }}>
                             <div className="flex items-center">고객명 {getSortIcon('name')}</div>
                         </th>
@@ -716,10 +716,13 @@ export default function OrderHistoryPage() {
                         <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '130px' }}>
                             <div className="flex items-center">이메일 {getSortIcon('email')}</div>
                         </th>
-                        <th style={{ width: '40px' }}>이용기간</th>
+                        <th style={{ width: '40px' }}>기간</th>
                         <th style={{ width: '90px' }}>금액</th>
                         <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
                             <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
+                        </th>
+                        <th className="text-center" style={{ width: '120px' }}>
+                            배정번호
                         </th>
                         <th className="text-center" style={{ width: '80px' }}>
                             <div className="flex items-center justify-center">관리</div>
@@ -732,7 +735,7 @@ export default function OrderHistoryPage() {
                         return (
                             <tr key={o.id}>
                                 <td>
-                                    <div className="text-sm">{new Date(o.created_at).toLocaleDateString()}</div>
+                                    <div className="text-sm">{format(new Date(o.created_at), 'yy.MM.dd')}</div>
                                     <div className="text-xs text-gray-500">{o.order_number}</div>
                                 </td>
                                 <td>
@@ -777,12 +780,14 @@ export default function OrderHistoryPage() {
                                                         'bg-yellow-100 text-yellow-800'}`}>
                                             {status}
                                         </span>
-                                        {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
-                                            <div className="text-[10px] text-gray-400 mt-1 font-mono whitespace-nowrap">
-                                                {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
-                                            </div>
-                                        )}
                                     </div>
+                                </td>
+                                <td className="text-center font-medium">
+                                    {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                        <div className="text-sm whitespace-nowrap">
+                                            {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="text-center">
                                     <div className="flex flex-col gap-1 items-center">
