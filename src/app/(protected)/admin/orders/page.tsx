@@ -764,7 +764,7 @@ export default function OrderHistoryPage() {
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
                                 </td>
                                 <td>
-                                    <div className="text-xs text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
+                                    <div className="text-sm text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
 
                                 <td>
