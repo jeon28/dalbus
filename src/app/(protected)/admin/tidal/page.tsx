@@ -761,13 +761,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ accounts: jsonData })
                 });
-                if (!res.ok) throw new Error('Import failed');
+                if (!res.ok) {
+                    const errObj = await res.json().catch(() => null);
+                    throw new Error(errObj?.error || `서버 오류 (${res.status})`);
+                }
                 const summary = await res.json();
                 setImportResults(summary);
                 setIsImportResultModalOpen(true);
                 fetchAccounts();
-            } catch {
-                alert('임포트 오류');
+            } catch (error: unknown) {
+                const e = error as Error;
+                alert(`엑셀 업로드 실패: ${e.message}`);
             }
         };
         reader.readAsArrayBuffer(file);

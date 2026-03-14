@@ -58,15 +58,15 @@ export async function POST(req: NextRequest) {
         });
 
         // 0. Fetch Product ID for 'tidal'
-        const { data: productData, error: productError } = await supabaseAdmin
+        const { data: products, error: productError } = await supabaseAdmin
             .from('products')
-            .select('id')
-            .eq('slug', 'tidal-hifi')
-            .single();
+            .select('id, name');
 
-        if (productError || !productData) {
-            return NextResponse.json({ error: 'Tidal product not found' }, { status: 404 });
+        if (productError || !products || products.length === 0) {
+            return NextResponse.json({ error: 'No products found in the database' }, { status: 404 });
         }
+
+        const productData = products.find(p => p.name.toLowerCase().includes('tidal') || p.name.includes('타이달')) || products[0];
 
         const mastersArray = Array.from(masterMap.values());
         console.log(`[Import] Processing ${mastersArray.length} master accounts...`);
