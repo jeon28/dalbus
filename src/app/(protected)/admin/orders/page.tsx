@@ -702,22 +702,22 @@ export default function OrderHistoryPage() {
             <table className={styles.table}>
                 <thead>
                     <tr>
-                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '100px' }}>
-                            <div className="flex items-center">날짜/주문번호 {getSortIcon('created_at')}</div>
+                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                            <div className="flex items-center justify-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
-                        <th style={{ width: '60px' }}>구분</th>
-                        <th style={{ width: '70px' }}>회원</th>
-                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '90px' }}>
-                            <div className="flex items-center">고객명 {getSortIcon('name')}</div>
+                        <th className="text-center" style={{ width: '60px' }}>구분</th>
+                        <th className="text-center" style={{ width: '70px' }}>회원</th>
+                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '90px' }}>
+                            <div className="flex items-center justify-center">고객명 {getSortIcon('name')}</div>
                         </th>
-                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '110px' }}>
-                            <div className="flex items-center">연락처 {getSortIcon('phone')}</div>
+                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '110px' }}>
+                            <div className="flex items-center justify-center">연락처 {getSortIcon('phone')}</div>
                         </th>
-                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '130px' }}>
-                            <div className="flex items-center">이메일 {getSortIcon('email')}</div>
+                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '130px' }}>
+                            <div className="flex items-center justify-center">이메일 {getSortIcon('email')}</div>
                         </th>
-                        <th style={{ width: '40px' }}>기간</th>
-                        <th style={{ width: '90px' }}>금액</th>
+                        <th className="text-center" style={{ width: '40px' }}>기간</th>
+                        <th className="text-center" style={{ width: '90px' }}>금액</th>
                         <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
                             <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
                         </th>
@@ -734,11 +734,11 @@ export default function OrderHistoryPage() {
                         const status = getOrderStatus(o);
                         return (
                             <tr key={o.id}>
-                                <td>
+                                <td className="text-center">
                                     <div className="text-sm">{format(new Date(o.created_at), 'yy.MM.dd')}</div>
                                     <div className="text-xs text-gray-500">{o.order_number}</div>
                                 </td>
-                                <td>
+                                <td className="text-center">
                                     <span className={`px-2 py-1 rounded text-xs font-medium
                                         ${o.order_type === 'NEW' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'}`}>
                                         {o.order_type === 'NEW' ? '신규' : '연장'}
@@ -750,7 +750,7 @@ export default function OrderHistoryPage() {
                                         {o.is_guest ? '비회원' : '회원'}
                                     </span>
                                 </td>
-                                <td>
+                                <td className="text-center">
                                     <div className="font-medium">
                                         {o.profiles?.name || o.buyer_name || 'Unknown'}
                                         {o.depositor_name && o.depositor_name !== (o.profiles?.name || o.buyer_name) && (
@@ -760,17 +760,17 @@ export default function OrderHistoryPage() {
                                         )}
                                     </div>
                                 </td>
-                                <td>
+                                <td className="text-center">
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
                                 </td>
-                                <td>
+                                <td className="text-center">
                                     <div className="text-sm text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
 
-                                <td>
+                                <td className="text-center">
                                     <div className="font-mono">{o.product_plans?.duration_months || '-'}</div>
                                 </td>
-                                <td>₩{o.amount?.toLocaleString()}</td>
+                                <td className="text-center">₩{o.amount?.toLocaleString()}</td>
                                 <td className="text-center">
                                     <div className="flex flex-col items-center">
                                         <span className={`px-2 py-1 rounded text-xs 
