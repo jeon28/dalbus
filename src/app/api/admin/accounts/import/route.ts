@@ -45,11 +45,15 @@ export async function POST(req: NextRequest) {
 
                 // Validate slot_number
                 if (!isNaN(slotNumber) && slotNumber >= 0 && slotNumber <= 5) {
+                    const mappedTidalId = String(row['소속 ID'] || '')?.trim();
+                    const mappedPassword = String(row['소속 PW'] || '')?.trim();
+                    const mappedOrderNum = String(row['주문번호'] || '')?.trim();
+
                     currentMaster.slots.push({
                         slot_number: slotNumber,
-                        tidal_id: String(row['소속 ID'] || '')?.trim() || '',
-                        tidal_password: String(row['소속 PW'] || '')?.trim() || '',
-                        order_number: String(row['주문번호'] || '')?.trim() || ''
+                        tidal_id: mappedTidalId === '' ? null : mappedTidalId,
+                        tidal_password: mappedPassword === '' ? null : mappedPassword,
+                        order_number: mappedOrderNum === '' ? null : mappedOrderNum
                     });
                 } else {
                     console.warn(`Invalid slot number: ${row['Slot']}, skipping`);
@@ -143,16 +147,16 @@ export async function POST(req: NextRequest) {
                             }
                         }
 
+                        // Safely handle empty strings for unique constraints
+                        const safeTidalId = slot.tidal_id ? slot.tidal_id : null;
+
                         const slotData = {
                             account_id: masterAccountId,
                             slot_number: slot.slot_number,
-                            tidal_id: slot.tidal_id || null,
+                            tidal_id: safeTidalId,
                             tidal_password: slot.tidal_password || '',
                             order_id: orderId
                         };
-
-                        // Strategy: Always manually check existing slot to avoid ON CONFLICT errors
-                        // since migrations might differ between environments
 
                         // Check if slot already exists
                         const { data: existing } = await supabaseAdmin
