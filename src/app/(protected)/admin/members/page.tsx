@@ -63,6 +63,9 @@ interface MemberAccount {
             duration_months: number;
         } | null;
     } | null;
+    accounts?: {
+        login_id: string | null;
+    } | null;
 }
 
 export default function MemberListPage() {
@@ -655,7 +658,7 @@ export default function MemberListPage() {
                                             <th className="px-4 py-2 text-center">개월수</th>
                                             <th className="px-4 py-2 text-center">시작일</th>
                                             <th className="px-4 py-2 text-center">종료일</th>
-                                            <th className="px-4 py-2 text-center">Slot</th>
+                                            <th className="px-4 py-2 text-center">배정번호</th>
                                             <th className="px-4 py-2 text-center">상태</th>
                                         </tr>
                                     </thead>
@@ -678,7 +681,7 @@ export default function MemberListPage() {
                                                         {account.end_date ? new Date(account.end_date).toLocaleDateString() : '-'}
                                                     </td>
                                                     <td className="px-4 py-3 text-center font-bold text-gray-400">
-                                                        #{account.slot_number + 1}
+                                                        {account.accounts?.login_id ? `${account.accounts.login_id} - #${account.slot_number + 1}` : `#${account.slot_number + 1}`}
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
                                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
