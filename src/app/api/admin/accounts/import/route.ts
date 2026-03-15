@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+// Excel date serial → ISO date string (e.g. 46095 → '2026-03-14')
+function excelDateToISO(serial: number | undefined | null): string | null {
+    if (!serial || typeof serial !== 'number') return null;
+    // Excel epoch is Jan 1, 1900; JS epoch is Jan 1, 1970
+    // 25569 = days between the two epochs
+    const date = new Date((serial - 25569) * 86400 * 1000);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString().split('T')[0];
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { accounts: importData } = await req.json();
@@ -47,13 +57,29 @@ export async function POST(req: NextRequest) {
                 if (!isNaN(slotNumber) && slotNumber >= 0 && slotNumber <= 5) {
                     const mappedTidalId = String(row['소속 ID'] || '')?.trim();
                     const mappedPassword = String(row['소속 PW'] || '')?.trim();
-                    const mappedOrderNum = String(row['주문번호'] || '')?.trim();
+                    // 주문번호: keep as string (may be number in Excel)
+                    const rawOrderNum = row['주문번호'];
+                    const mappedOrderNum = rawOrderNum != null ? String(rawOrderNum).trim() : null;
+
+                    // Customer info from Excel
+                    const buyerName = String(row['고객명'] || '').trim() || null;
+                    const buyerEmail = String(row['이메일'] || '').trim() || null;
+                    const buyerPhone = String(row['전화번호'] || '').trim() || null;
+
+                    // Start/end dates: stored as Excel serial numbers
+                    const startDate = excelDateToISO(row['시작일'] as number);
+                    const endDate = excelDateToISO(row['종료일'] as number);
 
                     currentMaster.slots.push({
                         slot_number: slotNumber,
                         tidal_id: mappedTidalId === '' ? null : mappedTidalId,
                         tidal_password: mappedPassword === '' ? null : mappedPassword,
-                        order_number: mappedOrderNum === '' ? null : mappedOrderNum
+                        order_number: mappedOrderNum === '' ? null : mappedOrderNum,
+                        buyer_name: buyerName,
+                        buyer_email: buyerEmail,
+                        buyer_phone: buyerPhone,
+                        start_date: startDate,
+                        end_date: endDate,
                     });
                 } else {
                     console.warn(`Invalid slot number: ${row['Slot']}, skipping`);
@@ -155,7 +181,13 @@ export async function POST(req: NextRequest) {
                             slot_number: slot.slot_number,
                             tidal_id: safeTidalId,
                             tidal_password: slot.tidal_password || '',
-                            order_id: orderId
+                            order_id: orderId,
+                            order_number: slot.order_number || null,
+                            buyer_name: slot.buyer_name || null,
+                            buyer_email: slot.buyer_email || null,
+                            buyer_phone: slot.buyer_phone || null,
+                            start_date: slot.start_date || null,
+                            end_date: slot.end_date || null,
                         };
 
                         // INSERT with UPSERT to prevent unique constraint conflicts on (account_id, slot_number)
