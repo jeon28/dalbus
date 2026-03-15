@@ -821,7 +821,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
     const handleMove = async () => {
-        if (!selectedAssignment?.orders?.id) return;
+        if (!selectedAssignment) return;
+
+        // 주문이 연결되지 않은 슬롯인 경우 미리 안내
+        if (!selectedAssignment.orders?.id) {
+            alert('이동 실패: 이 슬롯은 주문 정보가 없습니다.\n주문번호가 없는 슬롯은 이동 기능을 사용할 수 없습니다.\n대신 해당 슬롯을 직접 편집(연필 아이콘)하여 정보를 수동으로 변경해 주세요.');
+            return;
+        }
+
         try {
             const res = await apiFetch('/api/admin/accounts/move', {
                 method: 'POST',
@@ -833,13 +840,21 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     target_tidal_password: selectedAssignment.tidal_password
                 })
             });
-            if (!res.ok) throw new Error('Move failed');
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const reason = data?.error || '알 수 없는 오류가 발생했습니다.';
+                alert(`이동 실패: ${reason}`);
+                return;
+            }
+
             setIsMoveModalOpen(false);
             fetchAccounts();
         } catch {
-            alert('이동 실패');
+            alert('이동 실패: 네트워크 오류가 발생했습니다. 인터넷 연결을 확인 후 다시 시도해 주세요.');
         }
     };
+
 
     const openOrderDetail = (order?: Order) => {
         if (!order) return;
