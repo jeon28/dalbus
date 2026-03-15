@@ -1,7 +1,11 @@
-# [달버스(Dalbus)] 기술 구현 가이드 v2.5
+# [달버스(Dalbus)] 기술 구현 가이드 v3.0
 
 > **문서 목적**: 화면 설계서(Screen Flow)와 요구사항 정의서(PRD)를 기반으로, Next.js + Supabase + Vercel 스택에서 실제 구현 가능한 수준의 기술 명세를 제공한다.
-> **작성일**: 2025-02-07 | **대상 독자**: 프론트엔드/풀스택 개발자, 프로젝트 매니저
+> **최초 작성일**: 2025-02-07 | **최종 업데이트**: 2026-03-15 (v1.6.1 기준)
+> **대상 독자**: 프론트엔드/풀스택 개발자, 프로젝트 매니저
+>
+> ⚠️ **이 문서는 초기 설계 가이드로 작성되었으며, v1.6.1 구현과 차이가 있는 부분은 `[현재 구현]` 표기로 갱신하였습니다.**
+> 비즈니스 로직 상세는 [`docs/business-logic.md`](./business-logic.md)를 참조하세요.
 
 ---
 
@@ -76,6 +80,12 @@
 └─────────────────────────────┘
 ```
 
+> **[현재 구현] 실제 아키텍처 (v1.6.1)**
+> - PortOne PG Gateway → **미구현** (무통장 입금 + 수동 입금확인 방식)
+> - 솔라피 SMS/알림톡 → **미구현**, 대신 **Resend 이메일 API** 사용
+> - 외부 서비스 연동 → **Resend** (이메일 발송) 만 활성. ChannelTalk/Sentry/GA4는 미연동
+> - `fetch` API → Next.js 15 AbortError 이슈로 **XMLHttpRequest 래퍼(`api.ts`)** 사용
+
 ### 1.2 데이터 흐름 (Happy Path)
 
 ```
@@ -112,6 +122,11 @@
 | **Free-First** | 무료 티어 최대 활용 | 유료 전환 시점을 명확히 정의 |
 | **SEO-Ready** | 검색엔진 노출 최적화 | SSG/ISR, 구조화 데이터, 사이트맵 자동 생성 |
 
+> **[현재 구현]**
+> - **Server-First** → 실제로는 대부분 페이지가 `"use client"` (ServiceContext 의존). API Routes가 서버 역할 담당.
+> - **XHR-First** → Next.js 15의 `fetch` AbortError/Deadlock 이슈로, 클라이언트→서버 통신에 XMLHttpRequest 래퍼(`src/lib/api.ts`) 사용.
+> - **isHydrated 패턴** → SSR/CSR 하이드레이션 이슈 방지를 위해 `isHydrated` 상태 체크 후 렌더링.
+
 ---
 
 ## 2. 기술 스택 상세
@@ -122,25 +137,41 @@
 |------|------|------|----------|
 | **Framework** | Next.js (App Router) | 15.x | SSR/SSG/ISR 지원, Vercel 최적화 |
 | **Language** | TypeScript | 5.x | 타입 안전성, 코드 자동완성 |
+| **Runtime** | React | 19.x | 최신 React (concurrent features) |
 | **Styling** | Tailwind CSS | 3.x | 모바일-퍼스트 유틸리티, 빠른 개발 |
 | **UI Library** | shadcn/ui | latest | Radix 기반, 접근성 보장, 커스터마이징 용이 |
 | **Database** | Supabase (PostgreSQL) | - | Auth + DB + Storage 올인원 |
 | **Hosting** | Vercel | Hobby(무료) | Next.js 최적 배포, Edge Network |
-| **Payment** | PortOne V2 SDK | - | 국내 PG 25개사 통합, 월 5천만원 미만 무료 |
+| **Email** | Resend | ^6.9.1 | **[현재 구현]** 이메일 발송 API |
+| **Payment** | PortOne V2 SDK | - | 국내 PG 25개사 통합 (⚠️ **미구현** - 향후 연동 예정) |
 
 ### 2.2 보조 라이브러리
 
-| 라이브러리 | 용도 | 비고 |
+> **[현재 구현]** 실제 설치된 의존성 (`package.json` 기준)
+
+| 라이브러리 | 용도 | 상태 |
 |-----------|------|------|
-| `@supabase/ssr` | Supabase 서버사이드 클라이언트 | App Router 필수 |
-| `@portone/browser-sdk` | 결제창 호출 | V2 SDK |
-| `zustand` | 클라이언트 상태 관리 | 가볍고 심플 |
-| `react-hook-form` + `zod` | 폼 관리 + 유효성 검증 | 서버-클라이언트 통합 검증 |
-| `date-fns` | 날짜 계산 (D-Day 등) | 트리셰이킹 지원 |
-| `lucide-react` | 아이콘 | shadcn/ui 기본 아이콘 |
-| `next-sitemap` | 사이트맵 자동 생성 | SEO 필수 |
-| `@vercel/analytics` | 방문 분석 | Vercel 무료 제공 |
-| `@sentry/nextjs` | 에러 추적 | 무료 5K 이벤트/월 |
+| `@supabase/supabase-js` | Supabase 클라이언트 (client + admin) | ✅ 사용 중 |
+| `resend` | 이메일 발송 (Resend API) | ✅ 사용 중 |
+| `xlsx` | Excel 파일 임포트/내보내기 | ✅ 사용 중 |
+| `date-fns` | 날짜 계산 (D-Day, 30일/월 기준) | ✅ 사용 중 |
+| `lucide-react` | 아이콘 | ✅ 사용 중 |
+| `cmdk` | 커맨드 팔레트 (검색 UI) | ✅ 사용 중 |
+| `@radix-ui/*` | shadcn/ui 기반 UI 프리미티브 | ✅ 사용 중 |
+| `class-variance-authority` | 조건부 CSS 클래스 관리 | ✅ 사용 중 |
+| `tailwind-merge` | Tailwind 클래스 머지 | ✅ 사용 중 |
+
+**초기 설계 대비 미사용 라이브러리:**
+
+| 라이브러리 | 원래 용도 | 대체 구현 |
+|-----------|----------|----------|
+| ~~`@supabase/ssr`~~ | SSR 전용 Supabase | `@supabase/supabase-js` 직접 사용 |
+| ~~`@portone/browser-sdk`~~ | 결제창 호출 | 미구현 (무통장 입금) |
+| ~~`zustand`~~ | 상태 관리 | `React Context (ServiceContext)` |
+| ~~`react-hook-form` + `zod`~~ | 폼 관리 | `useState` 직접 구현 |
+| ~~`next-sitemap`~~ | 사이트맵 | 미구현 |
+| ~~`@vercel/analytics`~~ | 방문 분석 | 미연동 |
+| ~~`@sentry/nextjs`~~ | 에러 추적 | 미연동 |
 
 ### 2.3 개발 도구
 
@@ -193,6 +224,8 @@ npx shadcn-ui@latest add button card input label \
 
 ### 3.2 환경 변수 설정
 
+> **[현재 구현]** 실제 필요한 환경변수만 표기합니다.
+
 ```env
 # .env.local (로컬 개발용 - Git에 절대 포함하지 않음)
 
@@ -201,25 +234,25 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...          # 서버 전용, 절대 클라이언트 노출 금지
 
-# ── PortOne ──
-NEXT_PUBLIC_PORTONE_STORE_ID=store-xxxxx
-NEXT_PUBLIC_PORTONE_CHANNEL_KEY=channel-xxxxx
-PORTONE_API_SECRET=xxxxxxxx                       # 서버 전용
-
-# ── 솔라피 (SMS/알림톡) ──
-SOLAPI_API_KEY=xxxxx
-SOLAPI_API_SECRET=xxxxx
-SOLAPI_SENDER_PHONE=01012345678
+# ── Resend (이메일 발송) ── [현재 구현]
+RESEND_API_KEY=re_xxxxx                          # Resend API 키
 
 # ── 사이트 ──
-NEXT_PUBLIC_SITE_URL=https://dalbus.kr            # 도메인 매핑 후 변경
+NEXT_PUBLIC_SITE_URL=https://dalbus.vercel.app   # 현재 Vercel 기본 도메인 사용
 NEXT_PUBLIC_SITE_NAME=달버스
-
-# ── 외부 서비스 ──
-NEXT_PUBLIC_CHANNEL_TALK_KEY=xxxxx
-NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXX
-SENTRY_DSN=https://xxxxx@sentry.io/xxxxx
 ```
+
+> **[미구현 - 향후 연동 시 추가 예정]**
+> ```env
+> # ── PortOne (결제) ──
+> NEXT_PUBLIC_PORTONE_STORE_ID=store-xxxxx
+> PORTONE_API_SECRET=xxxxxxxx
+>
+> # ── 솔라피 (SMS/알림톡) ──
+> SOLAPI_API_KEY=xxxxx
+> SOLAPI_API_SECRET=xxxxx
+> SOLAPI_SENDER_PHONE=01012345678
+> ```
 
 ### 3.3 Supabase 프로젝트 생성
 
@@ -238,152 +271,127 @@ SENTRY_DSN=https://xxxxx@sentry.io/xxxxx
 
 ## 4. 디렉토리 구조
 
+> **[현재 구현]** v1.6.1 기준 실제 디렉토리 구조입니다.
+
 ```
-dalbus-web/
+dalbus/
 ├── src/
-│   ├── app/                          # ← Next.js App Router
-│   │   ├── (public)/                 # 비로그인 접근 가능 그룹
-│   │   │   ├── page.tsx              # SCR_LAND_001: 랜딩
-│   │   │   ├── products/
-│   │   │   │   ├── page.tsx          # SCR_SHOP_001: 상품 목록
-│   │   │   │   └── [slug]/
-│   │   │   │       └── page.tsx      # SCR_SHOP_002: 상품 상세
-│   │   │   ├── notices/
-│   │   │   │   ├── page.tsx          # SCR_NOTICE_001: 공지 목록
-│   │   │   │   └── [id]/
-│   │   │   │       └── page.tsx      # SCR_NOTICE_002: 공지 상세
-│   │   │   └── faq/
-│   │   │       └── page.tsx          # SCR_FAQ_001: FAQ
+│   ├── app/                             # ← Next.js App Router
+│   │   ├── page.tsx                     # / → /public 리다이렉트
+│   │   ├── layout.tsx                   # 루트 레이아웃 (ServiceProvider 포함)
 │   │   │
-│   │   ├── (auth)/                   # 인증 관련 그룹
+│   │   ├── (auth)/                      # 비인증 라우트 그룹
 │   │   │   ├── login/
-│   │   │   │   └── page.tsx          # SCR_AUTH_001: 로그인
-│   │   │   ├── signup/
-│   │   │   │   └── page.tsx          # SCR_AUTH_002: 회원가입
-│   │   │   ├── reset-password/
-│   │   │   │   └── page.tsx          # SCR_AUTH_003: 비밀번호 리셋 요청
-│   │   │   └── update-password/
-│   │   │       └── page.tsx          # SCR_AUTH_004: 비밀번호 변경
+│   │   │   │   ├── page.tsx             # 로그인
+│   │   │   │   └── ForgotPasswordDialog.tsx  # 비밀번호 찾기 (OTP 방식)
+│   │   │   └── signup/
+│   │   │       └── page.tsx             # 회원가입 (생년월일 포함)
 │   │   │
-│   │   ├── (protected)/              # 로그인 필수 그룹
-│   │   │   ├── layout.tsx            # 인증 체크 미들웨어
-│   │   │   ├── mypage/
-│   │   │   │   ├── page.tsx          # SCR_MY_001: 마이페이지 (구독현황)
-│   │   │   │   ├── orders/
-│   │   │   │   │   └── page.tsx      # SCR_MY_002: 주문내역
-│   │   │   │   └── profile/
-│   │   │   │       └── page.tsx      # SCR_MY_003: 프로필 수정
-│   │   │   └── payment/
-│   │   │       ├── page.tsx          # SCR_PAY_001: 결제 처리
-│   │   │       ├── success/
-│   │   │       │   └── page.tsx      # SCR_PAY_002: 결제 성공
-│   │   │       └── fail/
-│   │   │           └── page.tsx      # SCR_PAY_003: 결제 실패
+│   │   ├── (protected)/                 # 인증 필요 라우트 그룹
+│   │   │   ├── admin/
+│   │   │   │   ├── layout.tsx           # 관리자 레이아웃 (사이드바)
+│   │   │   │   ├── page.tsx             # 대시보드 (통계 + 사이트 설정)
+│   │   │   │   ├── orders/page.tsx      # 주문 관리 (4단계 상태 필터)
+│   │   │   │   ├── tidal/
+│   │   │   │   │   ├── page.tsx         # Tidal 계정 관리 (List/Grid View)
+│   │   │   │   │   └── inactive/page.tsx  # 비활성 슬롯 관리
+│   │   │   │   ├── members/page.tsx     # 회원 관리 (리사이즈 컬럼)
+│   │   │   │   ├── services/
+│   │   │   │   │   ├── page.tsx         # 상품 목록
+│   │   │   │   │   ├── new/page.tsx     # 상품 신규 등록
+│   │   │   │   │   └── [id]/page.tsx    # 상품 수정 + 요금제 관리
+│   │   │   │   ├── mail-history/page.tsx  # 메일 발송 이력
+│   │   │   │   ├── faqs/page.tsx        # FAQ 관리
+│   │   │   │   ├── notices/page.tsx     # 공지사항 관리
+│   │   │   │   └── qna/page.tsx         # 문의 관리
+│   │   │   └── mypage/
+│   │   │       └── page.tsx             # 구독현황 + 주문이력 + 프로필
 │   │   │
-│   │   ├── admin/                    # 관리자 전용
-│   │   │   ├── layout.tsx            # 관리자 권한 체크
-│   │   │   ├── page.tsx              # SCR_ADM_001: 주문 대시보드
-│   │   │   ├── assign/
-│   │   │   │   └── [orderId]/
-│   │   │   │       └── page.tsx      # SCR_ADM_002: 계정 배정
-│   │   │   ├── products/
-│   │   │   │   └── page.tsx          # SCR_ADM_003: 상품 관리
-│   │   │   ├── accounts/
-│   │   │   │   └── page.tsx          # SCR_ADM_004: 계정풀 관리
-│   │   │   ├── content/
-│   │   │   │   └── page.tsx          # SCR_ADM_005: 공지/FAQ 관리
-│   │   │   └── stats/
-│   │   │       └── page.tsx          # SCR_ADM_006: 매출 통계
+│   │   ├── public/                      # 공개 페이지 (route group 아님)
+│   │   │   ├── page.tsx                 # 랜딩 페이지
+│   │   │   ├── products/page.tsx        # 상품 목록
+│   │   │   ├── faq/page.tsx             # FAQ
+│   │   │   ├── notices/page.tsx         # 공지사항
+│   │   │   ├── qna/
+│   │   │   │   ├── page.tsx             # 문의 목록
+│   │   │   │   └── write/page.tsx       # 문의 작성
+│   │   │   ├── terms/page.tsx           # 이용약관
+│   │   │   ├── privacy/page.tsx         # 개인정보처리방침
+│   │   │   └── checkout/success/page.tsx  # 결제 성공
 │   │   │
-│   │   ├── api/                      # API Routes (서버 전용)
-│   │   │   ├── payment/
-│   │   │   │   ├── verify/
-│   │   │   │   │   └── route.ts      # 결제 검증 API
-│   │   │   │   └── webhook/
-│   │   │   │       └── route.ts      # PortOne 웹훅 수신
-│   │   │   ├── notifications/
-│   │   │   │   └── send/
-│   │   │   │       └── route.ts      # SMS/알림톡 발송
-│   │   │   └── cron/
-│   │   │       └── expiry-check/
-│   │   │           └── route.ts      # 만료 D-7, D-1 체크
+│   │   ├── service/[id]/page.tsx        # 서비스 상세 + 구매 (NEW/EXT 모드)
 │   │   │
-│   │   ├── layout.tsx                # 루트 레이아웃
-│   │   ├── not-found.tsx             # 404 페이지
-│   │   ├── error.tsx                 # 에러 바운더리
-│   │   ├── loading.tsx               # 글로벌 로딩
-│   │   ├── robots.ts                 # SEO: robots.txt 동적 생성
-│   │   ├── sitemap.ts                # SEO: sitemap.xml 동적 생성
-│   │   └── manifest.ts              # PWA: manifest.json
+│   │   └── api/                         # API Routes (서버 전용)
+│   │       ├── admin/
+│   │       │   ├── orders/              # 주문 CRUD + 상태 변경
+│   │       │   ├── accounts/            # 마스터 계정 CRUD + 슬롯 배정/이동/임포트
+│   │       │   ├── assignments/         # 슬롯 수정/삭제
+│   │       │   ├── members/             # 회원 조회
+│   │       │   ├── products/            # 상품 CRUD
+│   │       │   ├── plans/               # 요금제 CRUD
+│   │       │   ├── mail-history/        # 메일 이력 조회/재발송
+│   │       │   ├── tidal/notify/        # 만료 안내 이메일 발송
+│   │       │   ├── bank-accounts/       # 입금 계좌 관리
+│   │       │   ├── settings/            # 사이트 설정
+│   │       │   ├── faqs/, notices/, qna/  # 컨텐츠 관리
+│   │       │   └── faq-categories/, notice-categories/
+│   │       ├── auth/
+│   │       │   ├── login/route.ts
+│   │       │   ├── guest-signup/route.ts
+│   │       │   ├── check-email/route.ts
+│   │       │   ├── check-user/route.ts
+│   │       │   └── password-reset/      # request → verify → confirm
+│   │       ├── orders/route.ts          # 주문 생성 (사용자용)
+│   │       ├── public/                  # 공개 API (인증 불필요)
+│   │       │   ├── products/, banks/, settings/, faqs/, notices/
+│   │       │   └── faq-categories/
+│   │       ├── qna/                     # Q&A API
+│   │       └── user/mypage/route.ts     # 마이페이지 데이터
 │   │
 │   ├── components/
-│   │   ├── ui/                       # shadcn/ui 컴포넌트 (자동 생성)
+│   │   ├── ui/                          # shadcn/ui 컴포넌트
 │   │   ├── layout/
-│   │   │   ├── Header.tsx            # 반응형 헤더 + 모바일 햄버거
-│   │   │   ├── Footer.tsx            # 사이트 푸터
-│   │   │   ├── MobileNav.tsx         # 모바일 바텀 네비게이션
-│   │   │   └── ChannelTalk.tsx       # 채널톡 위젯
-│   │   ├── landing/
-│   │   │   ├── HeroSection.tsx       # 히어로 배너
-│   │   │   ├── PriceComparison.tsx   # 가격 비교 테이블
-│   │   │   ├── StepGuide.tsx         # 3단계 이용 가이드
-│   │   │   └── ReviewCarousel.tsx    # 후기 캐러셀
-│   │   ├── product/
-│   │   │   ├── ProductCard.tsx       # 서비스 카드
-│   │   │   ├── ProductDetail.tsx     # 상세 정보
-│   │   │   └── PeriodSelector.tsx    # 기간/가격 선택
-│   │   ├── mypage/
-│   │   │   ├── SubscriptionCard.tsx  # 구독 현황 카드 (ID/PW 표시)
-│   │   │   ├── CopyButton.tsx        # 복사 버튼 (📋)
-│   │   │   └── DDayBadge.tsx         # D-Day 카운트다운
-│   │   └── admin/
-│   │       ├── OrderTable.tsx        # 주문 목록 테이블
-│   │       ├── AssignForm.tsx        # 계정 배정 폼
-│   │       ├── StatsChart.tsx        # 매출 차트
-│   │       └── AccountPoolList.tsx   # 계정풀 목록
+│   │   │   ├── Header.tsx               # 반응형 헤더
+│   │   │   ├── Footer.tsx               # 사이트 푸터
+│   │   │   └── landing/                 # 랜딩 섹션 컴포넌트
+│   │   │       ├── HeroSection.tsx
+│   │   │       ├── PriceComparison.tsx
+│   │   │       ├── ReviewCarousel.tsx
+│   │   │       └── StepGuide.tsx
+│   │   ├── admin/
+│   │   │   ├── AdminSidebar.tsx         # 관리자 LNB (리사이즈 가능)
+│   │   │   └── AdminMobileMenu.tsx      # 모바일 관리자 메뉴
+│   │   └── ErrorHandler.tsx             # 전역 에러 핸들러
 │   │
 │   ├── lib/
-│   │   ├── supabase/
-│   │   │   ├── client.ts             # 브라우저용 Supabase 클라이언트
-│   │   │   ├── server.ts             # 서버 컴포넌트용 클라이언트
-│   │   │   ├── admin.ts              # Service Role 클라이언트 (API Route 전용)
-│   │   │   └── middleware.ts         # 미들웨어용 클라이언트
-│   │   ├── portone.ts                # PortOne 결제 유틸
-│   │   ├── solapi.ts                 # 솔라피 SMS 유틸
-│   │   └── utils.ts                  # 공통 유틸리티
-│   │
-│   ├── hooks/
-│   │   ├── useAuth.ts                # 인증 상태 훅
-│   │   ├── useCopyToClipboard.ts     # 클립보드 복사
-│   │   └── useCountdown.ts           # D-Day 카운트다운
-│   │
-│   ├── stores/
-│   │   └── cartStore.ts              # 결제 전 임시 상태 (zustand)
+│   │   ├── ServiceContext.tsx           # 전역 상태 관리 (React Context)
+│   │   ├── supabase.ts                  # 클라이언트 Supabase (storageKey: 'dalbus-auth-token')
+│   │   ├── supabaseAdmin.ts             # 서버 전용 Admin Supabase (Service Role)
+│   │   ├── api.ts                       # XHR 기반 API 래퍼 (JWT 자동 첨부)
+│   │   ├── auth.ts                      # 서버 세션 검증 (getServerSession)
+│   │   ├── email.ts                     # Resend 이메일 발송 + mail_history 로깅
+│   │   ├── logger.ts                    # 로깅 유틸
+│   │   └── utils.ts                     # 공통 유틸리티 (normalizePhone 등)
 │   │
 │   └── types/
-│       ├── database.ts               # Supabase 자동 생성 타입
-│       └── index.ts                  # 커스텀 타입 정의
+│       ├── database.ts                  # Supabase 자동 생성 타입
+│       └── index.ts                     # 커스텀 타입 정의
 │
-├── public/
-│   ├── og-image.png                  # 소셜 공유 이미지 (1200x630)
-│   ├── favicon.ico
-│   ├── icons/                        # PWA 아이콘
-│   └── images/
-│       └── services/                 # 서비스 로고 (tidal.png 등)
+├── docs/                                # 프로젝트 문서
+│   ├── business-logic.md                # 비즈니스 로직 상세
+│   ├── techspec.md                      # 기술 구현 가이드 (본 문서)
+│   ├── prd.md                           # 요구사항 정의서
+│   ├── db_schema.md                     # DB 스키마 문서
+│   └── ...                              # 기타 문서
 │
-├── supabase/
-│   └── migrations/                   # DB 마이그레이션 SQL
-│       ├── 001_create_tables.sql
-│       ├── 002_rls_policies.sql
-│       ├── 003_functions.sql
-│       └── 004_seed_data.sql
-│
-├── middleware.ts                      # Next.js 미들웨어 (인증 리프레시)
-├── next.config.ts
-├── tailwind.config.ts
-├── next-sitemap.config.js            # 사이트맵 설정
-├── .env.local                        # 환경변수 (Git 제외)
-├── .env.example                      # 환경변수 템플릿
+├── scripts/                             # 유틸리티 스크립트
+├── supabase/                            # Supabase 로컬 설정
+├── public/                              # 정적 파일
+├── *.sql                                # DB 마이그레이션 SQL 파일들
+├── next.config.mjs                      # Next.js 설정
+├── tailwind.config.js                   # Tailwind CSS 설정
+├── tsconfig.json                        # TypeScript 설정
+├── .env.local                           # 환경변수 (Git 제외)
 └── package.json
 ```
 
@@ -393,116 +401,189 @@ dalbus-web/
 
 ### 5.1 ERD (Entity Relationship Diagram)
 
+> **[현재 구현] v1.6.1 실제 스키마**
+> 초기 설계 대비 대폭 확장되었습니다. 아래는 실제 운영 중인 테이블 구조입니다.
+> 마이그레이션 파일: `supabase/migrations/` (29개 파일)
+
 ```
-┌──────────────────┐       ┌──────────────────────────┐
-│     profiles      │       │       products            │
-├──────────────────┤       ├──────────────────────────┤
-│ id (PK, FK→auth) │       │ id (PK, uuid)             │
-│ email             │       │ slug (unique)             │
-│ name              │       │ name                      │
-│ phone             │       │ description               │
-│ role (enum)       │──┐   │ original_price (integer)  │
-│ created_at        │  │   │ benefits (text[])          │
-│ updated_at        │  │   │ cautions (text[])          │
-└──────────────────┘  │   │ image_url                  │
-                       │   │ tags (text[])              │
-                       │   │ is_active (boolean)        │
-                       │   │ sort_order (integer)       │
-                       │   │ created_at                 │
-                       │   └──────────┬───────────────┘
-                       │              │
-                       │   ┌──────────┴───────────────┐
-                       │   │   product_plans            │
-                       │   ├──────────────────────────┤
-                       │   │ id (PK, uuid)             │
-                       │   │ product_id (FK→products)  │
-                       │   │ duration_months (integer)  │
-                       │   │ price (integer)            │
-                       │   │ discount_rate (numeric)    │
-                       │   │ is_active (boolean)        │
-                       │   └──────────┬───────────────┘
-                       │              │
-                       │   ┌──────────┴───────────────┐
-                       ├──▶│        orders              │
-                       │   ├──────────────────────────┤
-                       │   │ id (PK, uuid)             │
-                       │   │ order_number (unique)     │
-                       │   │ user_id (FK→profiles)     │
-                       │   │ product_id (FK→products)  │
-                       │   │ plan_id (FK→product_plans)│
-                       │   │ amount (integer)           │
-                       │   │ payment_status (enum)      │
-                       │   │ assignment_status (enum)   │
-                       │   │ portone_payment_id         │
-                       │   │ paid_at (timestamptz)      │
-                       │   │ assigned_at (timestamptz)  │
-                       │   │ start_date (date)          │
-                       │   │ end_date (date)            │
-                       │   │ created_at                 │
-                       │   └──────────┬───────────────┘
-                       │              │
-                       │   ┌──────────┴───────────────┐
-                       │   │   order_accounts           │
-                       │   ├──────────────────────────┤
-                       │   │ id (PK, uuid)             │
-                       │   │ order_id (FK→orders)      │
-                       │   │ account_id (FK→accounts)  │
-                       │   │ assigned_at               │
-                       │   └──────────────────────────┘
-                       │
-                       │   ┌──────────────────────────┐
-                       │   │      accounts              │
-                       │   ├──────────────────────────┤
-                       │   │ id (PK, uuid)             │
-                       │   │ product_id (FK→products)  │
-                       │   │ login_id (text, 암호화)    │
-                       │   │ login_pw (text, 암호화)    │
-                       │   │ status (enum)              │
-                       │   │ max_slots (integer)        │
-                       │   │ used_slots (integer)       │
-                       │   │ memo (text)                │
-                       │   │ created_at                 │
-                       │   └──────────────────────────┘
-                       │
-                       │   ┌──────────────────────────┐
-                       │   │       notices              │
-                       │   ├──────────────────────────┤
-                       │   │ id (PK, uuid)             │
-                       │   │ title                     │
-                       │   │ content (text)             │
-                       │   │ category (enum)            │
-                       │   │ is_published (boolean)     │
-                       │   │ is_pinned (boolean)        │
-                       │   │ created_at                 │
-                       │   └──────────────────────────┘
-                       │
-                       │   ┌──────────────────────────┐
-                       │   │         faqs               │
-                       │   ├──────────────────────────┤
-                       │   │ id (PK, uuid)             │
-                       │   │ question                  │
-                       │   │ answer (text)              │
-                       │   │ category (enum)            │
-                       │   │ sort_order (integer)       │
-                       │   │ is_published (boolean)     │
-                       │   │ created_at                 │
-                       │   └──────────────────────────┘
-                       │
-                       │   ┌──────────────────────────┐
-                       └──▶│   notification_logs        │
-                           ├──────────────────────────┤
-                           │ id (PK, uuid)             │
-                           │ user_id (FK→profiles)     │
-                           │ order_id (FK→orders)      │
-                           │ type (enum)                │
-                           │ channel (enum)             │
-                           │ status (enum)              │
-                           │ message (text)             │
-                           │ sent_at                    │
-                           └──────────────────────────┘
+┌─────────────────────┐       ┌──────────────────────────┐
+│      profiles        │       │       products            │
+├─────────────────────┤       ├──────────────────────────┤
+│ id (PK, FK→auth)    │       │ id (PK, uuid)             │
+│ email                │       │ slug (unique)             │
+│ name                 │       │ name                      │
+│ phone                │       │ description               │
+│ role (enum)          │──┐   │ original_price (integer)  │
+│ birth_date (text)  ★ │  │   │ benefits (text[])          │
+│ memo (text)        ★ │  │   │ cautions (text[])          │
+│ created_at           │  │   │ image_url                  │
+│ updated_at           │  │   │ tags (text[])              │
+└─────────────────────┘  │   │ is_active (boolean)        │
+                          │   │ sort_order (integer)       │
+★ = v1.6.1 추가 필드      │   │ created_at                 │
+                          │   └──────────┬───────────────┘
+                          │              │
+                          │   ┌──────────┴───────────────┐
+                          │   │   product_plans            │
+                          │   ├──────────────────────────┤
+                          │   │ id (PK, uuid)             │
+                          │   │ product_id (FK→products)  │
+                          │   │ duration_months (integer)  │
+                          │   │ price (integer)            │
+                          │   │ discount_rate (numeric)    │
+                          │   │ is_active (boolean)        │
+                          │   │ created_at                 │
+                          │   └──────────┬───────────────┘
+                          │              │
+                          │   ┌──────────┴───────────────┐
+                          ├──▶│        orders              │
+                          │   ├──────────────────────────┤
+                          │   │ id (PK, uuid)             │
+                          │   │ order_number (unique)     │
+                          │   │ user_id (FK→profiles)     │
+                          │   │ product_id (FK→products)  │
+                          │   │ plan_id (FK→product_plans)│
+                          │   │ amount (integer)           │
+                          │   │ payment_status (enum)      │
+                          │   │ assignment_status (enum)   │
+                          │   │ order_type (NEW|EXT)     ★ │
+                          │   │ buyer_name             ★  │
+                          │   │ buyer_phone            ★  │
+                          │   │ buyer_email            ★  │
+                          │   │ depositor_name         ★  │
+                          │   │ related_order_id       ★  │
+                          │   │ portone_payment_id         │
+                          │   │ paid_at, assigned_at       │
+                          │   │ created_at                 │
+                          │   └──────────┬───────────────┘
+                          │              │
+                          │   ┌──────────┴───────────────────────┐
+                          │   │     order_accounts ★ 대폭 확장     │
+                          │   ├─────────────────────────────────┤
+                          │   │ id (PK, uuid)                   │
+                          │   │ order_id (FK→orders)            │
+                          │   │ account_id (FK→accounts)        │
+                          │   │ slot_number (integer)         ★ │
+                          │   │ type ('master'|'user')        ★ │
+                          │   │ tidal_id, tidal_password      ★ │
+                          │   │ buyer_name, buyer_phone       ★ │
+                          │   │ buyer_email, order_number     ★ │
+                          │   │ start_date, end_date          ★ │
+                          │   │ is_active (boolean)           ★ │
+                          │   │ assigned_at                     │
+                          │   └─────────────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐
+                          │   │      accounts              │
+                          │   ├──────────────────────────┤
+                          │   │ id (PK, uuid)             │
+                          │   │ product_id (FK→products)  │
+                          │   │ login_id (text)            │
+                          │   │ login_pw (text)            │
+                          │   │ status (enum)              │
+                          │   │ max_slots (int, def 6)  ★ │
+                          │   │ used_slots (integer)       │
+                          │   │ payment_email (text)     ★ │
+                          │   │ payment_day (integer)    ★ │
+                          │   │ memo (text)                │
+                          │   │ created_at                 │
+                          │   └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐
+                          │   │      mail_history ★ 신규   │
+                          │   ├──────────────────────────┤
+                          │   │ id, recipient_email       │
+                          │   │ recipient_name            │
+                          │   │ mail_type, subject        │
+                          │   │ content, status           │
+                          │   │ error_message, sent_at    │
+                          │   └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐
+                          │   │   site_settings ★ 신규     │
+                          │   ├──────────────────────────┤
+                          │   │ key (PK, text)            │
+                          │   │ value (text)              │
+                          │   │ (admin_email,             │
+                          │   │  admin_sender_email,      │
+                          │   │  admin_login_id/pw 등)    │
+                          │   └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐
+                          │   │   bank_accounts ★ 신규     │
+                          │   ├──────────────────────────┤
+                          │   │ id, bank_name             │
+                          │   │ account_number            │
+                          │   │ account_holder            │
+                          │   │ is_active, sort_order     │
+                          │   └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐
+                          │   │ verification_codes ★ 신규  │
+                          │   ├──────────────────────────┤
+                          │   │ id, email, code           │
+                          │   │ expires_at, created_at    │
+                          │   └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐
+                          │   │       qna ★ 신규           │
+                          │   ├──────────────────────────┤
+                          │   │ id, user_id (nullable)    │
+                          │   │ guest_name, guest_password│
+                          │   │ title, content            │
+                          │   │ is_secret, status         │
+                          │   │ answer_content            │
+                          │   │ answered_at               │
+                          │   └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐  ┌──────────────────────────┐
+                          │   │       notices              │  │         faqs               │
+                          │   ├──────────────────────────┤  ├──────────────────────────┤
+                          │   │ id, title, content        │  │ id, question, answer     │
+                          │   │ category, is_published    │  │ category_id (FK) ★       │
+                          │   │ is_pinned, category_id ★  │  │ sort_order, is_published │
+                          │   │ created_at                │  │ created_at                │
+                          │   └──────────────────────────┘  └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐  ┌──────────────────────────┐
+                          │   │  notice_categories ★ 신규  │  │   faq_categories ★ 신규   │
+                          │   ├──────────────────────────┤  ├──────────────────────────┤
+                          │   │ id, name, sort_order      │  │ id, name, sort_order     │
+                          │   └──────────────────────────┘  └──────────────────────────┘
+                          │
+                          │   ┌──────────────────────────┐
+                          └──▶│   notification_logs        │
+                              ├──────────────────────────┤
+                              │ id (PK, uuid)             │
+                              │ user_id (FK→profiles)     │
+                              │ order_id (FK→orders)      │
+                              │ type (enum)                │
+                              │ channel (enum)             │
+                              │ status (enum)              │
+                              │ message (text)             │
+                              │ sent_at                    │
+                              └──────────────────────────┘
 ```
 
+> **[현재 구현] 주요 변경 요약 (초기 설계 → v1.6.1)**
+>
+> | 테이블 | 변경 내용 |
+> |--------|----------|
+> | `profiles` | `birth_date`, `memo` 필드 추가 |
+> | `orders` | `order_type`(NEW/EXT), `buyer_name/phone/email`, `depositor_name`, `related_order_id` 추가 |
+> | `order_accounts` | 단순 매핑 → **슬롯 관리 테이블로 확장** (slot_number, type, tidal_id/pw, buyer 정보, start/end_date, is_active) |
+> | `accounts` | `max_slots` 기본값 5→6, `payment_email`, `payment_day` 추가 |
+> | `mail_history` | **신규** - Resend 이메일 발송 이력 (notification_logs와 별도) |
+> | `site_settings` | **신규** - 관리자 이메일, 발신 이메일, 로그인 정보 등 키-값 설정 |
+> | `bank_accounts` | **신규** - 무통장 입금 계좌 관리 |
+> | `verification_codes` | **신규** - 비밀번호 초기화 OTP (6자리, 10분 만료) |
+> | `qna` | **신규** - 고객 문의 (회원/비회원 지원, 비밀글) |
+> | `notice_categories`, `faq_categories` | **신규** - enum 대신 동적 카테고리 테이블 |
+
 ### 5.2 테이블 생성 SQL (마이그레이션)
+
+> **[현재 구현]** 아래 SQL은 초기 설계 기준이며, 실제로는 `supabase/migrations/` 디렉토리에 29개의 마이그레이션 파일로 점진적으로 확장되었습니다.
+> 실제 스키마와 차이가 있는 부분은 Section 5.1 ERD의 ★ 표시를 참조하세요.
 
 ```sql
 -- supabase/migrations/001_create_tables.sql
@@ -991,289 +1072,81 @@ SELECT id, 3, 21900, 57.06 FROM products WHERE slug = 'netflix-standard';
 
 ## 6. 인증(Authentication) 구현
 
-### 6.1 Supabase 클라이언트 설정
+> **[현재 구현] 실제 인증 아키텍처 (v1.6.1)**
+>
+> 초기 설계와 대폭 다릅니다. 아래의 6.1~6.3 코드는 **초기 설계안**이며, 실제 구현은 다음과 같습니다:
+>
+> | 항목 | 초기 설계 | 실제 구현 (v1.6.1) |
+> |------|----------|-------------------|
+> | **Supabase 클라이언트** | `@supabase/ssr` (createBrowserClient/createServerClient) | `@supabase/supabase-js` 직접 사용 (`src/lib/supabase.ts`) |
+> | **서버 인증** | cookie 기반 (middleware.ts) | **Bearer Token** 기반 (`src/lib/auth.ts` → `getServerSession()`) |
+> | **미들웨어** | `middleware.ts` 에서 세션 갱신 + 보호 경로 리다이렉트 | **middleware.ts 없음** — 각 페이지/API에서 개별 처리 |
+> | **상태 관리** | `@supabase/ssr` 쿠키 자동 관리 | `ServiceContext` (React Context) + `localStorage('dalbus-auth-token')` |
+> | **Google OAuth** | `signInWithOAuth({ provider: 'google' })` | **미구현** — 이메일/비밀번호 로그인만 지원 |
+> | **폼 검증** | `react-hook-form` + `zod` | `useState` 직접 구현 |
+> | **비밀번호 초기화** | Supabase Auth 내장 resetPasswordForEmail | **자체 OTP 방식** (`verification_codes` 테이블, 6자리, 10분 만료) |
+> | **관리자 인증** | profiles.role 기반 (SSR) | `ServiceContext.isAdmin` + `site_settings` 테이블 기반 별도 관리자 로그인 |
+>
+> **실제 인증 흐름:**
+> ```
+> [클라이언트]                           [API Route]                    [Supabase]
+>    │                                      │                              │
+>    │── supabase.auth.signInWithPassword ──▶│                              │
+>    │                                      │── auth.getUser(token) ───────▶│
+>    │◀── session (JWT token) ──────────────│◀── user 정보 ────────────────│
+>    │                                      │                              │
+>    │── ServiceContext에 user 저장          │                              │
+>    │── localStorage에 토큰 백업           │                              │
+>    │                                      │                              │
+>    │── API 호출 (XHR + Bearer token) ────▶│                              │
+>    │                                      │── getServerSession(req) ─────▶│
+>    │                                      │   (Authorization 헤더에서     │
+>    │                                      │    토큰 추출 → 검증)          │
+>    │                                      │◀── { id, email, role } ──────│
+>    │◀── 응답 ────────────────────────────│                              │
+> ```
+>
+> **핵심 파일:**
+> - `src/lib/supabase.ts` — 클라이언트 Supabase (storageKey: `'dalbus-auth-token'`)
+> - `src/lib/supabaseAdmin.ts` — 서버 전용 Admin (Service Role, RLS 바이패스)
+> - `src/lib/auth.ts` — `getServerSession(req)`, `isAdmin(session)` 헬퍼
+> - `src/lib/ServiceContext.tsx` — 전역 상태 (user, isAdmin, isHydrated)
+> - `src/lib/api.ts` — XHR 래퍼 (JWT 자동 첨부, Next.js 15 fetch 이슈 회피)
+
+### 6.1 Supabase 클라이언트 설정 (초기 설계안)
+
+> ⚠️ 아래 코드는 초기 설계안입니다. 실제로는 `@supabase/ssr`을 사용하지 않습니다.
 
 ```typescript
-// src/lib/supabase/client.ts
-// 브라우저(클라이언트 컴포넌트)에서 사용
+// src/lib/supabase/client.ts (초기 설계 — 미사용)
 import { createBrowserClient } from '@supabase/ssr';
-import type { Database } from '@/types/database';
-
-export function createClient() {
-    return createBrowserClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-}
 ```
 
-```typescript
-// src/lib/supabase/server.ts
-// 서버 컴포넌트, Server Action에서 사용
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import type { Database } from '@/types/database';
+### 6.2 미들웨어 (초기 설계안)
 
-export async function createClient() {
-    const cookieStore = await cookies();
+> ⚠️ 실제로는 `middleware.ts`가 존재하지 않습니다. 라우트 보호는 각 페이지/API에서 개별 처리합니다.
 
-    return createServerClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return cookieStore.getAll();
-                },
-                setAll(cookiesToSet) {
-                    try {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        );
-                    } catch {
-                        // Server Component에서 호출 시 무시
-                    }
-                },
-            },
-        }
-    );
-}
-```
+### 6.3 로그인 페이지 (초기 설계안)
 
-```typescript
-// src/lib/supabase/admin.ts
-// API Route에서 Service Role로 사용 (RLS 바이패스)
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
-
-export const supabaseAdmin = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-```
-
-### 6.2 미들웨어 (세션 갱신)
-
-```typescript
-// middleware.ts (프로젝트 루트)
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
-
-export async function middleware(request: NextRequest) {
-    let supabaseResponse = NextResponse.next({ request });
-
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll();
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value }) =>
-                        request.cookies.set(name, value)
-                    );
-                    supabaseResponse = NextResponse.next({ request });
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    );
-                },
-            },
-        }
-    );
-
-    // 세션 갱신 (중요: 이 코드 제거 시 사용자 세션이 만료됨)
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // 보호된 경로 접근 시 로그인 필요
-    const protectedPaths = ['/mypage', '/payment'];
-    const isProtected = protectedPaths.some(path =>
-        request.nextUrl.pathname.startsWith(path)
-    );
-
-    if (isProtected && !user) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/login';
-        url.searchParams.set('redirect', request.nextUrl.pathname);
-        return NextResponse.redirect(url);
-    }
-
-    // 관리자 경로 보호
-    if (request.nextUrl.pathname.startsWith('/admin')) {
-        if (!user) {
-            return NextResponse.redirect(new URL('/login', request.url));
-        }
-
-        // 관리자 권한 체크는 layout에서 수행 (미들웨어에서 DB 조회 최소화)
-    }
-
-    return supabaseResponse;
-}
-
-export const config = {
-    matcher: [
-        // 정적 파일과 API 제외
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-    ],
-};
-```
-
-### 6.3 로그인 페이지 구현
-
-```typescript
-// src/app/(auth)/login/page.tsx
-'use client';
-
-import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import Link from 'next/link';
-
-const loginSchema = z.object({
-    email: z.string().email('올바른 이메일 형식을 입력하세요'),
-    password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다'),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
-
-export default function LoginPage() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const redirect = searchParams.get('redirect') || '/mypage';
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
-        resolver: zodResolver(loginSchema),
-    });
-
-    async function onSubmit(data: LoginForm) {
-        setLoading(true);
-        setError('');
-
-        const supabase = createClient();
-        const { error } = await supabase.auth.signInWithPassword({
-            email: data.email,
-            password: data.password,
-        });
-
-        if (error) {
-            setError('이메일 또는 비밀번호가 올바르지 않습니다');
-            setLoading(false);
-            return;
-        }
-
-        router.push(redirect);
-        router.refresh();
-    }
-
-    async function handleGoogleLogin() {
-        const supabase = createClient();
-        await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: `${window.location.origin}/api/auth/callback?redirect=${redirect}`,
-            },
-        });
-    }
-
-    return (
-        <div className="min-h-screen flex items-center justify-center px-4">
-            <div className="w-full max-w-sm space-y-6">
-                <div className="text-center">
-                    <h1 className="text-2xl font-bold">달버스 로그인</h1>
-                    <p className="text-muted-foreground mt-2">
-                        프리미엄 구독을 더 합리적으로
-                    </p>
-                </div>
-
-                {/* Google OAuth */}
-                <Button
-                    variant="outline"
-                    className="w-full h-12"
-                    onClick={handleGoogleLogin}
-                >
-                    <img src="/images/google-icon.svg" alt="" className="w-5 h-5 mr-2" />
-                    Google로 계속하기
-                </Button>
-
-                <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">또는</span>
-                    </div>
-                </div>
-
-                {/* 이메일 로그인 폼 */}
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="email">이메일</Label>
-                        <Input
-                            id="email"
-                            type="email"
-                            placeholder="hello@example.com"
-                            className="h-12"
-                            {...register('email')}
-                        />
-                        {errors.email && (
-                            <p className="text-sm text-destructive">{errors.email.message}</p>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <Label htmlFor="password">비밀번호</Label>
-                            <Link href="/reset-password" className="text-sm text-primary">
-                                비밀번호를 잊으셨나요?
-                            </Link>
-                        </div>
-                        <Input
-                            id="password"
-                            type="password"
-                            placeholder="8자 이상"
-                            className="h-12"
-                            {...register('password')}
-                        />
-                        {errors.password && (
-                            <p className="text-sm text-destructive">{errors.password.message}</p>
-                        )}
-                    </div>
-
-                    {error && (
-                        <p className="text-sm text-destructive text-center">{error}</p>
-                    )}
-
-                    <Button type="submit" className="w-full h-12" disabled={loading}>
-                        {loading ? '로그인 중...' : '로그인'}
-                    </Button>
-                </form>
-
-                <p className="text-center text-sm text-muted-foreground">
-                    아직 계정이 없으신가요?{' '}
-                    <Link href="/signup" className="text-primary font-medium">
-                        회원가입
-                    </Link>
-                </p>
-            </div>
-        </div>
-    );
-}
-```
+> ⚠️ 실제 로그인은 `src/app/(auth)/login/page.tsx`에서 `useState` + `supabase.auth.signInWithPassword`로 구현됩니다. Google OAuth, react-hook-form, zod는 사용하지 않습니다.
 
 ---
 
 ## 7. 주요 페이지별 구현 상세
 
-### 7.1 랜딩 페이지 (SSG - 검색엔진 최적화)
+> **[현재 구현]** 아래 7.1~7.3의 코드는 **초기 설계안**이며, 실제 구현과 상당한 차이가 있습니다.
+>
+> | 항목 | 초기 설계 | 실제 구현 (v1.6.1) |
+> |------|----------|-------------------|
+> | **랜딩 페이지** | Server Component + ISR (SSG) | `"use client"` — ServiceContext 의존 |
+> | **상품 상세** | slug 기반 (`/products/[slug]`) | id 기반 (`/service/[id]`) — NEW/EXT 모드 지원 |
+> | **마이페이지** | Server Component (3개 섹션) | `"use client"` — 구독현황 + 주문이력 + 프로필 수정 (XHR API 호출) |
+> | **SEO** | 동적 메타데이터 + JSON-LD + sitemap | 기본 메타데이터만 구현, sitemap/JSON-LD 미구현 |
+> | **데이터 패칭** | `createClient()` (서버) | `api.ts` XHR 래퍼 (클라이언트) |
+>
+> 실제 페이지 구현 상세는 [`docs/business-logic.md`](./business-logic.md)를 참조하세요.
+
+### 7.1 랜딩 페이지 (SSG - 검색엔진 최적화) — 초기 설계안
 
 ```typescript
 // src/app/(public)/page.tsx
@@ -1577,7 +1450,17 @@ export default async function MyPage() {
 
 ## 8. 결제 연동 (PortOne V2)
 
-### 8.1 결제 플로우
+> **[현재 구현] ⚠️ 미구현 — 무통장 입금 방식으로 운영 중 (v1.6.1)**
+>
+> PortOne 결제 연동은 구현되지 않았습니다. 현재 결제 흐름:
+> 1. 사용자가 상품/요금제 선택 → 주문 생성 (`payment_status: 'pending'`)
+> 2. 관리자가 등록한 입금 계좌 정보 표시 (`bank_accounts` 테이블)
+> 3. 사용자가 무통장 입금 후 대기
+> 4. 관리자가 `/admin/orders`에서 수동으로 입금 확인 → `payment_status: 'paid'`로 변경
+>
+> 아래 8.1~8.3은 **향후 연동을 위한 설계안**입니다.
+
+### 8.1 결제 플로우 (향후 설계안)
 
 ```
 [사용자]                     [Next.js]                    [PortOne]              [Supabase]
@@ -1720,7 +1603,26 @@ export async function POST(request: NextRequest) {
 
 ## 9. 알림 시스템 (SMS/알림톡)
 
-### 9.1 솔라피 API 유틸
+> **[현재 구현] ⚠️ SMS/알림톡 미구현 — Resend 이메일로 대체 (v1.6.1)**
+>
+> 솔라피(Solapi) SMS/알림톡 연동은 구현되지 않았습니다. 대신 **Resend API**를 통한 이메일 발송으로 대체되었습니다.
+>
+> **실제 구현된 알림 (이메일):**
+>
+> | 이메일 유형 | 발송 시점 | 구현 함수 |
+> |------------|----------|----------|
+> | 관리자 주문 알림 | 사용자 주문 생성 시 | `sendAdminOrderNotification()` |
+> | 사용자 주문 접수 안내 | 사용자 주문 생성 시 | `sendUserOrderNotification()` |
+> | 계정 세팅 완료 안내 | 관리자가 작업완료 처리 시 | `sendAssignmentNotification()` |
+> | 서비스 만료 안내 | 관리자가 수동 발송 | `sendExpiryNotification()` |
+> | 비밀번호 초기화 인증번호 | 사용자 비밀번호 찾기 시 | `sendPasswordResetCode()` |
+>
+> 핵심 파일: `src/lib/email.ts` (Resend + mail_history 자동 로깅)
+> 상세 문서: [`docs/business-logic.md` 4장 메일 발송 관리](./business-logic.md)
+>
+> 아래 9.1~9.2는 **향후 연동을 위한 설계안**입니다.
+
+### 9.1 솔라피 API 유틸 (향후 설계안)
 
 ```typescript
 // src/lib/solapi.ts
@@ -1868,7 +1770,21 @@ export async function GET(request: NextRequest) {
 
 ## 10. 관리자(Admin) 시스템
 
-### 10.1 관리자 레이아웃 (권한 검증)
+> **[현재 구현] 실제 관리자 시스템 (v1.6.1)**
+>
+> 초기 설계와 다른 주요 차이점:
+>
+> | 항목 | 초기 설계 | 실제 구현 |
+> |------|----------|----------|
+> | **인증** | SSR (서버 컴포넌트에서 세션 확인) | 클라이언트 (`ServiceContext.isAdmin`) + 별도 관리자 로그인 |
+> | **라우트** | `/admin`, `/admin/products`, `/admin/accounts` | `/admin/orders`, `/admin/tidal`, `/admin/services`, `/admin/members`, `/admin/mail-history`, `/admin/faqs`, `/admin/notices`, `/admin/qna` |
+> | **배정** | Server Action + DB 함수 (`assign_account`) | API Route (`/api/admin/accounts/[id]/assign`) + 클라이언트 XHR |
+> | **SMS 발송** | 솔라피 SMS 자동 발송 | Resend 이메일 수동 발송 (`/admin/tidal` 만료안내) |
+> | **레이아웃** | 서버 컴포넌트 사이드바 | `"use client"` + `AdminSidebar` (리사이즈 가능) + `AdminMobileMenu` |
+>
+> 실제 관리자 기능 상세는 [`docs/business-logic.md`](./business-logic.md)를 참조하세요.
+
+### 10.1 관리자 레이아웃 (권한 검증) — 초기 설계안
 
 ```typescript
 // src/app/admin/layout.tsx
@@ -1983,6 +1899,13 @@ export async function assignAccount(orderId: string, accountId: string) {
 ---
 
 ## 11. 모바일 최적화 전략
+
+> **[현재 구현]** 모바일 퍼스트 설계 원칙은 유지되고 있으나, 아래 코드 예시와 차이가 있습니다:
+> - 바텀 네비게이션 → **미구현** (헤더 기반 네비게이션 사용)
+> - Pretendard 폰트 → **Geist 폰트** 사용 (`next/font/google`)
+> - `MobileNav` 컴포넌트 → 대신 `Header.tsx`에서 반응형 햄버거 메뉴
+> - Glassmorphism 디자인 → 부분 적용 (랜딩 페이지 위주)
+> - ChannelTalk → **미연동**
 
 ### 11.1 반응형 레이아웃 원칙
 
@@ -2149,6 +2072,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ## 12. SEO 및 검색엔진 최적화
 
+> **[현재 구현]** SEO 기능은 대부분 **미구현** 상태입니다 (v1.6.1):
+> - `sitemap.ts` → 미구현
+> - `robots.ts` → 미구현
+> - JSON-LD 구조화 데이터 → 미구현
+> - 동적 메타데이터 → 기본 title만 설정
+> - Google Search Console / Naver Search Advisor → 미등록
+> - 대부분 페이지가 `"use client"`이므로 SSG/ISR 미적용
+>
+> 아래는 향후 SEO 최적화 시 참조할 설계안입니다.
+
 ### 12.1 SEO 전략 요약
 
 | 전략 | 구현 | 효과 |
@@ -2287,26 +2220,28 @@ export default async function FAQPage() {
 
 ## 13. 보안 체크리스트
 
+> **[현재 구현]** v1.6.1 기준 보안 상태를 반영하여 업데이트합니다.
+
 | 카테고리 | 항목 | 구현 상태 | 비고 |
 |---------|------|----------|------|
-| **인증** | Supabase Auth JWT + HttpOnly Cookie | ✅ | @supabase/ssr 자동 처리 |
+| **인증** | Supabase Auth JWT | ✅ | Bearer Token 방식 (cookie가 아닌 localStorage) |
 | **인증** | 비밀번호 해시 (bcrypt) | ✅ | Supabase Auth 기본 제공 |
 | **인증** | 로그인 시도 횟수 제한 | ✅ | Supabase Auth rate limiting |
 | **인가** | RLS 정책 전 테이블 적용 | ✅ | Section 5.3 참조 |
-| **인가** | Admin 경로 서버사이드 권한 체크 | ✅ | middleware.ts + layout.tsx |
-| **데이터** | 계정 ID/PW 함수 통해서만 조회 | ✅ | get_my_account_info() |
-| **데이터** | Service Role Key 서버 전용 | ✅ | SUPABASE_SERVICE_ROLE_KEY |
-| **결제** | 서버사이드 금액 검증 | ✅ | /api/payment/verify |
-| **결제** | PortOne API Secret 서버 전용 | ✅ | PORTONE_API_SECRET |
+| **인가** | Admin API 권한 체크 | ✅ | `getServerSession()` + `isAdmin()` (API Route) |
+| **데이터** | Service Role Key 서버 전용 | ✅ | `SUPABASE_SERVICE_ROLE_KEY` (API Route에서만 사용) |
+| **결제** | 서버사이드 금액 검증 | ⬜ 미구현 | PortOne 미연동 (무통장 입금) |
 | **통신** | HTTPS 강제 (Vercel 기본) | ✅ | 자동 SSL 인증서 |
 | **환경** | 환경변수 .env.local (Git 제외) | ✅ | .gitignore 설정 |
-| **XSS** | React 자동 이스케이프 | ✅ | dangerouslySetInnerHTML 최소화 |
-| **CSRF** | SameSite Cookie 정책 | ✅ | Supabase 기본 설정 |
-| **봇방지** | Cron API Bearer Token 검증 | ✅ | CRON_SECRET 환경변수 |
+| **XSS** | React 자동 이스케이프 | ✅ | dangerouslySetInnerHTML은 이메일 HTML에만 사용 |
+| **비밀번호 초기화** | OTP 10분 만료 | ✅ | `verification_codes` 테이블 |
+| **미들웨어** | 서버사이드 라우트 보호 | ⬜ 미구현 | 클라이언트 사이드에서 처리 |
 
 ---
 
 ## 14. Vercel 배포 및 도메인 설정
+
+> **[현재 구현]** Vercel 배포 완료. 기본 도메인 `dalbus.vercel.app` 사용 중. 커스텀 도메인(dalbus.kr) 미설정.
 
 ### 14.1 배포 프로세스
 
@@ -2413,6 +2348,8 @@ export default nextConfig;
 
 ## 15. CI/CD 파이프라인
 
+> **[현재 구현]** GitHub Actions CI 파이프라인 **미구현**. Vercel의 자동 빌드/배포만 사용 중 (main push → Production 자동 배포).
+
 ```
 ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
 │  개발자   │────▶│ GitHub  │────▶│  Vercel  │────▶│ 배포 완료 │
@@ -2455,6 +2392,8 @@ jobs:
 
 ## 16. 모니터링 및 에러 추적
 
+> **[현재 구현]** 외부 모니터링 서비스 **미연동** (v1.6.1). Vercel Analytics, Sentry, GA4, ChannelTalk 모두 미설정. Supabase Dashboard만 활용 중.
+
 ### 16.1 무료 모니터링 스택
 
 | 서비스 | 용도 | 무료 티어 |
@@ -2485,6 +2424,15 @@ jobs:
 ---
 
 ## 17. 운영비 시뮬레이션
+
+> **[현재 구현]** 현재 실제 운영비 (v1.6.1):
+> - Vercel Hobby: ₩0 (무료)
+> - Supabase Free: ₩0 (무료)
+> - Resend Free: ₩0 (월 3,000건 무료)
+> - PortOne / 솔라피: 미사용 (₩0)
+> - **월 합계: ₩0** (모든 서비스 무료 티어)
+>
+> 아래는 향후 성장 시 참조할 비용 시뮬레이션입니다.
 
 ### 17.1 서비스별 무료 티어 한도
 
@@ -2618,4 +2566,5 @@ jobs:
 
 ---
 
-> **문서 끝** | 이 가이드는 PRD v2.0, 화면설계서(Screen Flow), 기술제안서를 기반으로 작성되었으며, 실제 코드 구현 시 참조용입니다.
+> **문서 끝** | 이 가이드는 PRD v2.0, 화면설계서(Screen Flow), 기술제안서를 기반으로 작성되었으며, v1.6.1 기준 `[현재 구현]` 주석이 추가되었습니다 (2026-03-15 갱신).
+> 비즈니스 로직 상세는 [`docs/business-logic.md`](./business-logic.md)를 참조하세요.
