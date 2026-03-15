@@ -6,21 +6,27 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { order_id, target_account_id, target_slot_number, target_tidal_password } = body;
+        const { order_id, assignment_id, target_account_id, target_slot_number, target_tidal_password } = body;
 
-        if (!order_id || !target_account_id) {
-            return NextResponse.json({ error: '필수 정보가 누락되었습니다. 이동 대상 계정을 선택해 주세요.' }, { status: 400 });
+        if ((!order_id && !assignment_id) || !target_account_id) {
+            return NextResponse.json({ error: '필수 정보가 누락되었습니다. 이동할 대상을 확인해 주세요.' }, { status: 400 });
         }
 
         // 1. Get current assignment to find source account
-        const { data: currentAssignment, error: findError } = await supabaseAdmin
+        let query = supabaseAdmin
             .from('order_accounts')
-            .select('account_id, id')
-            .eq('order_id', order_id)
-            .single();
+            .select('account_id, id');
+        
+        if (assignment_id) {
+            query = query.eq('id', assignment_id);
+        } else {
+            query = query.eq('order_id', order_id);
+        }
+
+        const { data: currentAssignment, error: findError } = await query.single();
 
         if (findError || !currentAssignment) {
-            return NextResponse.json({ error: '현재 배정된 주문이 없습니다. 이 슬롯은 주문과 연결되지 않아 이동할 수 없습니다.' }, { status: 400 });
+            return NextResponse.json({ error: '배정 정보를 찾을 수 없거나 이동할 수 없는 상태입니다.' }, { status: 400 });
         }
 
         const sourceAccountId = currentAssignment.account_id;

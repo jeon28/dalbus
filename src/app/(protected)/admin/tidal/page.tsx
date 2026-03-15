@@ -24,7 +24,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { differenceInMonths, parseISO, format } from 'date-fns';
+import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 
 interface Assignment {
     id: string;
@@ -111,7 +111,10 @@ function TidalAccountsContent() {
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [isImportResultModalOpen, setIsImportResultModalOpen] = useState(false);
     const [importResults, setImportResults] = useState<{
-        success: { masters: number, slots: number },
+        success: {
+            masters: { created: number, updated: number },
+            slots: { created: number, updated: number }
+        },
         failed: { id: string, reason: string }[]
     } | null>(null);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -308,7 +311,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const getPeriodMonths = (start?: string, end?: string) => {
         if (!start || !end) return 0;
         try {
-            return differenceInMonths(parseISO(end), parseISO(start));
+            const startD = parseISO(start);
+            const endD = parseISO(end);
+            const days = differenceInDays(endD, startD);
+            return Math.floor(days / 30);
         } catch {
             return 0;
         }
@@ -368,7 +374,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     try {
                         const start = parseISO(assignment.start_date);
                         const end = parseISO(assignment.end_date);
-                        periodNum = differenceInMonths(end, start);
+                        const days = differenceInDays(end, start);
+                        periodNum = Math.floor(days / 30);
                     } catch { }
                 }
 
@@ -559,16 +566,27 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 next.tidal_id = emailPrefix ? `${emailPrefix}@hifitidal.com` : null;
             }
 
-            if ((field === 'start_date' || field === 'period_months') && (next.start_date && next.period_months)) {
-                try {
-                    const start = parseISO(next.start_date);
-                    const months = parseInt(String(next.period_months)) || 0;
-                    if (months > 0) {
-                        const end = new Date(start);
-                        end.setMonth(end.getMonth() + months);
+            if (field === 'start_date' || field === 'period_months') {
+                const startStr = next.start_date;
+                const months = parseInt(String(next.period_months)) || 0;
+                if (startStr && months >= 0) {
+                    try {
+                        const start = parseISO(startStr);
+                        const end = addDays(start, months * 30);
                         next.end_date = end.toISOString().split('T')[0];
-                    }
-                } catch { }
+                    } catch { }
+                }
+            } else if (field === 'end_date') {
+                const startStr = next.start_date;
+                const endStr = next.end_date;
+                if (startStr && endStr) {
+                    try {
+                        const start = parseISO(startStr);
+                        const end = parseISO(endStr);
+                        const days = differenceInDays(end, start);
+                        next.period_months = Math.max(0, Math.floor(days / 30));
+                    } catch { }
+                }
             }
             return { ...prev, [key]: next };
         });
@@ -823,18 +841,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleMove = async () => {
         if (!selectedAssignment) return;
 
-        // 주문이 연결되지 않은 슬롯인 경우 미리 안내
-        if (!selectedAssignment.orders?.id) {
-            alert('이동 실패: 이 슬롯은 주문 정보가 없습니다.\n주문번호가 없는 슬롯은 이동 기능을 사용할 수 없습니다.\n대신 해당 슬롯을 직접 편집(연필 아이콘)하여 정보를 수동으로 변경해 주세요.');
-            return;
-        }
-
         try {
             const res = await apiFetch('/api/admin/accounts/move', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    order_id: selectedAssignment.orders.id,
+                    assignment_id: selectedAssignment.id,
+                    order_id: selectedAssignment.orders?.id,
                     target_account_id: selectedTargetAccount,
                     target_slot_number: selectedTargetSlot,
                     target_tidal_password: selectedAssignment.tidal_password
@@ -1398,7 +1411,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     try {
                                         const start = parseISO(masterSlot.start_date);
                                         const now = new Date();
-                                        const diff = differenceInMonths(now, start);
+                                        const diff = Math.floor(differenceInDays(now, start) / 30);
                                         duration = `${diff}개월`;
                                     } catch { }
                                 }
@@ -1485,7 +1498,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         try {
                                                                             const start = parseISO(val.start_date);
                                                                             const end = parseISO(val.end_date);
-                                                                            const diff = differenceInMonths(end, start);
+                                                                            const days = differenceInDays(end, start);
+                                                                            const diff = Math.floor(days / 30);
                                                                             if (diff > 0) period = `${diff}개월`;
 
                                                                             // Check expiry
@@ -1833,7 +1847,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     {viewOrder.products?.name}
                                     {viewOrder.start_date && viewOrder.end_date && (
                                         <span className="ml-1 text-blue-600">
-                                            ({differenceInMonths(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date))}개월)
+                                            ({Math.round(differenceInDays(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date)) / 30)}개월)
                                         </span>
                                     )}
                                 </span>
@@ -1875,12 +1889,32 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <div className="space-y-4 py-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-green-50 p-4 rounded-lg text-center">
-                                    <div className="text-sm text-green-600">성공 마스터</div>
-                                    <div className="text-2xl font-bold text-green-700">{importResults.success.masters}</div>
+                                    <div className="text-sm text-green-600 font-bold mb-2">마스터 계정</div>
+                                    <div className="flex justify-around items-end">
+                                        <div>
+                                            <div className="text-[10px] text-green-500">신규</div>
+                                            <div className="text-xl font-bold text-green-700">{importResults.success.masters.created}</div>
+                                        </div>
+                                        <div className="text-gray-300 mb-1">/</div>
+                                        <div>
+                                            <div className="text-[10px] text-green-500">업데이트</div>
+                                            <div className="text-xl font-bold text-green-700">{importResults.success.masters.updated}</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="bg-blue-50 p-4 rounded-lg text-center">
-                                    <div className="text-sm text-blue-600">성공 슬롯</div>
-                                    <div className="text-2xl font-bold text-blue-700">{importResults.success.slots}</div>
+                                    <div className="text-sm text-blue-600 font-bold mb-2">슬롯</div>
+                                    <div className="flex justify-around items-end">
+                                        <div>
+                                            <div className="text-[10px] text-blue-500">신규</div>
+                                            <div className="text-xl font-bold text-blue-700">{importResults.success.slots.created}</div>
+                                        </div>
+                                        <div className="text-gray-300 mb-1">/</div>
+                                        <div>
+                                            <div className="text-[10px] text-blue-500">업데이트</div>
+                                            <div className="text-xl font-bold text-blue-700">{importResults.success.slots.updated}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

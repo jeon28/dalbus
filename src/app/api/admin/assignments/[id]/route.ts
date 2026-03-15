@@ -30,9 +30,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (body.order_number !== undefined) oaUpdates.order_number = body.order_number;
         if (type !== undefined) {
             oaUpdates.type = type;
-            if (type === 'master') {
-                oaUpdates.slot_number = 0;
-            }
+            // Removed: oaUpdates.slot_number = 0; here to avoid immediate constraint violation.
+            // Re-indexing logic below will handle the move to slot 0 safely.
         }
         if (buyer_name !== undefined) oaUpdates.buyer_name = buyer_name;
         if (buyer_phone !== undefined) oaUpdates.buyer_phone = normalizePhone(buyer_phone);
@@ -52,13 +51,56 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
             if (oaError) throw oaError;
 
-            // 2. If is_active changed, update used_slots
-            if (is_active !== undefined && updatedData) {
+            // 2. Re-index slots if type or is_active changed
+            const shouldReindex = type !== undefined || is_active !== undefined;
+            if (shouldReindex && updatedData) {
+                // Fetch all assignments for this account
+                const { data: allSlots, error: fetchAllError } = await supabaseAdmin
+                    .from('order_accounts')
+                    .select('id, slot_number, type')
+                    .eq('account_id', updatedData.account_id)
+                    .order('slot_number', { ascending: true });
+
+                if (fetchAllError) throw fetchAllError;
+
+                if (allSlots && allSlots.length > 0) {
+                    const sorted = [...allSlots].sort((a, b) => {
+                        if (a.type === 'master' && b.type !== 'master') return -1;
+                        if (b.type === 'master' && a.type !== 'master') return 1;
+                        if (a.type === 'master' && b.type === 'master') {
+                            if (a.id === id) return -1;
+                            if (b.id === id) return 1;
+                        }
+                        return a.slot_number - b.slot_number;
+                    });
+
+                    // Pass 1: Move to temporary high slots to avoid unique constraint collisions
+                    for (let i = 0; i < sorted.length; i++) {
+                        await supabaseAdmin
+                            .from('order_accounts')
+                            .update({ slot_number: sorted[i].slot_number + 1000 })
+                            .eq('id', sorted[i].id);
+                    }
+
+                    // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
+                    for (let i = 0; i < sorted.length; i++) {
+                        const updates: { slot_number: number; type?: string } = { slot_number: i };
+                        if (i > 0 && sorted[i].type === 'master') {
+                            updates.type = 'user'; // Force others to be user
+                        }
+                        
+                        await supabaseAdmin
+                            .from('order_accounts')
+                            .update(updates)
+                            .eq('id', sorted[i].id);
+                    }
+                }
+
+                // Sync used_slots
                 const { count: actualCount } = await supabaseAdmin
                     .from('order_accounts')
                     .select('*', { count: 'exact', head: true })
-                    .eq('account_id', updatedData.account_id)
-                    .eq('is_active', true); // ONLY Active slots count
+                    .eq('account_id', updatedData.account_id);
 
                 await supabaseAdmin
                     .from('accounts')
@@ -99,19 +141,59 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         if (delError) throw delError;
 
-        // 3. Update Account Used Slots (Robust Sync)
+        // 3. Re-index remaining slots to maintain sequence (1, 2, 3...)
+        // Fetch all remaining active assignments for this account, ordered by their current slot_number
+        const { data: remainingSlots, error: fetchRemainingError } = await supabaseAdmin
+            .from('order_accounts')
+            .select('id, slot_number, type')
+            .eq('account_id', assignment.account_id)
+            .order('slot_number', { ascending: true });
+
+        if (fetchRemainingError) throw fetchRemainingError;
+
+        if (remainingSlots && remainingSlots.length > 0) {
+            const sorted = [...remainingSlots].sort((a, b) => {
+                if (a.type === 'master') return -1;
+                if (b.type === 'master') return 1;
+                return (a.slot_number ?? 0) - (b.slot_number ?? 0);
+            });
+
+            // Pass 1: Move to temporary high slots
+            for (let i = 0; i < sorted.length; i++) {
+                await supabaseAdmin
+                    .from('order_accounts')
+                    .update({ slot_number: (sorted[i].slot_number ?? 0) + 1000 })
+                    .eq('id', sorted[i].id);
+            }
+
+            // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
+            for (let i = 0; i < sorted.length; i++) {
+                const updates: { slot_number: number; type?: string } = { slot_number: i };
+                if (i > 0 && sorted[i].type === 'master') {
+                    updates.type = 'user'; // Force others to be user
+                }
+
+                await supabaseAdmin
+                    .from('order_accounts')
+                    .update(updates)
+                    .eq('id', sorted[i].id);
+            }
+        }
+
+        // 4. Update Account Used Slots (Robust Sync)
         const { count: actualCount } = await supabaseAdmin
             .from('order_accounts')
             .select('*', { count: 'exact', head: true })
-            .eq('account_id', assignment.account_id)
-            .eq('is_active', true); // ONLY Active slots count
+            .eq('account_id', assignment.account_id);
+            // Removed .eq('is_active', true) because the system seems to use row presence as "active assignment" 
+            // per the general flow, though some old logic had it. Syncing with actual row count.
 
         await supabaseAdmin
             .from('accounts')
             .update({ used_slots: actualCount || 0 })
             .eq('id', assignment.account_id);
 
-        // 4. Update Order Status logic
+        // 5. Update Order Status logic
         // If it was an active assignment, we might want to set order to 'waiting' if we are "Unassigning".
         // But if we are deleting history, order might be old.
         // For now, if order_id exists, we set it to 'waiting' if it was paid?

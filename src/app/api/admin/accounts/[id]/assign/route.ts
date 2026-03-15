@@ -105,30 +105,61 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             finalEndDate = finalEndDate || format(addDays(parseISO(finalStartDate), durationMonths * 30), 'yyyy-MM-dd');
         }
 
-        // 2. Validate Slot
-        const { data: existing } = await supabaseAdmin
-            .from('order_accounts')
-            .select('*, orders(related_order_id)')
-            .eq('account_id', account_id)
-            .eq('slot_number', slot_number)
-            .maybeSingle();
+        // 2. Determine Slot Number and Type
+        let finalSlotNumber = slot_number;
+        let finalType = type;
 
-        if (existing) {
+        // Fetch current assignments to determine next slot or validate existing
+        const { data: currentAssignments, error: fetchError } = await supabaseAdmin
+            .from('order_accounts')
+            .select('id, slot_number, type')
+            .eq('account_id', account_id)
+            .order('slot_number', { ascending: true });
+
+        if (fetchError) throw fetchError;
+
+        if (finalSlotNumber === undefined || finalSlotNumber === null) {
+            // Pick next available
+            finalSlotNumber = currentAssignments?.length || 0;
+        }
+
+        if (!finalType) {
+            // If it's the first slot ever (index 0), it's default master
+            if (finalSlotNumber === 0 && (!currentAssignments || currentAssignments.length === 0)) {
+                finalType = 'master';
+            } else {
+                finalType = 'user';
+            }
+        }
+
+        // 3. Check for existing at this slot
+        const existingAssignment = currentAssignments?.find(a => a.slot_number === finalSlotNumber) as {
+            id?: string;
+            order_id?: string;
+            buyer_email?: string;
+            buyer_name?: string;
+            tidal_password?: string;
+            tidal_id?: string;
+            type?: string;
+            buyer_phone?: string;
+        } | undefined;
+
+        if (existingAssignment) {
             const { data: targetOrder } = await supabaseAdmin
                 .from('orders')
                 .select('related_order_id, order_type, buyer_email, buyer_name')
                 .eq('id', targetOrderId)
                 .single();
 
-            const isSameOrder = targetOrderId === existing.order_id;
-            const isExtensionOfExisting = targetOrder?.related_order_id === existing.order_id;
+            const isSameOrder = targetOrderId === existingAssignment?.order_id;
+            const isExtensionOfExisting = targetOrder?.related_order_id === existingAssignment?.order_id;
             const isBuyerMatch = targetOrder?.order_type === 'EXT' &&
-                ((targetOrder.buyer_email && targetOrder.buyer_email === existing.buyer_email) ||
-                    (targetOrder.buyer_name && targetOrder.buyer_name === existing.buyer_name));
+                ((targetOrder.buyer_email && targetOrder.buyer_email === existingAssignment?.buyer_email) ||
+                    (targetOrder.buyer_name && targetOrder.buyer_name === existingAssignment?.buyer_name));
 
             if (!isSameOrder && !isExtensionOfExisting && !isBuyerMatch) {
                 return NextResponse.json({
-                    error: `선택하신 슬롯은 이미 다른 주문(번호: ${existing.order_number || '번호없음'}, 고객: ${existing.buyer_name || '이름없음'})이 점유하고 있습니다.`
+                    error: `선택하신 슬롯(${finalSlotNumber + 1}번)은 이미 다른 주문이 점유하고 있습니다.`
                 }, { status: 409 });
             }
 
@@ -137,15 +168,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 .update({
                     order_id: targetOrderId,
                     order_number: finalOrderNumber,
-                    tidal_password: tidal_password || existing.tidal_password,
-                    tidal_id: tidal_id || existing.tidal_id,
-                    buyer_name: finalBuyerName || existing.buyer_name,
-                    buyer_phone: finalBuyerPhone || existing.buyer_phone,
-                    buyer_email: finalBuyerEmail || existing.buyer_email,
+                    tidal_password: tidal_password || existingAssignment?.tidal_password,
+                    tidal_id: tidal_id || existingAssignment?.tidal_id,
+                    type: finalType || existingAssignment?.type,
+                    buyer_name: finalBuyerName || existingAssignment?.buyer_name,
+                    buyer_phone: finalBuyerPhone || existingAssignment?.buyer_phone,
+                    buyer_email: finalBuyerEmail || existingAssignment?.buyer_email,
                     start_date: finalStartDate,
                     end_date: end_date || finalEndDate
                 })
-                .eq('id', existing.id);
+                .eq('id', existingAssignment?.id);
 
             if (updateError) throw updateError;
         } else {
@@ -155,10 +187,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     order_id: targetOrderId,
                     order_number: finalOrderNumber,
                     account_id: account_id,
-                    slot_number: slot_number,
+                    slot_number: finalSlotNumber,
                     tidal_password: tidal_password,
                     tidal_id: tidal_id || null,
-                    type: type || (slot_number === 0 ? 'master' : 'user'),
+                    type: finalType,
                     buyer_name: finalBuyerName || null,
                     buyer_phone: finalBuyerPhone || null,
                     buyer_email: finalBuyerEmail || null,

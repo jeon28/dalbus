@@ -11,6 +11,27 @@ function excelDateToISO(serial: number | undefined | null): string | null {
     return date.toISOString().split('T')[0];
 }
 
+interface ImportSlot {
+    slot_number: number;
+    tidal_id: string | null;
+    tidal_password: string | null;
+    order_number: string | null;
+    buyer_name: string | null;
+    buyer_email: string | null;
+    buyer_phone: string | null;
+    start_date: string | null;
+    end_date: string | null;
+}
+
+interface ImportAccount {
+    login_id: string;
+    payment_email: string;
+    payment_day: number;
+    login_pw: string;
+    memo: string;
+    slots: ImportSlot[];
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { accounts: importData } = await req.json();
@@ -20,13 +41,15 @@ export async function POST(req: NextRequest) {
         }
 
         const results = {
-            success: { masters: 0, slots: 0 },
+            success: {
+                masters: { created: 0, updated: 0 },
+                slots: { created: 0, updated: 0 }
+            },
             failed: [] as { id: string; reason: string }[],
         };
 
         // Group data by Master ID (login_id)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const masterMap = new Map<string, any>();
+        const masterMap = new Map<string, ImportAccount>();
         importData.forEach((row) => {
             const masterId = row['마스터 ID'] || row['그룹 ID'];
             
@@ -131,6 +154,7 @@ export async function POST(req: NextRequest) {
 
                     if (updateError) throw updateError;
                     masterAccountId = existingAcc.id;
+                    results.success.masters.updated++;
                 } else {
                     // Create new
                     console.log(`[Import] Creating new master: ${master.login_id}`);
@@ -151,7 +175,7 @@ export async function POST(req: NextRequest) {
 
                     if (insertError) throw insertError;
                     masterAccountId = newAcc.id;
-                    results.success.masters++;
+                    results.success.masters.created++;
                 }
 
                 // 2. Handle Slot Assignments
@@ -176,6 +200,26 @@ export async function POST(req: NextRequest) {
                         // Safely handle empty strings for unique constraints
                         const safeTidalId = slot.tidal_id ? slot.tidal_id : null;
 
+                        // 2.1 Check for existing master specifically for this group
+                        const { data: currentMasterSlot } = await supabaseAdmin
+                            .from('order_accounts')
+                            .select('slot_number')
+                            .eq('account_id', masterAccountId)
+                            .eq('type', 'master')
+                            .maybeSingle();
+
+                        // Determine slot type: Slot 1 is master if no other master exists
+                        let slotType = 'user';
+                        if (slot.slot_number === 0) {
+                            if (!currentMasterSlot || currentMasterSlot.slot_number === 0) {
+                                slotType = 'master';
+                            }
+                        } else {
+                            if (currentMasterSlot && currentMasterSlot.slot_number === slot.slot_number) {
+                                slotType = 'master';
+                            }
+                        }
+
                         const slotData = {
                             account_id: masterAccountId,
                             slot_number: slot.slot_number,
@@ -188,9 +232,18 @@ export async function POST(req: NextRequest) {
                             buyer_phone: slot.buyer_phone || null,
                             start_date: slot.start_date || null,
                             end_date: slot.end_date || null,
+                            type: slotType, // Apply determined type
                         };
 
                         // INSERT with UPSERT to prevent unique constraint conflicts on (account_id, slot_number)
+                        // Check if slot specifically exists to differentiate between created and updated
+                        const { data: existingSlot } = await supabaseAdmin
+                            .from('order_accounts')
+                            .select('id')
+                            .eq('account_id', masterAccountId)
+                            .eq('slot_number', slot.slot_number)
+                            .maybeSingle();
+
                         const { error: upsertError } = await supabaseAdmin
                             .from('order_accounts')
                             .upsert(slotData, { 
@@ -200,7 +253,11 @@ export async function POST(req: NextRequest) {
 
                         if (upsertError) throw upsertError;
 
-                        results.success.slots++;
+                        if (existingSlot) {
+                            results.success.slots.updated++;
+                        } else {
+                            results.success.slots.created++;
+                        }
                     } catch (slotError: unknown) {
                         const e = slotError as Error & { code?: string };
                         console.error('Slot upsert error:', e);
@@ -224,7 +281,41 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                // 3. Sync used_slots count after all slot operations
+                // 3. Re-index slots for this account to ensure sequentiality and master at 0
+                const { data: finalSlots, error: finalFetchError } = await supabaseAdmin
+                    .from('order_accounts')
+                    .select('id, slot_number, type')
+                    .eq('account_id', masterAccountId)
+                    .order('slot_number', { ascending: true });
+
+                if (!finalFetchError && finalSlots && finalSlots.length > 0) {
+                    const sorted = [...finalSlots].sort((a, b) => {
+                        if (a.type === 'master') return -1;
+                        if (b.type === 'master') return 1;
+                        return a.slot_number - b.slot_number;
+                    });
+
+                    // Pass 1: Move to temporary high slots
+                    for (let i = 0; i < sorted.length; i++) {
+                        await supabaseAdmin
+                            .from('order_accounts')
+                            .update({ slot_number: sorted[i].slot_number + 1000 })
+                            .eq('id', sorted[i].id);
+                    }
+
+                    // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
+                    for (let i = 0; i < sorted.length; i++) {
+                        const updates: { slot_number: number; type?: string } = { slot_number: i };
+                        if (i > 0 && sorted[i].type === 'master') updates.type = 'user';
+
+                        await supabaseAdmin
+                            .from('order_accounts')
+                            .update(updates)
+                            .eq('id', sorted[i].id);
+                    }
+                }
+
+                // 4. Sync used_slots count after all slot operations
                 const { count: actualCount } = await supabaseAdmin
                     .from('order_accounts')
                     .select('*', { count: 'exact', head: true })
@@ -249,8 +340,8 @@ export async function POST(req: NextRequest) {
 
         // Log final results
         console.log('[Import] ===== Import Summary =====');
-        console.log(`[Import] Masters created: ${results.success.masters}`);
-        console.log(`[Import] Slots created/updated: ${results.success.slots}`);
+        console.log(`[Import] Masters: Created=${results.success.masters.created}, Updated=${results.success.masters.updated}`);
+        console.log(`[Import] Slots: Created=${results.success.slots.created}, Updated=${results.success.slots.updated}`);
         console.log(`[Import] Failed items: ${results.failed.length}`);
         if (results.failed.length > 0) {
             console.log('[Import] Failed details:', results.failed);

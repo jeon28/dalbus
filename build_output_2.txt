@@ -1,88 +1,92 @@
 
-> dalbus@1.0.0 build
+> dalbus@1.5.8 build
 > next build
 
    ??Next.js 15.5.12
    - Environments: .env.local
 
    Creating an optimized production build ...
- ??Compiled successfully in 54s
+ ??Compiled successfully in 9.5s
    Linting and checking validity of types ...
    Collecting page data ...
-   Generating static pages (0/38) ...
-   Generating static pages (9/38) 
-   Generating static pages (18/38) 
-   Generating static pages (28/38) 
- ??Generating static pages (38/38)
+   Generating static pages (0/39) ...
+   Generating static pages (9/39) 
+   Generating static pages (19/39) 
+   Generating static pages (29/39) 
+ ??Generating static pages (39/39)
    Finalizing page optimization ...
    Collecting build traces ...
 
 Route (app)                                 Size  First Load JS
-????/                                      256 B         102 kB
+????/                                      263 B         102 kB
 ????/_not-found                            998 B         103 kB
-????/admin                               7.75 kB         169 kB
-????/admin/faqs                          5.14 kB         170 kB
-????/admin/members                       4.27 kB         322 kB
-????/admin/notices                       5.45 kB         170 kB
-????/admin/orders                          17 kB         363 kB
-????/admin/qna                           6.56 kB         168 kB
-????/admin/services                      6.98 kB         177 kB
-??? /admin/services/[id]                 5.81 kB         174 kB
-????/admin/services/new                  7.13 kB         172 kB
-????/admin/tidal                         14.7 kB         360 kB
-????/admin/tidal/inactive                5.53 kB         311 kB
-??? /api/admin/accounts                    256 B         102 kB
-??? /api/admin/accounts/[id]               256 B         102 kB
-??? /api/admin/accounts/[id]/assign        256 B         102 kB
-??? /api/admin/accounts/import             256 B         102 kB
-??? /api/admin/accounts/move               256 B         102 kB
-??? /api/admin/assignments/[id]            256 B         102 kB
-??? /api/admin/assignments/inactive        256 B         102 kB
-??? /api/admin/bank-accounts               256 B         102 kB
-??? /api/admin/bank-accounts/[id]          256 B         102 kB
-??? /api/admin/faq-categories              256 B         102 kB
-??? /api/admin/faq-categories/[id]         256 B         102 kB
-??? /api/admin/faqs                        256 B         102 kB
-??? /api/admin/faqs/[id]                   256 B         102 kB
-??? /api/admin/members                     256 B         102 kB
-??? /api/admin/members/[id]/accounts       256 B         102 kB
-??? /api/admin/notice-categories           256 B         102 kB
-??? /api/admin/notice-categories/[id]      256 B         102 kB
-??? /api/admin/notices                     256 B         102 kB
-??? /api/admin/notices/[id]                256 B         102 kB
-??? /api/admin/orders                      256 B         102 kB
-??? /api/admin/orders/[id]                 256 B         102 kB
-??? /api/admin/orders/[id]/assignment      256 B         102 kB
-??? /api/admin/orders/[id]/status          256 B         102 kB
-??? /api/admin/plans                       256 B         102 kB
-??? /api/admin/plans/[id]                  256 B         102 kB
-??? /api/admin/products                    256 B         102 kB
-??? /api/admin/products/[id]               256 B         102 kB
-??? /api/admin/qna/[id]/answer             256 B         102 kB
-??? /api/admin/settings                    256 B         102 kB
-??? /api/admin/tidal/notify                256 B         102 kB
-??? /api/auth/check-email                  256 B         102 kB
-??? /api/auth/check-user                   256 B         102 kB
-??? /api/auth/guest-signup                 256 B         102 kB
-??? /api/auth/login                        256 B         102 kB
-??? /api/auth/password-reset/confirm       256 B         102 kB
-??? /api/auth/password-reset/request       256 B         102 kB
-??? /api/auth/password-reset/verify        256 B         102 kB
-??? /api/diag                              256 B         102 kB
-??? /api/orders                            256 B         102 kB
-??? /api/orders/lookup                     256 B         102 kB
-??? /api/public/faq-categories             256 B         102 kB
-??? /api/public/faqs                       256 B         102 kB
-??? /api/public/notices                    256 B         102 kB
-??? /api/public/products                   256 B         102 kB
-??? /api/public/products/[id]              256 B         102 kB
-??? /api/public/settings                   256 B         102 kB
-??? /api/qna                               256 B         102 kB
-??? /api/qna/[id]                          256 B         102 kB
-??? /api/qna/[id]/verify                   256 B         102 kB
-??? /api/user/mypage                       256 B         102 kB
+????/admin                               7.86 kB         169 kB
+????/admin/faqs                          8.01 kB         169 kB
+????/admin/mail-history                  4.91 kB         212 kB
+????/admin/members                       5.72 kB         345 kB
+????/admin/notices                        8.3 kB         169 kB
+????/admin/orders                        19.2 kB         364 kB
+????/admin/qna                           6.86 kB         168 kB
+????/admin/services                      7.33 kB         177 kB
+??? /admin/services/[id]                  5.7 kB         174 kB
+????/admin/services/new                  3.85 kB         172 kB
+????/admin/tidal                         16.6 kB         362 kB
+????/admin/tidal/inactive                2.19 kB         312 kB
+??? /api/admin/accounts                    263 B         102 kB
+??? /api/admin/accounts/[id]               263 B         102 kB
+??? /api/admin/accounts/[id]/assign        263 B         102 kB
+??? /api/admin/accounts/import             263 B         102 kB
+??? /api/admin/accounts/move               263 B         102 kB
+??? /api/admin/assignments/[id]            263 B         102 kB
+??? /api/admin/assignments/inactive        263 B         102 kB
+??? /api/admin/bank-accounts               263 B         102 kB
+??? /api/admin/bank-accounts/[id]          263 B         102 kB
+??? /api/admin/faq-categories              263 B         102 kB
+??? /api/admin/faq-categories/[id]         263 B         102 kB
+??? /api/admin/faqs                        263 B         102 kB
+??? /api/admin/faqs/[id]                   263 B         102 kB
+??? /api/admin/mail-history                263 B         102 kB
+??? /api/admin/members                     263 B         102 kB
+??? /api/admin/members/[id]/accounts       263 B         102 kB
+??? /api/admin/notice-categories           263 B         102 kB
+??? /api/admin/notice-categories/[id]      263 B         102 kB
+??? /api/admin/notices                     263 B         102 kB
+??? /api/admin/notices/[id]                263 B         102 kB
+??? /api/admin/orders                      263 B         102 kB
+??? /api/admin/orders/[id]                 263 B         102 kB
+??? /api/admin/orders/[id]/assignment      263 B         102 kB
+??? /api/admin/orders/[id]/status          263 B         102 kB
+??? /api/admin/plans                       263 B         102 kB
+??? /api/admin/plans/[id]                  263 B         102 kB
+??? /api/admin/products                    263 B         102 kB
+??? /api/admin/products/[id]               263 B         102 kB
+??? /api/admin/qna/[id]                    263 B         102 kB
+??? /api/admin/qna/[id]/answer             263 B         102 kB
+??? /api/admin/settings                    263 B         102 kB
+??? /api/admin/tidal/notify                263 B         102 kB
+??? /api/auth/check-email                  263 B         102 kB
+??? /api/auth/check-user                   263 B         102 kB
+??? /api/auth/guest-signup                 263 B         102 kB
+??? /api/auth/login                        263 B         102 kB
+??? /api/auth/password-reset/confirm       263 B         102 kB
+??? /api/auth/password-reset/request       263 B         102 kB
+??? /api/auth/password-reset/verify        263 B         102 kB
+??? /api/diag                              263 B         102 kB
+??? /api/orders                            263 B         102 kB
+??? /api/orders/lookup                     263 B         102 kB
+??? /api/public/banks                      263 B         102 kB
+??? /api/public/faq-categories             263 B         102 kB
+??? /api/public/faqs                       263 B         102 kB
+??? /api/public/notices                    263 B         102 kB
+??? /api/public/products                   263 B         102 kB
+??? /api/public/products/[id]              263 B         102 kB
+??? /api/public/settings                   263 B         102 kB
+??? /api/qna                               263 B         102 kB
+??? /api/qna/[id]                          263 B         102 kB
+??? /api/qna/[id]/verify                   263 B         102 kB
+??? /api/user/mypage                       263 B         102 kB
 ????/login                               6.95 kB         185 kB
-????/mypage                              7.44 kB         168 kB
+????/mypage                              7.65 kB         169 kB
 ????/public                                176 B         111 kB
 ????/public/checkout/success             9.49 kB         171 kB
 ????/public/faq                          2.83 kB         164 kB
@@ -92,7 +96,7 @@ Route (app)                                 Size  First Load JS
 ????/public/qna                          6.26 kB         171 kB
 ????/public/qna/write                    5.92 kB         170 kB
 ????/public/terms                        1.86 kB         104 kB
-??? /service/[id]                        12.1 kB         185 kB
+??? /service/[id]                        12.2 kB         185 kB
 ????/signup                              5.98 kB         162 kB
 + First Load JS shared by all             102 kB
   ??chunks/1255-186e651176ba28b9.js        46 kB
