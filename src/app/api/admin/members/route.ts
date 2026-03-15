@@ -34,19 +34,32 @@ export async function GET(req: NextRequest) {
 
     // Filter by status if requested
     if (status === 'active' || status === 'inactive') {
-        const activeUserSubquery = `id.in.(select user_id from orders join order_accounts on orders.id = order_accounts.order_id where order_accounts.end_date > '${now}')`;
-        const activeEmailSubquery = `email.in.(select buyer_email from orders join order_accounts on orders.id = order_accounts.order_id where order_accounts.end_date > '${now}')`;
-        const activeCondition = `(${activeUserSubquery},${activeEmailSubquery})`;
-        
+        const { data: activeProfilesRows } = await supabaseAdmin
+            .from('orders')
+            .select(`
+                user_id,
+                buyer_email,
+                order_accounts!inner(id)
+            `)
+            .gt('order_accounts.end_date', now);
+
+        const activeUserIds = new Set(activeProfilesRows?.map(r => r.user_id).filter(Boolean));
+        const activeEmails = new Set(activeProfilesRows?.map(r => r.buyer_email).filter(Boolean));
+
         if (status === 'active') {
-            query = query.or(activeCondition);
-        } else {
-            // Inactive is more complex in a single OR, but we can use .not() if it was simple.
-            // For Supabase JS client, complex NOT IN is tricky. 
-            // Let's use the in-memory filtering for status IF it's provided, 
-            // or even better, just fetch IDs and filter.
-            // BUT, since we want pagination to work, let's try to use the raw filter if possible.
-            // Actually, Supabase doesn't support nested subqueries easily in the JS builder.
+            if (activeUserIds.size > 0 || activeEmails.size > 0) {
+                query = query.or(`id.in.(${Array.from(activeUserIds).map(id => `"${id}"`).join(',')}),email.in.(${Array.from(activeEmails).map(email => `"${email}"`).join(',')})`);
+            } else {
+                // No active users found, force empty result
+                query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+            }
+        } else if (status === 'inactive') {
+            if (activeUserIds.size > 0) {
+                query = query.not('id', 'in', `(${Array.from(activeUserIds).map(id => `"${id}"`).join(',')})`);
+            }
+            if (activeEmails.size > 0) {
+                query = query.not('email', 'in', `(${Array.from(activeEmails).map(email => `"${email}"`).join(',')})`);
+            }
         }
     }
 
