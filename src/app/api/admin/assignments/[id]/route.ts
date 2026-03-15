@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { normalizePhone } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,13 +19,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             start_date,
             end_date,
             type,
-            is_active
+            is_active,
+            tidal_id
         } = body;
 
         // 1. Update order_accounts
         const oaUpdates: Record<string, string | number | boolean | null> = {};
         if (tidal_password !== undefined) oaUpdates.tidal_password = tidal_password;
-        if (body.tidal_id !== undefined) oaUpdates.tidal_id = body.tidal_id || null;
+        if (tidal_id !== undefined) oaUpdates.tidal_id = tidal_id ? tidal_id.toLowerCase().trim() : null;
         if (body.order_number !== undefined) oaUpdates.order_number = body.order_number;
         if (type !== undefined) {
             oaUpdates.type = type;
@@ -33,11 +35,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             }
         }
         if (buyer_name !== undefined) oaUpdates.buyer_name = buyer_name;
-        if (buyer_phone !== undefined) oaUpdates.buyer_phone = buyer_phone;
+        if (buyer_phone !== undefined) oaUpdates.buyer_phone = normalizePhone(buyer_phone);
         if (buyer_email !== undefined) oaUpdates.buyer_email = buyer_email;
         if (start_date !== undefined) oaUpdates.start_date = start_date;
         if (end_date !== undefined) oaUpdates.end_date = end_date;
         if (is_active !== undefined) oaUpdates.is_active = is_active;
+
 
         if (Object.keys(oaUpdates).length > 0) {
             const { data: updatedData, error: oaError } = await supabaseAdmin

@@ -170,15 +170,19 @@ export async function POST(req: NextRequest) {
 
                         results.success.slots++;
                     } catch (slotError: unknown) {
-                        const e = slotError as Error;
+                        const e = slotError as Error & { code?: string };
                         console.error('Slot upsert error:', e);
 
                         // Provide more detailed error message
                         let errorMsg = e.message;
-                        if (errorMsg.includes('unique constraint')) {
-                            errorMsg = '중복된 Tidal ID 또는 슬롯 번호입니다.';
-                        } else if (errorMsg.includes('ON CONFLICT')) {
-                            errorMsg = 'DB 제약조건이 설정되지 않았습니다. Migration 020을 실행해주세요.';
+                        if (errorMsg.includes('unique constraint') || e.code === '23505') {
+                            errorMsg = '이미 동일한 Tidal ID 또는 슬롯 번호가 DB에 존재합니다. 엑셀 파일의 중복 여부를 확인해 주세요.';
+                        } else if (errorMsg.includes('ON CONFLICT') || errorMsg.includes('no unique or exclusion constraint')) {
+                            errorMsg = '[DB 설정 필요] 슬롯 중복 방지 제약 조건이 운영 DB에 설정되어 있지 않습니다. Supabase 대시보드 → SQL Editor에서 supabase/migrations/020_add_unique_tidal_id.sql 파일의 내용을 실행해주세요.';
+                        } else if (errorMsg.includes('violates not-null') || e.code === '23502') {
+                            errorMsg = '필수 입력 값이 비어있습니다. 엑셀 파일의 해당 슬롯 행을 확인해 주세요.';
+                        } else if (errorMsg.includes('foreign key') || e.code === '23503') {
+                            errorMsg = '연결된 마스터 계정이 존재하지 않습니다. 마스터 ID를 먼저 확인해 주세요.';
                         }
 
                         results.failed.push({

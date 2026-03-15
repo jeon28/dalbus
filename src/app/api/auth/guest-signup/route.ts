@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { normalizePhone, normalizeBirthDate } from '@/lib/utils';
 
 export async function POST(request: Request) {
     try {
@@ -9,6 +10,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: '필수 정보가 누락되었습니다.' }, { status: 400 });
         }
 
+        // Normalize data
+        const normalizedPhone = normalizePhone(phone);
+        const normalizedBirthDate = normalizeBirthDate(birthdate);
+
         // 1. Create user in auth.users
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
@@ -16,10 +21,11 @@ export async function POST(request: Request) {
             email_confirm: true,
             user_metadata: {
                 name,
-                phone,
-                birthdate
+                phone: normalizedPhone,
+                birthdate: normalizedBirthDate
             }
         });
+
 
         if (authError) {
             console.error('Auth User creation error:', authError);
