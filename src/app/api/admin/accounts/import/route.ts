@@ -1,6 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+// Excel date serial → ISO date string (e.g. 46095 → '2026-03-14')
+function excelDateToISO(serial: number | undefined | null): string | null {
+    if (!serial || typeof serial !== 'number') return null;
+    // Excel epoch is Jan 1, 1900; JS epoch is Jan 1, 1970
+    // 25569 = days between the two epochs
+    const date = new Date((serial - 25569) * 86400 * 1000);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString().split('T')[0];
+}
+
+interface ImportSlot {
+    slot_number: number;
+    tidal_id: string | null;
+    tidal_password: string | null;
+    order_number: string | null;
+    buyer_name: string | null;
+    buyer_email: string | null;
+    buyer_phone: string | null;
+    start_date: string | null;
+    end_date: string | null;
+}
+
+interface ImportAccount {
+    login_id: string;
+    payment_email: string;
+    payment_day: number;
+    login_pw: string;
+    memo: string;
+    slots: ImportSlot[];
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { accounts: importData } = await req.json();
@@ -10,13 +41,15 @@ export async function POST(req: NextRequest) {
         }
 
         const results = {
-            success: { masters: 0, slots: 0 },
+            success: {
+                masters: { created: 0, updated: 0 },
+                slots: { created: 0, updated: 0 }
+            },
             failed: [] as { id: string; reason: string }[],
         };
 
         // Group data by Master ID (login_id)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const masterMap = new Map<string, any>();
+        const masterMap = new Map<string, ImportAccount>();
         importData.forEach((row) => {
             const masterId = row['마스터 ID'] || row['그룹 ID'];
             
@@ -47,13 +80,29 @@ export async function POST(req: NextRequest) {
                 if (!isNaN(slotNumber) && slotNumber >= 0 && slotNumber <= 5) {
                     const mappedTidalId = String(row['소속 ID'] || '')?.trim();
                     const mappedPassword = String(row['소속 PW'] || '')?.trim();
-                    const mappedOrderNum = String(row['주문번호'] || '')?.trim();
+                    // 주문번호: keep as string (may be number in Excel)
+                    const rawOrderNum = row['주문번호'];
+                    const mappedOrderNum = rawOrderNum != null ? String(rawOrderNum).trim() : null;
+
+                    // Customer info from Excel
+                    const buyerName = String(row['고객명'] || '').trim() || null;
+                    const buyerEmail = String(row['이메일'] || '').trim() || null;
+                    const buyerPhone = String(row['전화번호'] || '').trim() || null;
+
+                    // Start/end dates: stored as Excel serial numbers
+                    const startDate = excelDateToISO(row['시작일'] as number);
+                    const endDate = excelDateToISO(row['종료일'] as number);
 
                     currentMaster.slots.push({
                         slot_number: slotNumber,
                         tidal_id: mappedTidalId === '' ? null : mappedTidalId,
                         tidal_password: mappedPassword === '' ? null : mappedPassword,
-                        order_number: mappedOrderNum === '' ? null : mappedOrderNum
+                        order_number: mappedOrderNum === '' ? null : mappedOrderNum,
+                        buyer_name: buyerName,
+                        buyer_email: buyerEmail,
+                        buyer_phone: buyerPhone,
+                        start_date: startDate,
+                        end_date: endDate,
                     });
                 } else {
                     console.warn(`Invalid slot number: ${row['Slot']}, skipping`);
@@ -105,6 +154,7 @@ export async function POST(req: NextRequest) {
 
                     if (updateError) throw updateError;
                     masterAccountId = existingAcc.id;
+                    results.success.masters.updated++;
                 } else {
                     // Create new
                     console.log(`[Import] Creating new master: ${master.login_id}`);
@@ -125,7 +175,7 @@ export async function POST(req: NextRequest) {
 
                     if (insertError) throw insertError;
                     masterAccountId = newAcc.id;
-                    results.success.masters++;
+                    results.success.masters.created++;
                 }
 
                 // 2. Handle Slot Assignments
@@ -151,6 +201,26 @@ export async function POST(req: NextRequest) {
                         // Safely handle empty strings for unique constraints
                         const safeTidalId = slot.tidal_id ? slot.tidal_id : null;
 
+                        // 2.1 Check for existing master specifically for this group
+                        const { data: currentMasterSlot } = await supabaseAdmin
+                            .from('order_accounts')
+                            .select('slot_number')
+                            .eq('account_id', masterAccountId)
+                            .eq('type', 'master')
+                            .maybeSingle();
+
+                        // Determine slot type: Slot 1 is master if no other master exists
+                        let slotType = 'user';
+                        if (slot.slot_number === 0) {
+                            if (!currentMasterSlot || currentMasterSlot.slot_number === 0) {
+                                slotType = 'master';
+                            }
+                        } else {
+                            if (currentMasterSlot && currentMasterSlot.slot_number === slot.slot_number) {
+                                slotType = 'master';
+                            }
+                        }
+
                         const slotData = {
                             account_id: masterAccountId,
                             slot_number: slot.slot_number,
@@ -158,7 +228,13 @@ export async function POST(req: NextRequest) {
                             tidal_password: slot.tidal_password || '',
                             order_id: orderId,
                             is_active: true,
-                            type: slot.slot_number === 0 ? 'master' : 'user'
+                            order_number: slot.order_number || null,
+                            buyer_name: slot.buyer_name || null,
+                            buyer_email: slot.buyer_email || null,
+                            buyer_phone: slot.buyer_phone || null,
+                            start_date: slot.start_date || null,
+                            end_date: slot.end_date || null,
+                            type: slotType, // Apply determined type
                         };
 
                         // 1. Check if the slot already exists
@@ -210,17 +286,25 @@ export async function POST(req: NextRequest) {
                             if (insertError) throw insertError;
                         }
 
-                        results.success.slots++;
+                        if (existingSlot) {
+                            results.success.slots.updated++;
+                        } else {
+                            results.success.slots.created++;
+                        }
                     } catch (slotError: unknown) {
-                        const e = slotError as Error;
+                        const e = slotError as Error & { code?: string };
                         console.error('Slot upsert error:', e);
 
                         // Provide more detailed error message
                         let errorMsg = e.message;
-                        if (errorMsg.includes('unique constraint')) {
-                            errorMsg = '중복된 Tidal ID 또는 슬롯 번호입니다.';
-                        } else if (errorMsg.includes('ON CONFLICT')) {
-                            errorMsg = 'DB 제약조건이 설정되지 않았습니다. Migration 020을 실행해주세요.';
+                        if (errorMsg.includes('unique constraint') || e.code === '23505') {
+                            errorMsg = '이미 동일한 Tidal ID 또는 슬롯 번호가 DB에 존재합니다. 엑셀 파일의 중복 여부를 확인해 주세요.';
+                        } else if (errorMsg.includes('ON CONFLICT') || errorMsg.includes('no unique or exclusion constraint')) {
+                            errorMsg = '[DB 설정 필요] 슬롯 중복 방지 제약 조건이 운영 DB에 설정되어 있지 않습니다. Supabase 대시보드 → SQL Editor에서 supabase/migrations/020_add_unique_tidal_id.sql 파일의 내용을 실행해주세요.';
+                        } else if (errorMsg.includes('violates not-null') || e.code === '23502') {
+                            errorMsg = '필수 입력 값이 비어있습니다. 엑셀 파일의 해당 슬롯 행을 확인해 주세요.';
+                        } else if (errorMsg.includes('foreign key') || e.code === '23503') {
+                            errorMsg = '연결된 마스터 계정이 존재하지 않습니다. 마스터 ID를 먼저 확인해 주세요.';
                         }
 
                         results.failed.push({
@@ -230,7 +314,41 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                // 3. Sync used_slots count after all slot operations
+                // 3. Re-index slots for this account to ensure sequentiality and master at 0
+                const { data: finalSlots, error: finalFetchError } = await supabaseAdmin
+                    .from('order_accounts')
+                    .select('id, slot_number, type')
+                    .eq('account_id', masterAccountId)
+                    .order('slot_number', { ascending: true });
+
+                if (!finalFetchError && finalSlots && finalSlots.length > 0) {
+                    const sorted = [...finalSlots].sort((a, b) => {
+                        if (a.type === 'master') return -1;
+                        if (b.type === 'master') return 1;
+                        return a.slot_number - b.slot_number;
+                    });
+
+                    // Pass 1: Move to temporary high slots
+                    for (let i = 0; i < sorted.length; i++) {
+                        await supabaseAdmin
+                            .from('order_accounts')
+                            .update({ slot_number: sorted[i].slot_number + 1000 })
+                            .eq('id', sorted[i].id);
+                    }
+
+                    // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
+                    for (let i = 0; i < sorted.length; i++) {
+                        const updates: { slot_number: number; type?: string } = { slot_number: i };
+                        if (i > 0 && sorted[i].type === 'master') updates.type = 'user';
+
+                        await supabaseAdmin
+                            .from('order_accounts')
+                            .update(updates)
+                            .eq('id', sorted[i].id);
+                    }
+                }
+
+                // 4. Sync used_slots count after all slot operations
                 const { count: actualCount } = await supabaseAdmin
                     .from('order_accounts')
                     .select('*', { count: 'exact', head: true })
@@ -255,8 +373,8 @@ export async function POST(req: NextRequest) {
 
         // Log final results
         console.log('[Import] ===== Import Summary =====');
-        console.log(`[Import] Masters created: ${results.success.masters}`);
-        console.log(`[Import] Slots created/updated: ${results.success.slots}`);
+        console.log(`[Import] Masters: Created=${results.success.masters.created}, Updated=${results.success.masters.updated}`);
+        console.log(`[Import] Slots: Created=${results.success.slots.created}, Updated=${results.success.slots.updated}`);
         console.log(`[Import] Failed items: ${results.failed.length}`);
         if (results.failed.length > 0) {
             console.log('[Import] Failed details:', results.failed);

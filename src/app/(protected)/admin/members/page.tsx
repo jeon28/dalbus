@@ -104,22 +104,36 @@ export default function MemberListPage() {
         birth: 100,
         status: 60,
         phone: 120,
-        memo: 620,
+        memo: 400,
         action: 100
     });
+
+    useEffect(() => {
+        const savedWidths = localStorage.getItem('memberListColumnWidths');
+        if (savedWidths) {
+            try {
+                setColumnWidths(JSON.parse(savedWidths));
+            } catch (e) {
+                console.error('Failed to parse saved column widths:', e);
+            }
+        }
+    }, []);
+
     const startResizing = (id: string, e: React.MouseEvent) => {
         e.preventDefault();
 
         const startX = e.pageX;
         const startWidth = columnWidths[id];
+        let currentWidth = startWidth;
 
         const onMouseMove = (moveEvent: MouseEvent) => {
             const currentX = moveEvent.pageX;
-            const newWidth = Math.max(50, startWidth + (currentX - startX));
-            setColumnWidths((prev: Record<string, number>) => ({ ...prev, [id]: newWidth }));
+            currentWidth = Math.max(50, startWidth + (currentX - startX));
+            setColumnWidths((prev: Record<string, number>) => ({ ...prev, [id]: currentWidth }));
         };
 
         const onMouseUp = () => {
+            localStorage.setItem('memberListColumnWidths', JSON.stringify({ ...columnWidths, [id]: currentWidth }));
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
         };
@@ -376,7 +390,7 @@ export default function MemberListPage() {
             <div className="flex-1 overflow-x-auto p-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className={`${styles.table} ${styles.resizableTable} text-xs mx-auto`} style={{ width: '1400px', minWidth: '1400px' }}>
+                        <table className={`${styles.table} ${styles.resizableTable} text-xs mx-auto`} style={{ width: '100%', minWidth: '1000px' }}>
                             <thead className="bg-gray-100 border-b">
                                 <tr>
                                     <th style={{ width: columnWidths.email }} className="relative group p-3 text-xs font-bold text-gray-600 uppercase">
@@ -615,7 +629,7 @@ export default function MemberListPage() {
                     <DialogHeader>
                         <DialogTitle>관리자 메모 편집</DialogTitle>
                         <DialogDescription>
-                            {selectedMember?.name} 회원의 메모를 수정합니다. (ID: {selectedMember?.email})
+                            {selectedMember?.name} 회원의 메모를 수정합니다. ({selectedMember?.email})
                             이 내용은 관리자에게만 보여집니다.
                         </DialogDescription>
                     </DialogHeader>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendAdminOrderNotification, sendUserOrderNotification } from '@/lib/email';
 import { getServerSession } from '@/lib/auth';
+import { normalizePhone } from '@/lib/utils';
 
 export async function POST(req: NextRequest) {
     try {
@@ -14,15 +15,20 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { orderData, product_name, plan_name } = body;
 
+        // Normalize phone number
+        const normalizedOrderData = {
+            ...orderData,
+            buyer_phone: normalizePhone(orderData.buyer_phone),
+            order_type: orderData.order_type || 'NEW'
+        };
+
         // 1. Insert order into Supabase
         const { data: order, error: insertError } = await supabaseAdmin
             .from('orders')
-            .insert([{
-                ...orderData,
-                order_type: orderData.order_type || 'NEW'
-            }])
+            .insert([normalizedOrderData])
             .select()
             .single();
+
 
         if (insertError) {
             console.error('Order insert error:', insertError);

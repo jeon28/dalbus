@@ -48,9 +48,11 @@ export async function GET(req: NextRequest) {
 
         if (error) throw error;
 
-        // Filter out inactive assignments and recalculate used_slots locally for accuracy
+        // Filter out inactive assignments, re-sort by slot_number, and recalculate used_slots locally for accuracy
         const filteredData = data?.map(account => {
-            const activeAssignments = account.order_accounts.filter((oa: { is_active?: boolean }) => oa.is_active !== false);
+            const activeAssignments = (account.order_accounts || [])
+                .filter((oa: { is_active?: boolean }) => oa.is_active !== false)
+                .sort((a: { slot_number: number }, b: { slot_number: number }) => a.slot_number - b.slot_number);
             return {
                 ...account,
                 order_accounts: activeAssignments,
@@ -76,11 +78,18 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         // body: product_id, login_id, login_pw, payment_email, payment_day, max_slots, memo
 
+        const normalizedBody = {
+            ...body,
+            login_id: body.login_id ? body.login_id.toLowerCase().trim() : body.login_id,
+            payment_email: body.payment_email ? body.payment_email.toLowerCase().trim() : body.payment_email
+        };
+
         const { data, error } = await supabaseAdmin
             .from('accounts')
-            .insert([body])
+            .insert([normalizedBody])
             .select()
             .single();
+
 
         if (error) throw error;
 
