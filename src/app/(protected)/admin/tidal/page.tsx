@@ -1338,9 +1338,34 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         {sortedAccounts
                             .map((acc) => {
                                 const isExpanded = expandedRows.has(acc.id);
-                                let sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => {
-                                    if (a.type === 'master') return -1;
-                                    if (b.type === 'master') return 1;
+                                let paddedAssignments: any[] = [];
+                                for (let i = 0; i < acc.max_slots; i++) {
+                                    const existing = acc.order_accounts?.find(oa => oa.slot_number === i);
+                                    if (existing) {
+                                        paddedAssignments.push(existing);
+                                    } else {
+                                        paddedAssignments.push({
+                                            id: `empty_${acc.id}_${i}`,
+                                            slot_number: i,
+                                            type: i === 0 ? 'master' : 'user',
+                                            account_id: acc.id,
+                                            is_active: true,
+                                            // Empty placeholders
+                                            tidal_id: null,
+                                            tidal_password: null,
+                                            buyer_name: null,
+                                            buyer_email: null,
+                                            buyer_phone: null,
+                                            order_number: null,
+                                            start_date: null,
+                                            end_date: null
+                                        });
+                                    }
+                                }
+
+                                let sortedAssignments = paddedAssignments.sort((a, b) => {
+                                    if (a.type === 'master' && b.type !== 'master') return -1;
+                                    if (b.type === 'master' && a.type !== 'master') return 1;
                                     return (a.slot_number || 0) - (b.slot_number || 0);
                                 });
 

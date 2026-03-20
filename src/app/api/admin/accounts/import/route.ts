@@ -130,8 +130,9 @@ export async function POST(req: NextRequest) {
 
                 // 2. Handle Slot Assignments
                 for (const slot of master.slots) {
-                    // Skip completely empty slots (no tidal_id AND no tidal_password)
-                    if (!slot.tidal_id && !slot.tidal_password) continue;
+                    // Skip completely empty slots (no tidal_id AND no tidal_password AND no order_number)
+                    // If any identifying information exists (like an order number from the legacy format), we import it.
+                    if (!slot.tidal_id && !slot.tidal_password && !slot.order_number) continue;
 
                     try {
                         // Try to find the order if order_number is provided
@@ -155,18 +156,59 @@ export async function POST(req: NextRequest) {
                             slot_number: slot.slot_number,
                             tidal_id: safeTidalId,
                             tidal_password: slot.tidal_password || '',
-                            order_id: orderId
+                            order_id: orderId,
+                            is_active: true,
+                            type: slot.slot_number === 0 ? 'master' : 'user'
                         };
 
-                        // INSERT with UPSERT to prevent unique constraint conflicts on (account_id, slot_number)
-                        const { error: upsertError } = await supabaseAdmin
+                        // 1. Check if the slot already exists
+                        const { data: existingSlot } = await supabaseAdmin
                             .from('order_accounts')
-                            .upsert(slotData, { 
-                                onConflict: 'account_id, slot_number',
-                                ignoreDuplicates: false 
-                            });
+                            .select('id, tidal_id')
+                            .eq('account_id', masterAccountId)
+                            .eq('slot_number', slot.slot_number)
+                            .maybeSingle();
 
-                        if (upsertError) throw upsertError;
+                        // 2. Clear existing tidal_id if it belongs to another slot
+                        if (safeTidalId) {
+                            const { data: existingByTidal } = await supabaseAdmin
+                                .from('order_accounts')
+                                .select('id, account_id, slot_number')
+                                .eq('tidal_id', safeTidalId)
+                                .maybeSingle();
+                                
+                            if (existingByTidal && (!existingSlot || existingByTidal.id !== existingSlot.id)) {
+                                console.log(`[Import] Tidal ID ${safeTidalId} is already in use at another slot. Removing old binding.`);
+                                // Remove tidal_id from the old slot to prevent Unique Constraint Violation
+                                await supabaseAdmin
+                                    .from('order_accounts')
+                                    .update({ tidal_id: null, tidal_password: null })
+                                    .eq('id', existingByTidal.id);
+                            }
+                        }
+
+                        const refinedSlotData = {
+                            ...slotData,
+                            tidal_id: safeTidalId || null,
+                            tidal_password: slotData.tidal_password || null
+                        };
+
+                        if (existingSlot) {
+                            // Update existing slot
+                            const { error: updateError } = await supabaseAdmin
+                                .from('order_accounts')
+                                .update(refinedSlotData)
+                                .eq('id', existingSlot.id);
+                            
+                            if (updateError) throw updateError;
+                        } else {
+                            // Insert new slot
+                            const { error: insertError } = await supabaseAdmin
+                                .from('order_accounts')
+                                .insert(refinedSlotData);
+                            
+                            if (insertError) throw insertError;
+                        }
 
                         results.success.slots++;
                     } catch (slotError: unknown) {
