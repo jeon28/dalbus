@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-// Excel date serial → ISO date string (e.g. 46095 → '2026-03-14')
-function excelDateToISO(serial: number | undefined | null): string | null {
-    if (!serial || typeof serial !== 'number') return null;
-    // Excel epoch is Jan 1, 1900; JS epoch is Jan 1, 1970
-    // 25569 = days between the two epochs
-    const date = new Date((serial - 25569) * 86400 * 1000);
-    if (isNaN(date.getTime())) return null;
-    return date.toISOString().split('T')[0];
+function parseExcelDate(value: any): string | null {
+    if (!value) return null;
+    if (typeof value === 'number') {
+        const date = new Date((value - 25569) * 86400 * 1000);
+        if (isNaN(date.getTime())) return null;
+        return date.toISOString().split('T')[0];
+    }
+    if (typeof value === 'string') {
+        const parsed = new Date(value);
+        if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString().split('T')[0];
+        }
+    }
+    return null;
 }
 
 interface ImportSlot {
@@ -21,6 +27,8 @@ interface ImportSlot {
     buyer_phone: string | null;
     start_date: string | null;
     end_date: string | null;
+    amount: number | null;
+    period_months: number | null;
 }
 
 interface ImportAccount {
@@ -28,7 +36,7 @@ interface ImportAccount {
     payment_email: string;
     payment_day: number;
     login_pw: string;
-    memo: string;
+    memo: string | null;
     slots: ImportSlot[];
 }
 
@@ -51,29 +59,55 @@ export async function POST(req: NextRequest) {
         // Group data by Master ID (login_id)
         const masterMap = new Map<string, ImportAccount>();
         importData.forEach((row) => {
-            const masterId = row['마스터 ID'] || row['그룹 ID'];
+            const assignmentNum = String(row['배정번호'] || '').trim();
             
+            let masterId: string, slotText: string;
+            
+            if (assignmentNum && assignmentNum.includes('-')) {
+                const lastDashIndex = assignmentNum.lastIndexOf('-');
+                masterId = assignmentNum.substring(0, lastDashIndex).trim();
+                slotText = assignmentNum.substring(lastDashIndex + 1).trim();
+            } else {
+                masterId = String(row['마스터 ID'] || row['그룹 ID'] || '').trim();
+                slotText = String(row['Slot'] || '').replace('Slot ', '').replace('#', '').trim();
+            }
+            if (!masterId && assignmentNum) masterId = assignmentNum;
+
             let currentMaster;
 
             if (masterId) {
                 if (!masterMap.has(masterId)) {
                     masterMap.set(masterId, {
                         login_id: masterId,
-                        payment_email: row['결제 계정'] || '',
-                        payment_day: parseInt(row['결제일']?.toString().replace('일', '') || '1'),
+                        payment_email: row['결제 계정'] !== undefined ? String(row['결제 계정']).trim() : '',
+                        payment_day: parseInt(row['결제일']?.toString().replace('일', '') || '0') || 0,
                         login_pw: '', // Default to empty string to satisfy NOT NULL constraint
-                        memo: row['메모'] || '',
+                        memo: row['메모'] !== undefined ? String(row['메모']).trim() : null, // keep null if not provided
                         slots: []
                     });
+                } else {
+                    const existing = masterMap.get(masterId);
+                    if (existing) {
+                        if (existing.memo === null || existing.memo === '') {
+                            const newMemo = row['메모'] !== undefined ? String(row['메모']).trim() : null;
+                            if (newMemo) existing.memo = newMemo;
+                        }
+                        if (!existing.payment_email && row['결제 계정']) {
+                            existing.payment_email = String(row['결제 계정']).trim();
+                        }
+                        if (!existing.payment_day && row['결제일']) {
+                            existing.payment_day = parseInt(row['결제일']?.toString().replace('일', '') || '0') || 0;
+                        }
+                    }
                 }
                 currentMaster = masterMap.get(masterId);
             } else if (masterMap.size > 0) {
                 // It's a slot row for the last seen master (legacy format support)
-                currentMaster = Array.from(masterMap.values()).pop();
+                const masters = Array.from(masterMap.values());
+                currentMaster = masters[masters.length - 1];
             }
 
-            if (currentMaster && row['Slot']) {
-                const slotText = String(row['Slot']).replace('Slot ', '').replace('#', '').trim();
+            if (currentMaster && slotText) {
                 const slotNumber = parseInt(slotText) - 1;
 
                 // Validate slot_number
@@ -89,9 +123,25 @@ export async function POST(req: NextRequest) {
                     const buyerEmail = String(row['이메일'] || '').trim() || null;
                     const buyerPhone = String(row['전화번호'] || '').trim() || null;
 
-                    // Start/end dates: stored as Excel serial numbers
-                    const startDate = excelDateToISO(row['시작일'] as number);
-                    const endDate = excelDateToISO(row['종료일'] as number);
+                    const startDate = parseExcelDate(row['시작일']);
+                    const endDate = parseExcelDate(row['종료일']);
+                    
+                    const amountRaw = row['계약금액'] ?? row['결제금액'];
+                    let amount = null;
+                    if (amountRaw !== undefined && amountRaw !== null && amountRaw !== '') {
+                        const sanitizedAmt = String(amountRaw).replace(/,/g, '');
+                        if (!isNaN(parseInt(sanitizedAmt))) {
+                            amount = parseInt(sanitizedAmt);
+                        }
+                    }
+
+                    const periodRaw = row['개월'];
+                    let period_months = null;
+                    if (periodRaw !== undefined && periodRaw !== null && periodRaw !== '') {
+                        if (!isNaN(parseInt(String(periodRaw)))) {
+                            period_months = parseInt(String(periodRaw));
+                        }
+                    }
 
                     currentMaster.slots.push({
                         slot_number: slotNumber,
@@ -103,6 +153,8 @@ export async function POST(req: NextRequest) {
                         buyer_phone: buyerPhone,
                         start_date: startDate,
                         end_date: endDate,
+                        amount: amount,
+                        period_months: period_months
                     });
                 } else {
                     console.warn(`Invalid slot number: ${row['Slot']}, skipping`);
@@ -110,7 +162,8 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        // 0. Fetch Product ID for 'tidal'
+        // 0. Fetch Product ID dynamically
+        const productName = req.nextUrl.searchParams.get('product') || 'tidal';
         const { data: products, error: productError } = await supabaseAdmin
             .from('products')
             .select('id, name');
@@ -119,7 +172,27 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'No products found in the database' }, { status: 404 });
         }
 
-        const productData = products.find(p => p.name.toLowerCase().includes('tidal') || p.name.includes('타이달')) || products[0];
+        let productData;
+        if (productName.toLowerCase().includes('hifi')) {
+            productData = products.find(p => p.name.toLowerCase() === 'hifitidal') || products.find(p => p.name.toLowerCase().includes('hifitidal'));
+        } else {
+            productData = products.find(p => p.name.toLowerCase().includes('tidal') && !p.name.toLowerCase().includes('hifitidal')) || products[0];
+        }
+
+        if (!productData) {
+            return NextResponse.json({ error: 'Matching product not found in the database. Ensure a product with the appropriate name exists.' }, { status: 404 });
+        }
+
+        let targetPlanId = null;
+        const { data: plan } = await supabaseAdmin
+            .from('product_plans')
+            .select('id')
+            .eq('product_id', productData.id)
+            .limit(1)
+            .maybeSingle();
+        if (plan) {
+            targetPlanId = plan.id;
+        }
 
         const mastersArray = Array.from(masterMap.values());
         console.log(`[Import] Processing ${mastersArray.length} master accounts...`);
@@ -136,20 +209,22 @@ export async function POST(req: NextRequest) {
                     .from('accounts')
                     .select('id')
                     .eq('login_id', master.login_id)
-                    .single();
+                    .eq('product_id', productData.id)
+                    .maybeSingle();
 
                 let masterAccountId: string;
 
                 if (existingAcc) {
                     // Update existing
                     console.log(`[Import] Updating existing master: ${master.login_id}`);
+                    const masterUpdates: any = {};
+                    if (master.payment_email) masterUpdates.payment_email = master.payment_email;
+                    if (master.payment_day) masterUpdates.payment_day = master.payment_day;
+                    if (master.memo !== null) masterUpdates.memo = master.memo;
+
                     const { error: updateError } = await supabaseAdmin
                         .from('accounts')
-                        .update({
-                            payment_email: master.payment_email,
-                            payment_day: master.payment_day,
-                            memo: master.memo
-                        })
+                        .update(masterUpdates)
                         .eq('id', existingAcc.id);
 
                     if (updateError) throw updateError;
@@ -163,8 +238,8 @@ export async function POST(req: NextRequest) {
                         .insert({
                             login_id: master.login_id,
                             login_pw: master.login_pw || null, // Allow null
-                            payment_email: master.payment_email,
-                            payment_day: master.payment_day,
+                            payment_email: master.payment_email || '',
+                            payment_day: master.payment_day || 1,
                             memo: master.memo || '',
                             product_id: productData.id, // Use fetched UUID
                             max_slots: 6,
@@ -180,9 +255,9 @@ export async function POST(req: NextRequest) {
 
                 // 2. Handle Slot Assignments
                 for (const slot of master.slots) {
-                    // Skip completely empty slots (no tidal_id AND no tidal_password AND no order_number)
-                    // If any identifying information exists (like an order number from the legacy format), we import it.
-                    if (!slot.tidal_id && !slot.tidal_password && !slot.order_number) continue;
+                    // Skip completely empty slots (no tidal_id AND no tidal_password AND no order_number AND no buyer_name AND no buyer_email AND no buyer_phone)
+                    // If any identifying information exists, we import it.
+                    if (!slot.tidal_id && !slot.tidal_password && !slot.order_number && !slot.buyer_name && !slot.buyer_email && !slot.buyer_phone) continue;
 
                     try {
                         // Try to find the order if order_number is provided
@@ -195,6 +270,61 @@ export async function POST(req: NextRequest) {
                                 .maybeSingle();
                             if (orderData) {
                                 orderId = orderData.id;
+                            }
+                        }
+                        
+                        // Check if the slot already exists to reuse its order_id if no explicit order_number was provided
+                        const { data: existingSlot } = await supabaseAdmin
+                            .from('order_accounts')
+                            .select('id, tidal_id, order_id')
+                            .eq('account_id', masterAccountId)
+                            .eq('slot_number', slot.slot_number)
+                            .maybeSingle();
+
+                        if (!orderId && existingSlot?.order_id) {
+                            orderId = existingSlot.order_id;
+                        }
+
+                        // If no order found, and we have an amount or customer info, let's create a guest order
+                        // This mirrors the behavior in assign/route.ts, BUT ONLY for Tidal
+                        const isHifiTidal = productData.name.toLowerCase().includes('hifitidal');
+                        if (!isHifiTidal) {
+                            if (!orderId) {
+                                const { data: newOrder, error: orderErr } = await supabaseAdmin
+                                    .from('orders')
+                                    .insert([{
+                                        user_id: null,
+                                        product_id: productData.id,
+                                        plan_id: targetPlanId,
+                                        payment_status: 'paid',
+                                        assignment_status: 'waiting',
+                                        buyer_name: slot.buyer_name || '',
+                                        buyer_phone: slot.buyer_phone || '',
+                                        buyer_email: slot.buyer_email || '',
+                                        order_number: slot.order_number || null,
+                                        amount: slot.amount !== null ? slot.amount : 0,
+                                        is_guest: true
+                                    }])
+                                    .select('id')
+                                    .single();
+                                if (orderErr) {
+                                    console.error('[Import] Failed to create order:', orderErr);
+                                }
+                                if (newOrder) orderId = newOrder.id;
+                            } else if (slot.amount !== null || slot.buyer_name || slot.buyer_email || slot.buyer_phone) {
+                                // If order exists and we uploaded amount or customer info, update it
+                                const orderUpdates: any = {};
+                                if (slot.amount !== null) orderUpdates.amount = slot.amount;
+                                if (slot.buyer_name) orderUpdates.buyer_name = slot.buyer_name;
+                                if (slot.buyer_phone) orderUpdates.buyer_phone = slot.buyer_phone;
+                                if (slot.buyer_email) orderUpdates.buyer_email = slot.buyer_email;
+                                
+                                if (Object.keys(orderUpdates).length > 0) {
+                                    await supabaseAdmin
+                                        .from('orders')
+                                        .update(orderUpdates)
+                                        .eq('id', orderId);
+                                }
                             }
                         }
 
@@ -235,15 +365,12 @@ export async function POST(req: NextRequest) {
                             start_date: slot.start_date || null,
                             end_date: slot.end_date || null,
                             type: slotType, // Apply determined type
+                            amount: slot.amount,
+                            period_months: slot.period_months,
                         };
 
-                        // 1. Check if the slot already exists
-                        const { data: existingSlot } = await supabaseAdmin
-                            .from('order_accounts')
-                            .select('id, tidal_id')
-                            .eq('account_id', masterAccountId)
-                            .eq('slot_number', slot.slot_number)
-                            .maybeSingle();
+                        // 1. We already checked existingSlot earlier, but we just use that variable.
+
 
                         // 2. Clear existing tidal_id if it belongs to another slot
                         if (safeTidalId) {

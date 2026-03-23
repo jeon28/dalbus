@@ -20,7 +20,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             end_date,
             type,
             is_active,
-            tidal_id
+            tidal_id,
+            amount,
+            period_months,
+            memo
         } = body;
 
         // 1. Update order_accounts
@@ -39,6 +42,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (start_date !== undefined) oaUpdates.start_date = start_date;
         if (end_date !== undefined) oaUpdates.end_date = end_date;
         if (is_active !== undefined) oaUpdates.is_active = is_active;
+        if (amount !== undefined && amount !== null) oaUpdates.amount = Number(amount);
+        if (period_months !== undefined && period_months !== null) oaUpdates.period_months = Number(period_months);
+        if (memo !== undefined) {
+            // memo is updated in profiles.memo, not order_accounts
+            
+            // Sync with profiles.memo if a user_id exists for this order
+            const { data: assignmentData } = await supabaseAdmin
+                .from('order_accounts')
+                .select('orders(user_id)')
+                .eq('id', id)
+                .single();
+                
+            const userId = (assignmentData?.orders as { user_id?: string } | null)?.user_id;
+            if (userId) {
+                await supabaseAdmin
+                    .from('profiles')
+                    .update({ memo })
+                    .eq('id', userId);
+            }
+        }
 
 
         if (Object.keys(oaUpdates).length > 0) {
@@ -100,7 +123,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 const { count: actualCount } = await supabaseAdmin
                     .from('order_accounts')
                     .select('*', { count: 'exact', head: true })
-                    .eq('account_id', updatedData.account_id);
+                    .eq('account_id', updatedData.account_id)
+                    .eq('is_active', true);
 
                 await supabaseAdmin
                     .from('accounts')
@@ -133,11 +157,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         if (fetchError || !assignment) throw new Error('Assignment not found');
 
-        // 2. Delete assignment
+        // 2. Soft Delete assignment (Deactivate)
         const { error: delError } = await supabaseAdmin
             .from('order_accounts')
-            .delete()
+            .update({ is_active: false })
             .eq('id', id);
+
 
         if (delError) throw delError;
 
@@ -184,9 +209,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const { count: actualCount } = await supabaseAdmin
             .from('order_accounts')
             .select('*', { count: 'exact', head: true })
-            .eq('account_id', assignment.account_id);
-            // Removed .eq('is_active', true) because the system seems to use row presence as "active assignment" 
-            // per the general flow, though some old logic had it. Syncing with actual row count.
+            .eq('account_id', assignment.account_id)
+            .eq('is_active', true);
 
         await supabaseAdmin
             .from('accounts')

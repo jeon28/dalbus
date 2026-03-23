@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             tidal_id,
             type,
             // Manual creation fields
-            buyer_name, buyer_phone, buyer_email, start_date, end_date
+            buyer_name, buyer_phone, buyer_email, start_date, end_date, memo, amount
         } = body;
 
         let targetOrderId = order_id;
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     buyer_name: buyer_name || '',
                     buyer_phone: buyer_phone || '',
                     buyer_email: buyer_email || '',
-                    amount: 0,
+                    amount: amount !== undefined ? amount : 0,
                     is_guest: true
                 }])
                 .select()
@@ -124,8 +124,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         if (!finalType) {
-            // If it's the first slot ever (index 0), it's default master
-            if (finalSlotNumber === 0 && (!currentAssignments || currentAssignments.length === 0)) {
+            if (finalSlotNumber === 0) {
                 finalType = 'master';
             } else {
                 finalType = 'user';
@@ -142,6 +141,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             tidal_id?: string;
             type?: string;
             buyer_phone?: string;
+            memo?: string;
         } | undefined;
 
         if (existingAssignment) {

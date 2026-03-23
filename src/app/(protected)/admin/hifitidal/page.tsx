@@ -269,7 +269,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     // --- Fetching Functions ---
     const fetchAccounts = async () => {
         try {
-            const res = await apiFetch('/api/admin/accounts?product=Tidal', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/accounts?product=HifiTidal', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
@@ -293,7 +293,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'),
                         period_months: assignment?.period_months || 0,
-                        amount: assignment?.orders?.amount || 0,
+                        amount: assignment?.amount || 0,
                         memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
                     };
                 }
@@ -371,8 +371,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         accounts.forEach((acc, accIdx) => {
             const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i);
+                let assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
                 if (!assignment) {
                     if (i > 0 && !hasMaster) continue;
                     assignment = {
@@ -731,12 +730,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         try {
             const prodRes = await apiFetch('/api/admin/products');
             const products = await prodRes.json();
-            const tidal = products.find((p: { name: string }) => p.name.includes('Tidal') && !p.name.toLowerCase().includes('hifi')) || products[0];
+            const hifitidal = products.find((p: { name: string }) => p.name.toLowerCase() === 'hifitidal') || products.find((p: { name: string }) => p.name.toLowerCase().includes('hifitidal'));
 
             const res = await apiFetch('/api/admin/accounts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newAccount, product_id: tidal?.id })
+                body: JSON.stringify({ ...newAccount, product_id: hifitidal?.id })
             });
             if (!res.ok) throw new Error('Failed to create');
             alert('생성되었습니다.');
@@ -824,7 +823,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     '소속 PW': item.tidal_password || '',
                     '시작일': item.start_date || '',
                     '종료일': item.end_date || '',
-                    '개월': getPeriodMonths(item.start_date, item.end_date),
+                    '개월': item.period_months || getPeriodMonths(item.start_date, item.end_date),
                     '계약금액': item.amount || 0
                 });
             });
@@ -832,8 +831,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
-        XLSX.utils.book_append_sheet(wb, ws, 'Tidal 계정');
-        XLSX.writeFile(wb, `Tidal계정_${new Date().toLocaleDateString()}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, 'HifiTidal 계정');
+        XLSX.writeFile(wb, `HifiTidal계정_${new Date().toLocaleDateString()}.xlsx`);
     };
 
     const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -845,7 +844,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 const data = new Uint8Array(event.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                const res = await apiFetch('/api/admin/accounts/import?product=Tidal', {
+                const res = await apiFetch('/api/admin/accounts/import?product=HifiTidal', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ accounts: jsonData })
@@ -1075,7 +1074,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             <header className={`${styles.header} glass`}>
                 <div className="container flex justify-between items-center bg-white/50 py-2 rounded-lg">
                     <div className="flex items-center gap-4">
-                        <h1 className={styles.title}>Tidal 계정 관리</h1>
+                        <h1 className={styles.title}>HifiTidal 계정 관리</h1>
                         <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
                             {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
                             {isGridView ? 'List View' : 'Grid View'}

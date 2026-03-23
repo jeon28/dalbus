@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
+        const productName = req.nextUrl.searchParams.get('product');
+
         const { data, error } = await supabaseAdmin
             .from('accounts')
             .select(`
@@ -31,6 +33,8 @@ export async function GET(req: NextRequest) {
                     start_date,
                     end_date,
                     is_active,
+                    amount,
+                    period_months,
                     orders(
                         id,
                         order_number,
@@ -39,17 +43,32 @@ export async function GET(req: NextRequest) {
                         payment_status,
                         assignment_status,
                         user_id,
-                        profiles(name, phone, email),
+                        profiles(name, phone, email, memo),
                         products(name)
                     )
                 )
             `)
+            .neq('status', 'disabled')
             .order('created_at', { ascending: false });
 
+
+
         if (error) throw error;
+        
+        let processedData = data;
+        if (productName && processedData) {
+            processedData = processedData.filter(account => {
+                const pName = account.products?.name?.toLowerCase() || '';
+                if (productName.toLowerCase().includes('hifi')) {
+                    return pName.includes('hifitidal');
+                } else {
+                    return pName.includes('tidal') && !pName.includes('hifitidal');
+                }
+            });
+        }
 
         // Filter out inactive assignments, re-sort by slot_number, and recalculate used_slots locally for accuracy
-        const filteredData = data?.map(account => {
+        const filteredData = processedData?.map(account => {
             const activeAssignments = (account.order_accounts || [])
                 .filter((oa: { is_active?: boolean }) => oa.is_active !== false)
                 .sort((a: { slot_number: number }, b: { slot_number: number }) => a.slot_number - b.slot_number);
