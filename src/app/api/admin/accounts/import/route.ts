@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-function parseExcelDate(value: any): string | null {
+function parseExcelDate(value: unknown): string | null {
     if (!value) return null;
     if (typeof value === 'number') {
         const date = new Date((value - 25569) * 86400 * 1000);
@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
                 if (existingAcc) {
                     // Update existing
                     console.log(`[Import] Updating existing master: ${master.login_id}`);
-                    const masterUpdates: any = {};
+                    const masterUpdates: Record<string, string | number | null> = {};
                     if (master.payment_email) masterUpdates.payment_email = master.payment_email;
                     if (master.payment_day) masterUpdates.payment_day = master.payment_day;
                     if (master.memo !== null) masterUpdates.memo = master.memo;
@@ -313,7 +313,7 @@ export async function POST(req: NextRequest) {
                                 if (newOrder) orderId = newOrder.id;
                             } else if (slot.amount !== null || slot.buyer_name || slot.buyer_email || slot.buyer_phone) {
                                 // If order exists and we uploaded amount or customer info, update it
-                                const orderUpdates: any = {};
+                                const orderUpdates: Record<string, string | number> = {};
                                 if (slot.amount !== null) orderUpdates.amount = slot.amount;
                                 if (slot.buyer_name) orderUpdates.buyer_name = slot.buyer_name;
                                 if (slot.buyer_phone) orderUpdates.buyer_phone = slot.buyer_phone;

@@ -12,7 +12,6 @@ export async function GET() {
         // If rpc isn't available, we'll try a raw sql query if possible (supabase js doesn't support raw sql directly)
         // Let's attempt to insert two nulls and see the EXACT error message 
         
-        // Setup mock master
         const { data: products } = await supabaseAdmin.from('products').select('id').limit(1);
         
         const testLogin = 'XYZ-NULL-TEST-' + Date.now();
@@ -20,7 +19,7 @@ export async function GET() {
             login_id: testLogin,
             payment_email: 'test@test.com',
             payment_day: 1,
-            product_id: products[0].id,
+            product_id: products![0].id,
             max_slots: 6,
             used_slots: 0
         }).select('id').single();
@@ -29,7 +28,7 @@ export async function GET() {
         
         // Insert Slot 1
         const { error: err1 } = await supabaseAdmin.from('order_accounts').insert({
-            account_id: master.id,
+            account_id: master!.id,
             slot_number: 1,
             tidal_id: null,
             tidal_password: null
@@ -38,7 +37,7 @@ export async function GET() {
         
         // Insert Slot 2
         const { error: err2 } = await supabaseAdmin.from('order_accounts').insert({
-            account_id: master.id,
+            account_id: master!.id,
             slot_number: 2,
             tidal_id: null,
             tidal_password: null
@@ -47,7 +46,7 @@ export async function GET() {
         
         // Insert Slot 3 (Empty string)
         const { error: err3 } = await supabaseAdmin.from('order_accounts').insert({
-            account_id: master.id,
+            account_id: master!.id,
             slot_number: 3,
             tidal_id: '',
             tidal_password: ''
@@ -55,7 +54,7 @@ export async function GET() {
         if (err3) errors.push({ phase: 'Slot 3 Insert (Empty string)', error: err3 });
 
         // Clean up
-        await supabaseAdmin.from('accounts').delete().eq('id', master.id);
+        await supabaseAdmin.from('accounts').delete().eq('id', master!.id);
         
         return NextResponse.json({
             status: 'Test Completed',

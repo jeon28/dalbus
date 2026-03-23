@@ -371,10 +371,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         accounts.forEach((acc, accIdx) => {
             const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
-                let assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
-                if (!assignment) {
+                let assignmentObj = acc.order_accounts?.find(oa => oa.slot_number === i);
+                if (!assignmentObj) {
                     if (i > 0 && !hasMaster) continue;
-                    assignment = {
+                    assignmentObj = {
                         id: `empty_${acc.id}_${i}`,
                         slot_number: i,
                         type: i === 0 ? 'master' : 'user',
@@ -391,6 +391,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     } as any;
                 }
+                const assignment = assignmentObj as Assignment;
 
                 // Search Filter
                 const query = searchQuery.toLowerCase().trim();

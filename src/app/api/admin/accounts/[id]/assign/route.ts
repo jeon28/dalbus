@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             tidal_id,
             type,
             // Manual creation fields
-            buyer_name, buyer_phone, buyer_email, start_date, end_date, memo, amount
+            buyer_name, buyer_phone, buyer_email, start_date, end_date, amount
         } = body;
 
         let targetOrderId = order_id;
