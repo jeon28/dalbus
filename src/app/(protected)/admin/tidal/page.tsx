@@ -279,7 +279,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     // --- Fetching Functions ---
     const fetchAccounts = async () => {
         try {
-            const res = await apiFetch(`/api/admin/accounts?product=Tidal&showInactive=true`, { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/accounts?product=Tidal', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
