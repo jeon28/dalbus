@@ -164,6 +164,8 @@ function TidalAccountsContent() {
     const [memoTargetSlotIdx, setMemoTargetSlotIdx] = useState<number | null>(null);
     const [memoTargetAssignmentId, setMemoTargetAssignmentId] = useState('');
 
+    const [lastSavedKey, setLastSavedKey] = useState<string | null>(null);
+
     // --- DAL-20: Column Resizing and Filter States ---
     const [expiredDays, setExpiredDays] = useState(7);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -179,7 +181,8 @@ function TidalAccountsContent() {
         'order_number': 120,
         'start_date': 120,
         'end_date': 120,
-        'period': 60,
+        'period': 100, // 개월 수 표기를 위해 넓힘
+        'amount': 100, // 금액 표기를 위해 넓힘
         'manage': 140
     });
     const [resizingCol, setResizingCol] = useState<string | null>(null);
@@ -668,6 +671,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             }
             alert('저장되었습니다.');
             setEditingSlots(prev => ({ ...prev, [key]: false }));
+            setLastSavedKey(data.assignment_id || key); // assignment_id가 있으면 사용, 없으면 key 사용
+            setTimeout(() => setLastSavedKey(null), 3000); // 3초 후 하이라이트 제거
             fetchAccounts();
         } catch (e) {
             alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
@@ -1329,6 +1334,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const key = `${acc.id}_${sIdx}`;
                                         const val = gridValues[key] || {};
                                         const isEditing = editingSlots[key];
+                                        const isLastSaved = lastSavedKey === assignment.id || lastSavedKey === key;
 
                                         const today = new Date();
                                         today.setHours(0, 0, 0, 0);
@@ -1337,7 +1343,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const isEmpty = assignment.id.startsWith('empty_');
 
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''} ${isLastSaved ? 'bg-yellow-100 transition-all duration-500' : ''}`}>
                                                 <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
@@ -1398,10 +1404,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-1 border-r" style={{ width: columnWidths['end_date'] }}>
                                                             <Input type="date" className="h-7 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r w-12" style={{ width: columnWidths['period'] }}>
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['period'] }}>
                                                             <Input type="number" className="h-7 text-xs bg-white px-1" placeholder="개월" value={val.period_months !== undefined ? val.period_months : (item.period || '')} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
                                                         </td>
-                                                        <td className="p-1 border-r w-16" style={{ width: columnWidths['amount'] || 80 }}>
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['amount'] || 100 }}>
                                                             <Input type="number" className="h-7 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} />
                                                         </td>
                                                     </>
@@ -1671,6 +1677,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 {sortedAssignments.map((assignment) => {
                                                                     const sIdx = assignment.slot_number;
                                                                     const key = `${acc.id}_${sIdx}`;
+                                         const isLastSaved = lastSavedKey === assignment.id || lastSavedKey === key;
                                                                     const val = gridValues[key] || {}; // Current Input Values
                                                                     const isEditing = editingSlots[key];
 
@@ -1686,7 +1693,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             if (diff > 0) period = `${diff}개월`;
 
                                                                             // Check expiry
-                                                                            const today = new Date();
+                                         const today = new Date();
                                                                             today.setHours(0, 0, 0, 0);
                                                                             if (end < today) isExpired = true;
                                                                         } catch { }
@@ -1695,7 +1702,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const isEmpty = assignment.id.startsWith('empty_');
 
                                                                     return (
-                                                                        <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
+                                                                        <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${isLastSaved ? 'bg-yellow-100 transition-all duration-500' : ''}`}>
                                                                             <td className="text-center text-[10px] font-bold">
                                                                                 <span className={isEmpty ? "text-green-600" : "text-gray-900"}>
                                                                                     {acc.login_id}-{assignment.slot_number + 1}
