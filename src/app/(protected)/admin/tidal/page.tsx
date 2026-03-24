@@ -171,7 +171,6 @@ function TidalAccountsContent() {
     const [editAssignKey, setEditAssignKey] = useState<string | null>(null);
 
     const [lastSavedKey, setLastSavedKey] = useState<string | null>(null);
-    const [showDeleted, setShowDeleted] = useState(false);
 
     // --- DAL-20: Column Resizing and Filter States ---
     const [expiredDays, setExpiredDays] = useState(7);
@@ -652,7 +651,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         });
     };
 
-    const handleSaveRow = async (accountId: string, slotIdx: number, dataOverride?: any) => {
+    const handleSaveRow = async (accountId: string, slotIdx: number, dataOverride?: GridValue) => {
         const key = `${accountId}_${slotIdx}`;
         const data = dataOverride || gridValues[key];
         if (!data) return;
@@ -1025,9 +1024,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         return pass;
     };
 
-    const startEdit = (accountId: string, slotIdx: number) => {
-        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
-    };
+
 
     const cancelEdit = (accountId: string, slotIdx: number) => {
         setEditingSlots(prev => {
