@@ -2286,7 +2286,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-</Dialog>
 
             {/* Edit Assignment Modal */}
             <Dialog open={isEditAssignModalOpen} onOpenChange={setIsEditAssignModalOpen}>
