@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
             .from('accounts')
             .select(`
                 *,
-                products ( name ),
+                products ( name, slug ),
                 order_accounts(
                     id,
                     assigned_at,
@@ -58,24 +58,26 @@ export async function GET(req: NextRequest) {
         let processedData = data;
         if (productName && processedData) {
             processedData = processedData.filter(account => {
-                const pName = account.products?.name?.toLowerCase() || '';
+                const pSlug = account.products?.slug || '';
                 if (productName.toLowerCase().includes('hifi')) {
-                    return pName.includes('hifitidal');
+                    return pSlug === 'hifitidal';
                 } else {
-                    return pName.includes('tidal') && !pName.includes('hifitidal');
+                    return pSlug !== 'hifitidal';
                 }
             });
         }
 
         // Filter out inactive assignments, re-sort by slot_number, and recalculate used_slots locally for accuracy
         const filteredData = processedData?.map(account => {
-            const activeAssignments = (account.order_accounts || [])
-                .filter((oa: { is_active?: boolean }) => oa.is_active !== false)
+            const { searchParams } = new URL(req.url);
+            const showAll = searchParams.get('showInactive') === 'true';
+            const assignments = (account.order_accounts || [])
+                .filter((oa: { is_active?: boolean }) => showAll || oa.is_active !== false)
                 .sort((a: { slot_number: number }, b: { slot_number: number }) => a.slot_number - b.slot_number);
             return {
                 ...account,
-                order_accounts: activeAssignments,
-                used_slots: activeAssignments.length
+                order_accounts: assignments,
+                used_slots: assignments.filter((oa: { is_active?: boolean }) => oa.is_active !== false).length
             };
         });
 

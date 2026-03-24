@@ -50,6 +50,7 @@ interface Assignment {
     period_months?: number;
     amount?: number;
     memo?: string;
+    is_active?: boolean;
 }
 
 interface Account {
@@ -103,6 +104,8 @@ interface GridValue {
     period_months?: number;
     amount?: number;
     memo?: string;
+    is_active: boolean;
+    assignment_number?: string;
 }
 
 function TidalAccountsContent() {
@@ -138,6 +141,11 @@ function TidalAccountsContent() {
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
+    const [showInactive, setShowInactive] = useState(false); // New state for filtering deleted/inactive items
+
+    const [isEditAssignModalOpen, setIsEditAssignModalOpen] = useState(false);
+    const [editAssignData, setEditAssignData] = useState<GridValue | null>(null);
+    const [editAssignKey, setEditAssignKey] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [newAccount, setNewAccount] = useState({
@@ -269,8 +277,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     // --- Fetching Functions ---
     const fetchAccounts = async () => {
         try {
-            const res = await apiFetch('/api/admin/accounts?product=HifiTidal', { cache: 'no-store' });
-            if (!res.ok) throw new Error('Failed to fetch accounts');
+            const res = await apiFetch('/api/admin/accounts?product=HifiTidal&showInactive=true', { cache: 'no-store' }); // Always fetch all to support filtering
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to fetch accounts');
+            }
             const data = await res.json();
             setAccounts(data);
 
@@ -295,6 +307,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         period_months: assignment?.period_months || 0,
                         amount: assignment?.amount || 0,
                         memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
+                        is_active: assignment?.is_active ?? true,
                     };
                 }
             });
@@ -641,11 +654,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         });
     };
 
-    const handleSaveRow = async (accountId: string, slotIdx: number) => {
+    const handleSaveRow = async (accountId: string, slotIdx: number, dataOverride?: GridValue) => {
         const key = `${accountId}_${slotIdx}`;
-        const data = gridValues[key];
+        const data = dataOverride || gridValues[key];
         if (!data) return;
-
+ 
         try {
             if (data.assignment_id) {
                 const res = await apiFetch(`/api/admin/assignments/${data.assignment_id}`, {
@@ -708,15 +721,25 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
     const handleDeactivate = async (assignmentId: string) => {
-        if (!confirm('배정을 종료하시겠습니까?')) return;
+        // Find current status from gridValues
+        let currentActive = true;
+        Object.keys(gridValues).forEach(key => {
+            if (gridValues[key].assignment_id === assignmentId) {
+                currentActive = gridValues[key].is_active !== false;
+            }
+        });
+
+        const actionText = currentActive ? '종료(비활성화)' : '활성화';
+        if (!confirm(`배정을 ${actionText}하시겠습니까?`)) return;
+        
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: false })
+                body: JSON.stringify({ is_active: !currentActive })
             });
-            if (!res.ok) throw new Error('Deactivation failed');
-            alert('비활성화 되었습니다.');
+            if (!res.ok) throw new Error('Action failed');
+            alert(currentActive ? '비활성화 되었습니다.' : '활성화 되었습니다.');
             fetchAccounts();
         } catch (error) {
             alert('실패: ' + (error instanceof Error ? error.message : String(error)));
@@ -1012,10 +1035,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         return pass;
     };
 
-    const startEdit = (accountId: string, slotIdx: number) => {
-        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
-    };
-
     const cancelEdit = (accountId: string, slotIdx: number) => {
         setEditingSlots(prev => {
             const next = { ...prev };
@@ -1023,6 +1042,30 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return next;
         });
         fetchAccounts();
+    };
+
+    const openEditAssignModal = (accountId: string, slotIdx: number) => {
+        const key = `${accountId}_${slotIdx}`;
+        const data = gridValues[key];
+        if (!data) return;
+
+        const acc = accounts.find(a => a.id === accountId);
+        const assignmentNumber = acc ? `${acc.login_id}-${slotIdx + 1}` : '';
+        
+        setEditAssignKey(key);
+        setEditAssignData({ 
+            ...data,
+            assignment_number: assignmentNumber
+        }); 
+        setIsEditAssignModalOpen(true);
+    };
+
+    const handleUpdateEditAssign = async () => {
+        if (!editAssignKey || !editAssignData) return;
+        const [accountId, sIdxStr] = editAssignKey.split('_');
+        const sIdx = parseInt(sIdxStr);
+        await handleSaveRow(accountId, sIdx, editAssignData);
+        setIsEditAssignModalOpen(false);
     };
 
     const openMemoModal = (accountId: string, slotIdx: number, currentMemo: string, assignmentId: string) => {
@@ -1114,6 +1157,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             >
                                 <Filter className="w-4 h-4" />
                                 잔여일 조회
+                            </Button>
+                            <Button
+                                variant={showInactive ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setShowInactive(!showInactive)}
+                                className={`flex items-center gap-2 h-8 ${showInactive ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-700' : ''}`}
+                                title="삭제된 데이터(빨간 행) 표시/숨기기"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                {showInactive ? '전체 보기' : '삭제 데이터'}
                             </Button>
                             <Button
                                 variant="outline"
@@ -1336,8 +1389,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                         const isEmpty = assignment.id.startsWith('empty_');
 
+                                        const isDeactivated = val.is_active === false;
+                                        if (showInactive && !isDeactivated) return null; // Show ONLY deleted if filter is ON
+                                        if (!showInactive && isDeactivated) return null; // Hide deleted by default
+
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isDeactivated ? 'bg-red-200' : (isExpired ? 'bg-red-50/30' : '')} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                 <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
@@ -1468,7 +1525,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, sIdx)}>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditAssignModal(acc.id, sIdx)}>
                                                                     <Pencil size={12} />
                                                                 </Button>
                                                                 {!isEmpty && (
@@ -1568,6 +1625,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                     // If no expired assignments in this account, hide the account row
                                     if (sortedAssignments.length === 0) return null;
+                                }
+
+                                // --- Deleted Filter (List View) ---
+                                if (showInactive) {
+                                    sortedAssignments = sortedAssignments.filter(oa => oa.is_active === false);
+                                    if (sortedAssignments.length === 0) return null;
+                                } else {
+                                    sortedAssignments = sortedAssignments.filter(oa => oa.is_active !== false);
                                 }
 
 
@@ -1878,7 +1943,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                         </>
                                                                                     ) : (
                                                                                         <>
-                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, assignment.slot_number)}>
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditAssignModal(acc.id, assignment.slot_number)}>
                                                                                                 <Pencil size={14} />
                                                                                             </Button>
 
@@ -1895,8 +1960,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                                     </Button>
 
                                                                                                     {/* Deactivate Button for Expired/Active Accounts */}
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                                                        <PowerOff size={14} />
+                                                                                                    <Button size="sm" variant="ghost" 
+                                                                                                        className={`h-7 w-7 p-0 ${val.is_active === false ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-orange-600'}`} 
+                                                                                                        title={val.is_active === false ? "활성화" : "비활성화 (종료)"} 
+                                                                                                        onClick={() => handleDeactivate(assignment.id)}
+                                                                                                    >
+                                                                                                        {val.is_active === false ? <Save size={14} /> : <PowerOff size={14} />}
                                                                                                     </Button>
 
                                                                                                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
@@ -2243,6 +2312,149 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <Dialog open={isEditAssignModalOpen} onOpenChange={setIsEditAssignModalOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>정보수정 {editAssignData?.assignment_number ? `/ ${editAssignData.assignment_number}` : ''}</DialogTitle>
+                    </DialogHeader>
+                    {editAssignData && (
+                        <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
+                            {/* Row 1: Tidal ID / PW */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-tidal-id">Tidal ID</Label>
+                                    <Input
+                                        id="edit-tidal-id"
+                                        value={editAssignData.tidal_id || ''}
+                                        onChange={(e) => setEditAssignData({ ...editAssignData, tidal_id: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-tidal-pw">PW</Label>
+                                    <Input
+                                        id="edit-tidal-pw"
+                                        value={editAssignData.tidal_password || ''}
+                                        onChange={(e) => setEditAssignData({ ...editAssignData, tidal_password: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Row 2: 고객명 */}
+                            <div className="space-y-1">
+                                <Label htmlFor="edit-buyer-name">고객명</Label>
+                                <Input
+                                    id="edit-buyer-name"
+                                    value={editAssignData.buyer_name || ''}
+                                    onChange={(e) => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Row 3: 전화번호 / 이메일 */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-buyer-phone">전화번호</Label>
+                                    <Input
+                                        id="edit-buyer-phone"
+                                        value={editAssignData.buyer_phone || ''}
+                                        onChange={(e) => setEditAssignData({ ...editAssignData, buyer_phone: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-buyer-email">Email</Label>
+                                    <Input
+                                        id="edit-buyer-email"
+                                        value={editAssignData.buyer_email || ''}
+                                        onChange={(e) => setEditAssignData({ ...editAssignData, buyer_email: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Row 4: 시작일 / 종료일 */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-start-date">시작일</Label>
+                                    <Input
+                                        id="edit-start-date"
+                                        type="date"
+                                        value={editAssignData.start_date || ''}
+                                        onChange={(e) => {
+                                            const newStart = e.target.value;
+                                            let newEnd = editAssignData.end_date;
+                                            if (newStart && editAssignData.period_months) {
+                                                try {
+                                                    const start = parseISO(newStart);
+                                                    const end = addDays(start, editAssignData.period_months * 30);
+                                                    newEnd = end.toISOString().split('T')[0];
+                                                } catch {}
+                                            }
+                                            setEditAssignData({ ...editAssignData, start_date: newStart, end_date: newEnd });
+                                        }}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-end-date">종료일</Label>
+                                    <Input
+                                        id="edit-end-date"
+                                        type="date"
+                                        value={editAssignData.end_date || ''}
+                                        onChange={(e) => {
+                                            const newEnd = e.target.value;
+                                            let newMonths = editAssignData.period_months;
+                                            if (editAssignData.start_date && newEnd) {
+                                                try {
+                                                    const start = parseISO(editAssignData.start_date);
+                                                    const end = parseISO(newEnd);
+                                                    const days = differenceInDays(end, start);
+                                                    newMonths = Math.max(0, Math.floor(days / 30));
+                                                } catch {}
+                                            }
+                                            setEditAssignData({ ...editAssignData, end_date: newEnd, period_months: newMonths });
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Row 5: 개월 / 계약금액 */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-months">개월</Label>
+                                    <Input
+                                        id="edit-months"
+                                        type="number"
+                                        value={editAssignData.period_months || ''}
+                                        onChange={(e) => {
+                                            const months = parseInt(e.target.value) || 0;
+                                            let newEnd = editAssignData.end_date;
+                                            if (editAssignData.start_date && months >= 0) {
+                                                try {
+                                                    const start = parseISO(editAssignData.start_date);
+                                                    const end = addDays(start, months * 30);
+                                                    newEnd = end.toISOString().split('T')[0];
+                                                } catch {}
+                                            }
+                                            setEditAssignData({ ...editAssignData, period_months: months, end_date: newEnd });
+                                        }}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-amount">계약금액</Label>
+                                    <Input
+                                        id="edit-amount"
+                                        type="number"
+                                        value={editAssignData.amount || ''}
+                                        onChange={(e) => setEditAssignData({ ...editAssignData, amount: parseInt(e.target.value) || 0 })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditAssignModalOpen(false)}>취소</Button>
+                        <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">저장하기</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Memo Modal */}
             <Dialog open={isMemoModalOpen} onOpenChange={setIsMemoModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
