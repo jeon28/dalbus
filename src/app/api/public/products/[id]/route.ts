@@ -14,6 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             `)
             .eq('id', id)
             .eq('product_plans.is_active', true)
+            .not('name', 'ilike', '%HifiTidal%')
             .single();
 
         if (error) {
