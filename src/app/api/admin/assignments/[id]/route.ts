@@ -20,6 +20,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             end_date,
             type,
             is_active,
+            is_deleted,
             tidal_id,
             amount,
             period_months,
@@ -42,10 +43,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (start_date !== undefined) oaUpdates.start_date = start_date;
         if (end_date !== undefined) oaUpdates.end_date = end_date;
         if (is_active !== undefined) oaUpdates.is_active = is_active;
-        if (amount !== undefined && amount !== null) oaUpdates.amount = Number(amount);
-        if (period_months !== undefined && period_months !== null) oaUpdates.period_months = Number(period_months);
+        if (body.is_deleted !== undefined) oaUpdates.is_deleted = body.is_deleted;
+        if (amount !== undefined) oaUpdates.amount = amount;
+        if (period_months !== undefined) oaUpdates.period_months = period_months;
         if (memo !== undefined) {
-            // memo is updated in profiles.memo, not order_accounts
+            oaUpdates.memo = memo;
+            // Sync with profiles.memo if a user_id exists for this order
             
             // Sync with profiles.memo if a user_id exists for this order
             const { data: assignmentData } = await supabaseAdmin
@@ -124,7 +127,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     .from('order_accounts')
                     .select('*', { count: 'exact', head: true })
                     .eq('account_id', updatedData.account_id)
-                    .eq('is_active', true);
+                    .eq('is_deleted', false);
 
                 await supabaseAdmin
                     .from('accounts')
@@ -157,10 +160,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         if (fetchError || !assignment) throw new Error('Assignment not found');
 
-        // 2. Soft Delete assignment (Deactivate)
+        // 2. Soft Delete assignment
         const { error: delError } = await supabaseAdmin
             .from('order_accounts')
-            .update({ is_active: false })
+            .update({ is_deleted: true, is_active: false })
             .eq('id', id);
 
 
@@ -172,6 +175,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             .from('order_accounts')
             .select('id, slot_number, type')
             .eq('account_id', assignment.account_id)
+            .eq('is_deleted', false)
             .order('slot_number', { ascending: true });
 
         if (fetchRemainingError) throw fetchRemainingError;

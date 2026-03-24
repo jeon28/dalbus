@@ -51,6 +51,7 @@ interface Assignment {
     amount?: number;
     memo?: string;
     is_active?: boolean;
+    is_deleted?: boolean;
 }
 
 interface Account {
@@ -81,6 +82,9 @@ interface Order {
     user_id?: string;
     products?: {
         name: string;
+    };
+    product_plans?: {
+        duration_months: number;
     };
     profiles?: {
         name: string;
@@ -281,8 +285,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         end_date: assignment?.end_date || '',
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'),
-                        period_months: assignment?.period_months || 0,
-                        amount: assignment?.orders?.amount || 0,
+                        period_months: assignment?.period_months || (assignment?.orders?.product_plans as { duration_months?: number })?.duration_months || 0,
+                        amount: assignment?.amount || assignment?.orders?.amount || 0,
                         memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
                         is_active: assignment?.is_active ?? true,
                     };
@@ -405,8 +409,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 }
 
                 // Inactive/Deleted Filter
-                if (!showInactive && assignment.is_active === false) continue; // If showInactive is false, hide inactive assignments
-                if (showInactive && assignment.is_active !== false) continue; // If showInactive is true, hide active assignments (only show inactive)
+                if (!showInactive && assignment.is_deleted === true) continue; // Hide deleted from normal view
+                if (showInactive && assignment.is_deleted !== true) continue; // Show ONLY deleted in Trash view
 
                 let periodNum = assignment.period_months || 0;
                 if (!periodNum && assignment.start_date && assignment.end_date) {
@@ -635,7 +639,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return;
         }
 
-        if (!confirm('정말 삭제하시겠습니까?')) return;
+        if (!confirm('삭제 하시겠습니까?')) return;
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
@@ -657,8 +661,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             }
         }
 
-        const actionText = currentActive ? '종료(비활성화)' : '활성화';
-        if (!confirm(`배정을 ${actionText}하시겠습니까?`)) return;
+        if (currentActive) {
+            alert('비활성화 합니다');
+        }
 
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
@@ -667,7 +672,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 body: JSON.stringify({ is_active: !currentActive })
             });
             if (!res.ok) throw new Error('Action failed');
-            alert(currentActive ? '비활성화 되었습니다.' : '활성화 되었습니다.');
+            
+            if (!currentActive) {
+                alert('활성화 되었습니다.');
+            }
+            
             fetchAccounts();
         } catch (error) {
             alert('실패: ' + (error instanceof Error ? error.message : String(error)));
@@ -962,10 +971,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         const mins = String(now.getMinutes()).padStart(2, '0');
         const timestamp = `${yy}/${mm}/${dd} ${hh}:${mins} `;
         
-        if (!currentMemo) {
-            setCurrentMemoInput(timestamp);
+        if (currentMemo) {
+            setCurrentMemoInput(timestamp + "\n" + currentMemo);
         } else {
-            setCurrentMemoInput(currentMemo + "\n" + timestamp);
+            setCurrentMemoInput(timestamp);
         }
         setIsMemoModalOpen(true);
     };
@@ -1203,12 +1212,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         </div>
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('amount', e)} />
                                     </th>
-                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
-                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
-                                            타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                                        </div>
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('type', e)} />
-                                    </th>
 
                                     <th className="relative p-2 text-center" style={{ width: columnWidths['manage'] }}>
                                         관리
@@ -1270,7 +1273,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 <td className="p-2 border-r text-center">
                                                     {!isEmpty && (
                                                         <div className="flex items-center justify-center gap-1">
-                                                            <span>{assignment.type === 'master' ? 'M' : 'U'}</span>
+                                                            <span className={`px-1 rounded text-xs ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
+                                                                {assignment.type === 'master' ? 'Master' : 'User'}
+                                                            </span>
                                                             <MessageSquareText
                                                                 size={14}
                                                                 className={`cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
@@ -1294,7 +1299,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 <td className="p-2 border-r text-center text-xs">{val.end_date || '-'}</td>
                                                 <td className="p-2 border-r text-center">{getPeriodMonths(val.start_date, val.end_date)}</td>
                                                 <td className="p-2 border-r text-right">{val.amount?.toLocaleString() || '0'}</td>
-                                                <td className="p-2 border-r text-center text-xs">{val.type}</td>
+
                                                 <td className="p-2 text-center">
                                                     <div className="flex items-center justify-center gap-1">
                                                         {isEmpty ? (
@@ -1577,60 +1582,63 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </DialogHeader>
                     {editAssignData && (
                         <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
-                            {/* Row 1: Tidal ID / PW */}
-                            <div className="grid grid-cols-2 gap-4">
+                            {/* Row 1: 고객명 / Tidal ID / PW */}
+                            <div className="grid grid-cols-3 gap-4">
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-tidal-id">Tidal ID</Label>
+                                    <Label htmlFor="edit-buyer-name" className="text-xs text-gray-500">이름</Label>
+                                    <Input
+                                        id="edit-buyer-name"
+                                        value={editAssignData.buyer_name || ''}
+                                        onChange={(e) => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-tidal-id" className="text-xs text-gray-500">Tidal ID</Label>
                                     <Input
                                         id="edit-tidal-id"
                                         value={editAssignData.tidal_id || ''}
                                         onChange={(e) => setEditAssignData({ ...editAssignData, tidal_id: e.target.value })}
+                                        className="h-9"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-tidal-pw">PW</Label>
+                                    <Label htmlFor="edit-tidal-pw" className="text-xs text-gray-500">PW</Label>
                                     <Input
                                         id="edit-tidal-pw"
                                         value={editAssignData.tidal_password || ''}
                                         onChange={(e) => setEditAssignData({ ...editAssignData, tidal_password: e.target.value })}
+                                        className="h-9"
                                     />
                                 </div>
                             </div>
 
-                            {/* Row 2: 고객명 */}
-                            <div className="space-y-1">
-                                <Label htmlFor="edit-buyer-name">고객명</Label>
-                                <Input
-                                    id="edit-buyer-name"
-                                    value={editAssignData.buyer_name || ''}
-                                    onChange={(e) => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })}
-                                />
-                            </div>
-
-                            {/* Row 3: 전화번호 / 이메일 */}
+                            {/* Row 2: 전화번호 / 이메일 */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-buyer-phone">전화번호</Label>
+                                    <Label htmlFor="edit-buyer-phone" className="text-xs text-gray-500">전화번호</Label>
                                     <Input
                                         id="edit-buyer-phone"
                                         value={editAssignData.buyer_phone || ''}
                                         onChange={(e) => setEditAssignData({ ...editAssignData, buyer_phone: e.target.value })}
+                                        className="h-9"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-buyer-email">Email</Label>
+                                    <Label htmlFor="edit-buyer-email" className="text-xs text-gray-500">이메일</Label>
                                     <Input
                                         id="edit-buyer-email"
                                         value={editAssignData.buyer_email || ''}
                                         onChange={(e) => setEditAssignData({ ...editAssignData, buyer_email: e.target.value })}
+                                        className="h-9"
                                     />
                                 </div>
                             </div>
 
-                            {/* Row 4: 시작일 / 종료일 */}
-                            <div className="grid grid-cols-2 gap-4">
+                            {/* Row 3: 시작일 / 종료일 / 개월 / 계약금액 */}
+                            <div className="grid grid-cols-4 gap-2">
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-start-date">시작일</Label>
+                                    <Label htmlFor="edit-start-date" className="text-[10px] text-gray-500">시작일</Label>
                                     <Input
                                         id="edit-start-date"
                                         type="date"
@@ -1647,10 +1655,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             }
                                             setEditAssignData({ ...editAssignData, start_date: newStart, end_date: newEnd });
                                         }}
+                                        className="h-9 text-xs px-1"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-end-date">종료일</Label>
+                                    <Label htmlFor="edit-end-date" className="text-[10px] text-gray-500">종료일</Label>
                                     <Input
                                         id="edit-end-date"
                                         type="date"
@@ -1668,14 +1677,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             }
                                             setEditAssignData({ ...editAssignData, end_date: newEnd, period_months: newMonths });
                                         }}
+                                        className="h-9 text-xs px-1"
                                     />
                                 </div>
-                            </div>
-
-                            {/* Row 5: 개월 / 계약금액 */}
-                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-months">개월</Label>
+                                    <Label htmlFor="edit-months" className="text-[10px] text-gray-500">개월</Label>
                                     <Input
                                         id="edit-months"
                                         type="number"
@@ -1692,17 +1698,31 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             }
                                             setEditAssignData({ ...editAssignData, period_months: months, end_date: newEnd });
                                         }}
+                                        className="h-9 text-xs px-1"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="edit-amount">계약금액</Label>
+                                    <Label htmlFor="edit-amount" className="text-[10px] text-gray-500">계약금액</Label>
                                     <Input
                                         id="edit-amount"
                                         type="number"
                                         value={editAssignData.amount || ''}
                                         onChange={(e) => setEditAssignData({ ...editAssignData, amount: parseInt(e.target.value) || 0 })}
+                                        className="h-9 text-xs px-1"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Row 4: 메모 (3줄) */}
+                            <div className="space-y-1">
+                                <Label htmlFor="edit-memo" className="text-xs text-gray-500">메모</Label>
+                                <textarea
+                                    id="edit-memo"
+                                    rows={3}
+                                    className="w-full p-2 text-sm border rounded-md focus:ring-1 focus:ring-blue-500 outline-none"
+                                    value={editAssignData.memo || ''}
+                                    onChange={(e) => setEditAssignData({ ...editAssignData, memo: e.target.value })}
+                                />
                             </div>
                         </div>
                     )}

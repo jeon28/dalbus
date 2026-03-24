@@ -32,9 +32,11 @@ export async function GET(req: NextRequest) {
                     order_number,
                     start_date,
                     end_date,
-                    is_active,
-                    amount,
                     period_months,
+                    amount,
+                    memo,
+                    is_active,
+                    is_deleted,
                     orders(
                         id,
                         order_number,
@@ -44,6 +46,7 @@ export async function GET(req: NextRequest) {
                         assignment_status,
                         user_id,
                         profiles(name, phone, email, memo),
+                        product_plans(duration_months),
                         products(name)
                     )
                 )

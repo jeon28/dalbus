@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             tidal_id,
             type,
             // Manual creation fields
-            buyer_name, buyer_phone, buyer_email, start_date, end_date, amount
+            buyer_name, buyer_phone, buyer_email, start_date, end_date, amount, period_months, memo
         } = body;
 
         let targetOrderId = order_id;
@@ -175,7 +175,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     buyer_phone: finalBuyerPhone || existingAssignment?.buyer_phone,
                     buyer_email: finalBuyerEmail || existingAssignment?.buyer_email,
                     start_date: finalStartDate,
-                    end_date: end_date || finalEndDate
+                    end_date: end_date || finalEndDate,
+                    amount: amount !== undefined ? amount : (existingAssignment as { amount?: number })?.amount,
+                    period_months: period_months !== undefined ? period_months : (existingAssignment as { period_months?: number })?.period_months,
+                    memo: memo !== undefined ? memo : (existingAssignment as { memo?: string })?.memo
                 })
                 .eq('id', existingAssignment?.id);
 
@@ -195,7 +198,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     buyer_phone: finalBuyerPhone || null,
                     buyer_email: finalBuyerEmail || null,
                     start_date: finalStartDate,
-                    end_date: finalEndDate
+                    end_date: finalEndDate,
+                    amount: amount || 0,
+                    period_months: period_months || 0,
+                    memo: memo || null
                 }]);
 
             if (insertError) throw insertError;
