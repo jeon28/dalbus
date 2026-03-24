@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Image from 'next/image';
@@ -32,7 +33,7 @@ export default function ProductsPage() {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await fetch('/api/public/products');
+                const response = await apiFetch('/api/public/products');
                 if (!response.ok) throw new Error('Failed to fetch products');
 
                 const data: ProductResponse[] = await response.json();

@@ -187,3 +187,152 @@
     font-weight: 600;
     color: var(--text-muted);
 }
+
+/* Mobile Responsive Utils */
+.mobileOnly {
+    display: block !important;
+}
+
+.desktopOnly {
+    display: none !important;
+}
+
+.mobileOnly {
+    display: block;
+}
+
+.desktopOnly {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .mobileOnly {
+        display: none !important;
+    }
+
+    .desktopOnly {
+        display: block !important;
+    }
+}
+
+/* Order Card Styles (Mobile) */
+.orderCards {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.orderCard {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 15px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.orderCardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.orderId {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.orderDate {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.orderCardContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.productName {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.memberInfo {
+    font-size: 0.85rem;
+}
+
+.priceInfo {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.orderCardActions {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.actionBtnIcon {
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Header Responsiveness */
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .headerActions {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+.resizableTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.resizableTable th {
+    position: relative;
+    user-select: none;
+    background-color: var(--secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 5px;
+    background: rgba(0, 0, 0, 0.05);
+    cursor: col-resize;
+    z-index: 1;
+}
+
+.resizer:hover,
+.resizing {
+    background: var(--primary);
+    width: 2px;
+}
+
+.resizableTable td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

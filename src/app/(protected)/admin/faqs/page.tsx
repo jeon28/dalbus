@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useServices } from '@/lib/ServiceContext';
 import { Pencil, Trash2, Plus } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface FAQ {
     id: string;
@@ -47,8 +48,8 @@ export default function FAQAdminPage() {
         setLoading(true);
         try {
             const [faqRes, catRes] = await Promise.all([
-                fetch('/api/admin/faqs'),
-                fetch('/api/admin/faq-categories')
+                apiFetch('/api/admin/faqs'),
+                apiFetch('/api/admin/faq-categories')
             ]);
             if (faqRes.ok) setFaqs(await faqRes.json());
             if (catRes.ok) {
@@ -77,9 +78,8 @@ export default function FAQAdminPage() {
         const method = isEditing ? 'PUT' : 'POST';
 
         try {
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
 
@@ -113,7 +113,7 @@ export default function FAQAdminPage() {
     const handleDelete = async (id: string) => {
         if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/faqs/${id}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/faqs/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 fetchData();
             } else {
@@ -127,9 +127,8 @@ export default function FAQAdminPage() {
 
     const handleAddCategory = async () => {
         if (!newCategory) return;
-        const res = await fetch('/api/admin/faq-categories', {
+        const res = await apiFetch('/api/admin/faq-categories', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newCategory, sort_order: categories.length + 1 })
         });
         if (res.ok) {
@@ -140,7 +139,7 @@ export default function FAQAdminPage() {
 
     const handleDeleteCategory = async (id: string) => {
         if (!confirm('카테고리를 삭제하시겠습니까? 해당 카테고리의 FAQ들은 유지되지만 카테고리 명이 일치하지 않을 수 있습니다.')) return;
-        const res = await fetch(`/api/admin/faq-categories/${id}`, { method: 'DELETE' });
+        const res = await apiFetch(`/api/admin/faq-categories/${id}`, { method: 'DELETE' });
         if (res.ok) fetchData();
     };
 

@@ -21,6 +21,92 @@ const getSenderEmail = async (): Promise<string> => {
     return 'Dalbus <onboarding@resend.dev>'; // Fallback
 };
 
+const logMailHistory = async (details: {
+    recipient_name?: string;
+    recipient_email: string;
+    mail_type: string;
+    subject: string;
+    content: string;
+    status: 'success' | 'failed';
+    error_message?: string;
+}) => {
+    try {
+        await supabaseAdmin.from('mail_history').insert({
+            recipient_name: details.recipient_name || '',
+            recipient_email: details.recipient_email,
+            mail_type: details.mail_type,
+            subject: details.subject,
+            content: details.content,
+            status: details.status,
+            error_message: details.error_message,
+            sent_at: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error logging mail history:', error);
+    }
+};
+
+/**
+ * 메일 발송 및 이력 로깅을 위한 범용 함수
+ */
+export const sendEmail = async (details: {
+    recipient_email: string;
+    recipient_name?: string;
+    subject: string;
+    html: string;
+    mailType: string;
+}) => {
+    if (!resend) {
+        console.error('RESEND_API_KEY is missing. Email notification skipped.');
+        return { success: false, error: 'Missing API Key' };
+    }
+
+    const { recipient_email, recipient_name, subject, html, mailType } = details;
+    const sender = await getSenderEmail();
+
+    try {
+        const { data, error } = await resend.emails.send({
+            from: sender,
+            to: [recipient_email],
+            subject,
+            html,
+        });
+
+        const status = error ? 'failed' : 'success';
+        const error_message = error ? JSON.stringify(error) : undefined;
+
+        await logMailHistory({
+            recipient_name,
+            recipient_email,
+            mail_type: mailType,
+            subject,
+            content: html,
+            status,
+            error_message
+        });
+
+        if (error) {
+            console.error(`Email sending failed (${mailType}):`, error);
+            return { success: false, error };
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error(`Unexpected error sending email (${mailType}):`, error);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        await logMailHistory({
+            recipient_name,
+            recipient_email,
+            mail_type: mailType,
+            subject,
+            content: html,
+            status: 'failed',
+            error_message: errMsg
+        });
+        return { success: false, error };
+    }
+};
+
 interface OrderNotificationProps {
     orderId: string;
     productName: string;
@@ -35,20 +121,9 @@ export const sendAdminOrderNotification = async (
     adminEmail: string,
     order: OrderNotificationProps
 ) => {
-    if (!resend) {
-        console.error('RESEND_API_KEY is missing. Email notification skipped.');
-        return { success: false, error: 'Missing API Key' };
-    }
-
-    try {
-        const { orderId, productName, planName, amount, buyerName, buyerPhone, depositorName } = order;
-        const sender = await getSenderEmail();
-
-        const { data, error } = await resend.emails.send({
-            from: sender,
-            to: [adminEmail],
-            subject: `[Dalbus] 신규 주문 알림 - ${buyerName}님`,
-            html: `
+    const { orderId, productName, planName, amount, buyerName, buyerPhone, depositorName } = order;
+    const subject = `[Dalbus] 신규 주문 알림 - ${buyerName}님`;
+    const html = `
         <h1>신규 주문이 접수되었습니다!</h1>
         <p><strong>주문 번호:</strong> ${orderId}</p>
         <hr />
@@ -68,19 +143,15 @@ export const sendAdminOrderNotification = async (
         <hr />
         <p>관리자 페이지에서 입금 확인 후 배정을 진행해주세요.</p>
         <a href="https://dalbus.vercel.app/admin/orders">관리자 페이지 바로가기</a>
-      `,
-        });
+      `;
 
-        if (error) {
-            console.error('Email sending failed:', error);
-            return { success: false, error };
-        }
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('Unexpected error sending email:', error);
-        return { success: false, error };
-    }
+    return sendEmail({
+        recipient_email: adminEmail,
+        recipient_name: 'Admin',
+        subject,
+        html,
+        mailType: '주문 알림 (관리자)'
+    });
 };
 
 /**
@@ -90,20 +161,9 @@ export const sendUserOrderNotification = async (
     userEmail: string,
     order: OrderNotificationProps
 ) => {
-    if (!resend) {
-        console.error('RESEND_API_KEY is missing. Email notification skipped.');
-        return { success: false, error: 'Missing API Key' };
-    }
-
-    try {
-        const { orderId, productName, planName, amount, buyerName, depositorName } = order;
-        const sender = await getSenderEmail();
-
-        const { data, error } = await resend.emails.send({
-            from: sender,
-            to: [userEmail],
-            subject: `[Dalbus] 주문 접수 안내 - ${buyerName}님`,
-            html: `
+    const { orderId, productName, planName, amount, buyerName, depositorName } = order;
+    const subject = `[Dalbus] 주문 접수 안내 - ${buyerName}님`;
+    const html = `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
           <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">주문이 정상적으로 접수되었습니다.</h2>
           <p>안녕하세요, <strong>${buyerName}</strong>님! Dalbus를 이용해 주셔서 감사합니다.</p>
@@ -125,19 +185,15 @@ export const sendUserOrderNotification = async (
             본 메일은 발신전용입니다. 문의사항은 관리자 페이지 또는 고객센터를 이용해 주세요.
           </p>
         </div>
-      `,
-        });
+      `;
 
-        if (error) {
-            console.error('User Email sending failed:', error);
-            return { success: false, error };
-        }
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('Unexpected error sending user email:', error);
-        return { success: false, error };
-    }
+    return sendEmail({
+        recipient_email: userEmail,
+        recipient_name: buyerName,
+        subject,
+        html,
+        mailType: '주문 접수 안내'
+    });
 };
 
 interface ExpiryNotificationProps {
@@ -151,20 +207,9 @@ export const sendExpiryNotification = async (
     targetEmail: string,
     details: ExpiryNotificationProps
 ) => {
-    if (!resend) {
-        console.error('RESEND_API_KEY is missing. Email notification skipped.');
-        return { success: false, error: 'Missing API Key' };
-    }
-
-    try {
-        const { buyerName, tidalId, endDate, message } = details;
-        const sender = await getSenderEmail();
-
-        const { data, error } = await resend.emails.send({
-            from: sender,
-            to: [targetEmail],
-            subject: `[Dalbus] 서비스 만료 안내 - ${buyerName}님`,
-            html: `
+    const { buyerName, tidalId, endDate, message } = details;
+    const subject = `[Dalbus] 서비스 만료 안내 - ${buyerName}님`;
+    const html = `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
           <h2 style="color: #2563eb;">서비스 만료 안내</h2>
           <div style="white-space: pre-wrap; margin-bottom: 20px;">
@@ -175,19 +220,15 @@ ${message.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).re
             본 메일은 정보통신망법 등 관련 법령에 의거하여 발송되는 안내 메일입니다.
           </p>
         </div>
-      `,
-        });
+      `;
 
-        if (error) {
-            console.error('Email sending failed:', error);
-            return { success: false, error };
-        }
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('Unexpected error sending email:', error);
-        return { success: false, error };
-    }
+    return sendEmail({
+        recipient_email: targetEmail,
+        recipient_name: buyerName,
+        subject,
+        html,
+        mailType: '서비스 만료 안내'
+    });
 };
 
 interface AssignmentNotificationProps {
@@ -202,20 +243,9 @@ export const sendAssignmentNotification = async (
     targetEmail: string,
     details: AssignmentNotificationProps
 ) => {
-    if (!resend) {
-        console.error('RESEND_API_KEY is missing. Email notification skipped.');
-        return { success: false, error: 'Missing API Key' };
-    }
-
-    try {
-        const { buyerName, productName, tidalId, tidalPw, endDate } = details;
-        const sender = await getSenderEmail();
-
-        const { data, error } = await resend.emails.send({
-            from: sender,
-            to: [targetEmail],
-            subject: `[Dalbus] 계정 세팅 완료 안내 - ${buyerName}님`,
-            html: `
+    const { buyerName, productName, tidalId, tidalPw, endDate } = details;
+    const subject = `[Dalbus] 계정 세팅 완료 안내 - ${buyerName}님`;
+    const html = `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
           <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">계정 세팅 완료 안내</h2>
           <p>안녕하세요, <strong>${buyerName}</strong>님!</p>
@@ -235,19 +265,15 @@ export const sendAssignmentNotification = async (
             본 메일은 발신전용입니다. 문의사항은 관리자 페이지 또는 고객센터를 이용해 주세요.
           </p>
         </div>
-      `,
-        });
+      `;
 
-        if (error) {
-            console.error('Email sending failed:', error);
-            return { success: false, error };
-        }
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('Unexpected error sending email:', error);
-        return { success: false, error };
-    }
+    return sendEmail({
+        recipient_email: targetEmail,
+        recipient_name: buyerName,
+        subject,
+        html,
+        mailType: '계정 세팅 완료 안내'
+    });
 };
 
 /**
@@ -257,19 +283,8 @@ export const sendPasswordResetCode = async (
     targetEmail: string,
     code: string
 ) => {
-    if (!resend) {
-        console.error('RESEND_API_KEY is missing. Email notification skipped.');
-        return { success: false, error: 'Missing API Key' };
-    }
-
-    try {
-        const sender = await getSenderEmail();
-
-        const { data, error } = await resend.emails.send({
-            from: sender,
-            to: [targetEmail],
-            subject: `[Dalbus] 비밀번호 초기화 인증번호 안내`,
-            html: `
+    const subject = `[Dalbus] 비밀번호 초기화 인증번호 안내`;
+    const html = `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
           <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">비밀번호 초기화 인증번호</h2>
           <p>안녕하세요, Dalbus입니다.</p>
@@ -287,17 +302,12 @@ export const sendPasswordResetCode = async (
             본 메일은 발신전용입니다. 문의사항은 고객센터를 이용해 주세요.
           </p>
         </div>
-      `,
-        });
+      `;
 
-        if (error) {
-            console.error('Password reset email sending failed:', error);
-            return { success: false, error };
-        }
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('Unexpected error sending password reset email:', error);
-        return { success: false, error };
-    }
+    return sendEmail({
+        recipient_email: targetEmail,
+        subject,
+        html,
+        mailType: '비밀번호 초기화 인증번호'
+    });
 };

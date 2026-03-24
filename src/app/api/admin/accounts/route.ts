@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession, isAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 // GET: Fetch all accounts
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const session = await getServerSession(req);
+        if (!isAdmin(session)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        const productName = req.nextUrl.searchParams.get('product');
+
         const { data, error } = await supabaseAdmin
             .from('accounts')
             .select(`
@@ -25,6 +33,8 @@ export async function GET() {
                     start_date,
                     end_date,
                     is_active,
+                    amount,
+                    period_months,
                     orders(
                         id,
                         order_number,
@@ -33,18 +43,35 @@ export async function GET() {
                         payment_status,
                         assignment_status,
                         user_id,
-                        profiles(name, phone, email),
+                        profiles(name, phone, email, memo),
                         products(name)
                     )
                 )
             `)
+            .neq('status', 'disabled')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
 
-        // Filter out inactive assignments and recalculate used_slots locally for accuracy
-        const filteredData = data?.map(account => {
-            const activeAssignments = account.order_accounts.filter((oa: { is_active?: boolean }) => oa.is_active !== false);
+
+        if (error) throw error;
+        
+        let processedData = data;
+        if (productName && processedData) {
+            processedData = processedData.filter(account => {
+                const pName = account.products?.name?.toLowerCase() || '';
+                if (productName.toLowerCase().includes('hifi')) {
+                    return pName.includes('hifitidal');
+                } else {
+                    return pName.includes('tidal') && !pName.includes('hifitidal');
+                }
+            });
+        }
+
+        // Filter out inactive assignments, re-sort by slot_number, and recalculate used_slots locally for accuracy
+        const filteredData = processedData?.map(account => {
+            const activeAssignments = (account.order_accounts || [])
+                .filter((oa: { is_active?: boolean }) => oa.is_active !== false)
+                .sort((a: { slot_number: number }, b: { slot_number: number }) => a.slot_number - b.slot_number);
             return {
                 ...account,
                 order_accounts: activeAssignments,
@@ -62,14 +89,26 @@ export async function GET() {
 // POST: Create a new shared account
 export async function POST(req: NextRequest) {
     try {
+        const session = await getServerSession(req);
+        if (!isAdmin(session)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
         const body = await req.json();
         // body: product_id, login_id, login_pw, payment_email, payment_day, max_slots, memo
 
+        const normalizedBody = {
+            ...body,
+            login_id: body.login_id ? body.login_id.toLowerCase().trim() : body.login_id,
+            payment_email: body.payment_email ? body.payment_email.toLowerCase().trim() : body.payment_email
+        };
+
         const { data, error } = await supabaseAdmin
             .from('accounts')
-            .insert([body])
+            .insert([normalizedBody])
             .select()
             .single();
+
 
         if (error) throw error;
 

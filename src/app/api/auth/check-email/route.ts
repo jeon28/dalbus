@@ -22,14 +22,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if email exists in profiles table
+        // Use select and potentially multiple rows to handle cases where duplicates might already exist
         const { data, error } = await supabaseAdmin
             .from('profiles')
             .select('email')
-            .eq('email', email)
-            .single();
+            .eq('email', email);
 
-        if (error && error.code !== 'PGRST116') {
-            // PGRST116 means no rows returned (email available)
+        if (error) {
             console.error('Email check error:', error);
             return NextResponse.json(
                 { available: false, message: '중복 확인 중 오류가 발생했습니다.' },
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (data) {
+        if (data && data.length > 0) {
             return NextResponse.json({
                 available: false,
                 message: '이미 사용 중인 이메일입니다.'

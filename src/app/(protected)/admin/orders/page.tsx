@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
+import { apiFetch } from '@/lib/api';
 import {
     Dialog,
     DialogContent,
@@ -22,10 +23,10 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
-import { addMonths, differenceInMonths, format, parseISO } from 'date-fns';
+import { addDays, differenceInMonths, format, parseISO } from 'date-fns';
 
 interface Profile {
     name?: string;
@@ -88,6 +89,10 @@ interface Account {
 export default function OrderHistoryPage() {
     const { isAdmin, isHydrated } = useServices();
     const [orders, setOrders] = useState<Order[]>([]);
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(25);
+    const [pagination, setPagination] = useState<{ total: number; page: number; limit: number; totalPages: number } | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [selectedOrderTypes, setSelectedOrderTypes] = useState<string[]>([]);
     const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([]);
@@ -159,6 +164,42 @@ export default function OrderHistoryPage() {
     const [newDuration, setNewDuration] = useState<number>(1);
     const [newBuyerName, setNewBuyerName] = useState('');
     const [newBuyerEmail, setNewBuyerEmail] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const fetchOrders = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const params = new URLSearchParams();
+            params.append('page', page.toString());
+            params.append('limit', limit.toString());
+            if (selectedStatuses.length > 0) params.append('status', selectedStatuses[0]);
+            if (selectedOrderTypes.length > 0) params.append('order_type', selectedOrderTypes[0]);
+            if (selectedGuestTypes.length > 0) params.append('guest_type', selectedGuestTypes[0]);
+            if (phoneSearch) params.append('search', phoneSearch);
+
+            const response = await apiFetch(`/api/admin/orders?${params.toString()}`);
+            if (!response.ok) throw new Error('Failed to fetch orders');
+            const result = await response.json();
+            setOrders(result.data);
+            setPagination(result.pagination);
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [page, limit, selectedStatuses, selectedOrderTypes, selectedGuestTypes, phoneSearch]);
+
+    const handleSearchClick = () => {
+        setPage(1);
+        if (page === 1) {
+            fetchOrders();
+        }
+    };
+
+    // Reset to page 1 when filters or limit change
+    useEffect(() => {
+        setPage(1);
+    }, [selectedStatuses, selectedOrderTypes, selectedGuestTypes, limit]);
 
     useEffect(() => {
         if (isHydrated && !isAdmin) {
@@ -166,18 +207,7 @@ export default function OrderHistoryPage() {
         } else if (isHydrated && isAdmin) {
             fetchOrders();
         }
-    }, [isAdmin, isHydrated, router]);
-
-    const fetchOrders = async () => {
-        try {
-            const response = await fetch('/api/admin/orders');
-            if (!response.ok) throw new Error('Failed to fetch orders');
-            const data = await response.json();
-            setOrders(data);
-        } catch (error) {
-            console.error('Error fetching orders:', error);
-        }
-    };
+    }, [isAdmin, isHydrated, fetchOrders, router]);
 
     const getOrderStatus = (order: Order) => {
         if (order.assignment_status === 'completed') return '작업완료';
@@ -187,8 +217,8 @@ export default function OrderHistoryPage() {
     };
 
     const exportToExcel = () => {
-        const data = filteredOrders.map(order => ({
-            '날짜': new Date(order.created_at).toLocaleDateString(),
+        const data = orders.map(order => ({
+            '날짜': format(new Date(order.created_at), 'yy.MM.dd'),
             '주문번호': order.order_number,
             '구분': order.order_type === 'NEW' ? '신규' : '연장',
             '회원여부': order.is_guest ? '비회원' : '회원',
@@ -235,7 +265,7 @@ export default function OrderHistoryPage() {
             try {
                 // Try finding by related_order_id first, then fallback to buyer_email
                 const lookupId = order.related_order_id || order.id;
-                const res = await fetch(`/api/admin/orders/${lookupId}/assignment`);
+                const res = await apiFetch(`/api/admin/orders/${lookupId}/assignment`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.assignment) {
@@ -251,7 +281,7 @@ export default function OrderHistoryPage() {
 
         // 2. Fetch available accounts
         try {
-            const res = await fetch('/api/admin/accounts');
+            const res = await apiFetch('/api/admin/accounts');
             if (res.ok) {
                 const data = await res.json();
 
@@ -300,7 +330,7 @@ export default function OrderHistoryPage() {
                     if (prev.end_date || prev.orders?.end_date) {
                         try {
                             const currentEnd = parseISO(prev.end_date || prev.orders.end_date);
-                            const newEnd = format(addMonths(currentEnd, duration), 'yyyy-MM-dd');
+                            const newEnd = format(addDays(currentEnd, duration * 30), 'yyyy-MM-dd');
                             setExtEndDate(newEnd);
                         } catch (e) {
                             console.error('Date calculation error:', e);
@@ -319,7 +349,7 @@ export default function OrderHistoryPage() {
                     const phone = order.profiles?.phone || order.buyer_phone || '';
                     const duration = order.product_plans?.duration_months || 1;
                     const start = format(new Date(), 'yyyy-MM-dd');
-                    const end = format(addMonths(parseISO(start), duration), 'yyyy-MM-dd');
+                    const end = format(addDays(parseISO(start), duration * 30), 'yyyy-MM-dd');
 
                     setNewStartDate(start);
                     setNewEndDate(end);
@@ -399,7 +429,7 @@ export default function OrderHistoryPage() {
     };
 
     const confirmMatch = async () => {
-        if (!selectedOrder || !selectedAccount) return;
+        if (!selectedOrder || !selectedAccount || isProcessing) return;
 
         // 자동으로 가장 낮은 번호의 빈 슬롯 선택 (단, 연장인 경우 기존 슬롯 고수)
         let targetSlot = selectedSlot;
@@ -412,8 +442,9 @@ export default function OrderHistoryPage() {
             targetSlot = availableSlots[0]; // 가장 낮은 번호 선택
         }
 
+        setIsProcessing(true);
         try {
-            const res = await fetch(`/api/admin/accounts/${selectedAccount}/assign`, {
+            const res = await apiFetch(`/api/admin/accounts/${selectedAccount}/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -446,13 +477,16 @@ export default function OrderHistoryPage() {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             alert(message);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const confirmPayment = async (orderId: string) => {
-        if (!confirm('입금 확인 처리하시겠습니까?')) return;
+        if (isProcessing || !confirm('입금 확인 처리하시겠습니까?')) return;
+        setIsProcessing(true);
         try {
-            const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_status: 'paid' })
@@ -461,13 +495,16 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('입금 확인 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const handleRevertPayment = async (orderId: string) => {
-        if (!confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
+        if (isProcessing || !confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
+        setIsProcessing(true);
         try {
-            const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ payment_status: 'pending' })
@@ -476,6 +513,8 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('상태 변경 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -486,10 +525,11 @@ export default function OrderHistoryPage() {
             return;
         }
 
-        if (!confirm('배정을 취소하고 "입금확인" 상태로 되돌리시겠습니까?')) return;
+        if (isProcessing || !confirm('배정을 취소하고 "입금확인" 상태로 되돌리시겠습니까?')) return;
 
+        setIsProcessing(true);
         try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
                 method: 'DELETE'
             });
             if (!res.ok) throw new Error('Unassign failed');
@@ -497,13 +537,16 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('배정 취소 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const markAsCompleted = async (orderId: string) => {
-        if (!confirm('작업완료 하시겠습니까 ?')) return;
+        if (isProcessing || !confirm('작업완료 하시겠습니까 ?')) return;
+        setIsProcessing(true);
         try {
-            const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ assignment_status: 'completed' })
@@ -524,6 +567,8 @@ export default function OrderHistoryPage() {
             fetchOrders();
         } catch {
             alert('상태 변경 실패');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -533,12 +578,13 @@ export default function OrderHistoryPage() {
             return;
         }
 
-        if (!confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'}) 내역을 삭제하시겠습니까?`)) {
+        if (isProcessing || !confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'}) 내역을 삭제하시겠습니까?`)) {
             return;
         }
 
+        setIsProcessing(true);
         try {
-            const res = await fetch(`/api/admin/orders/${order.id}`, {
+            const res = await apiFetch(`/api/admin/orders/${order.id}`, {
                 method: 'DELETE'
             });
 
@@ -552,6 +598,8 @@ export default function OrderHistoryPage() {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             alert(message);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -572,27 +620,113 @@ export default function OrderHistoryPage() {
 
     if (!isAdmin) return null;
 
+    const renderCards = (list: Order[]) => (
+        <div className={`${styles.orderCards} ${styles.mobileOnly}`}>
+            {list.map(o => {
+                const status = getOrderStatus(o);
+                return (
+                    <div key={o.id} className={styles.orderCard}>
+                        <div className={styles.orderCardHeader}>
+                            <div className="flex flex-col">
+                                <span className={styles.orderId}>{o.order_number}</span>
+                                <span className={styles.orderDate}>{format(new Date(o.created_at), 'yy.MM.dd')}</span>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-medium
+                                ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
+                                    status === '배정완료' ? 'bg-blue-100 text-blue-800' :
+                                        status === '입금확인' ? 'bg-green-100 text-green-800' :
+                                            'bg-yellow-100 text-yellow-800'}`}>
+                                {status}
+                            </span>
+                        </div>
+                        <div className={styles.orderCardContent}>
+                            <div className="flex justify-between items-center">
+                                <span className={styles.productName}>{o.products?.name || 'Product'}</span>
+                                <span className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold
+                                    ${o.order_type === 'NEW' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
+                                    {o.order_type === 'NEW' ? '신규' : '연장'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className={styles.memberInfo}>
+                                    <span className="font-bold">{o.profiles?.name || o.buyer_name || 'Unknown'}</span>
+                                    {o.depositor_name && o.depositor_name !== (o.profiles?.name || o.buyer_name) && (
+                                        <span className="text-xs text-orange-600 ml-1">({o.depositor_name})</span>
+                                    )}
+                                    <span className="text-gray-400 ml-2 text-xs">{o.is_guest ? '비회원' : '회원'}</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    {o.profiles?.phone || o.buyer_phone || '-'} | {o.profiles?.email || o.buyer_email || '-'}
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-end mt-2">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] text-gray-400">기간: {o.product_plans?.duration_months || '-'}개월</span>
+                                    <span className={styles.priceInfo}>₩{o.amount?.toLocaleString()}</span>
+                                </div>
+                                {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                    <div className="text-sm font-bold text-gray-800 bg-secondary px-2 py-1 rounded">
+                                        {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className={styles.orderCardActions}>
+                            {status === '주문신청' && (
+                                <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                            )}
+                            {status === '입금확인' && (
+                                <>
+                                    <Button className="flex-1" size="sm" onClick={() => handleOpenMatchModal(o)} disabled={isProcessing}>계정배정</Button>
+                                    <Button size="sm" variant="ghost" className="px-2" onClick={() => handleRevertPayment(o.id)} disabled={isProcessing}>취소</Button>
+                                </>
+                            )}
+                            {status === '배정완료' && (
+                                <>
+                                    <Button className="flex-1" size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
+                                    <Button size="sm" variant="ghost" className="px-2" onClick={() => handleUnassign(o)} disabled={isProcessing}>취소</Button>
+                                </>
+                            )}
+                            {o.order_accounts?.length === 0 && (
+                                <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+
     const renderTable = (list: Order[]) => (
-        <div className={styles.tableWrapper}>
+        <div className={`${styles.tableWrapper} ${styles.desktopOnly}`}>
             <table className={styles.table}>
                 <thead>
                     <tr>
-                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors" style={{ width: '140px' }}>
-                            <div className="flex items-center">날짜/주문번호 {getSortIcon('created_at')}</div>
+                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                            <div className="flex items-center justify-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
-                        <th>구분</th>
-                        <th>회원여부</th>
-                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center">고객명 {getSortIcon('name')}</div>
+                        <th className="text-center" style={{ width: '60px' }}>구분</th>
+                        <th className="text-center" style={{ width: '70px' }}>회원</th>
+                        <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '90px' }}>
+                            <div className="flex items-center justify-center">고객명 {getSortIcon('name')}</div>
                         </th>
-                        <th>연락처/이메일</th>
-                        <th>서비스</th>
-                        <th>이용기간</th>
-                        <th>금액</th>
-                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center">상태 {getSortIcon('status')}</div>
+                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '110px' }}>
+                            <div className="flex items-center justify-center">연락처 {getSortIcon('phone')}</div>
                         </th>
-                        <th>관리</th>
+                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '130px' }}>
+                            <div className="flex items-center justify-center">이메일 {getSortIcon('email')}</div>
+                        </th>
+                        <th className="text-center" style={{ width: '40px' }}>기간</th>
+                        <th className="text-center" style={{ width: '90px' }}>금액</th>
+                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                            <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
+                        </th>
+                        <th className="text-center" style={{ width: '120px' }}>
+                            <div className="flex items-center justify-center">배정번호</div>
+                        </th>
+                        <th className="text-center" style={{ width: '80px' }}>
+                            <div className="flex items-center justify-center">관리</div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -600,11 +734,11 @@ export default function OrderHistoryPage() {
                         const status = getOrderStatus(o);
                         return (
                             <tr key={o.id}>
-                                <td>
-                                    <div className="text-sm">{new Date(o.created_at).toLocaleDateString()}</div>
+                                <td className="text-center">
+                                    <div className="text-sm">{format(new Date(o.created_at), 'yy.MM.dd')}</div>
                                     <div className="text-xs text-gray-500">{o.order_number}</div>
                                 </td>
-                                <td>
+                                <td className="text-center">
                                     <span className={`px-2 py-1 rounded text-xs font-medium
                                         ${o.order_type === 'NEW' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800'}`}>
                                         {o.order_type === 'NEW' ? '신규' : '연장'}
@@ -616,7 +750,7 @@ export default function OrderHistoryPage() {
                                         {o.is_guest ? '비회원' : '회원'}
                                     </span>
                                 </td>
-                                <td>
+                                <td className="text-center">
                                     <div className="font-medium">
                                         {o.profiles?.name || o.buyer_name || 'Unknown'}
                                         {o.depositor_name && o.depositor_name !== (o.profiles?.name || o.buyer_name) && (
@@ -626,18 +760,18 @@ export default function OrderHistoryPage() {
                                         )}
                                     </div>
                                 </td>
-                                <td>
+                                <td className="text-center">
                                     <div className="text-sm">{o.profiles?.phone || o.buyer_phone || '-'}</div>
-                                    <div className="text-xs text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
-                                <td>
-                                    <div>{o.products?.name || 'Product'}</div>
+                                <td className="text-center">
+                                    <div className="text-sm text-gray-400">{o.profiles?.email || o.buyer_email || '-'}</div>
                                 </td>
-                                <td>
+
+                                <td className="text-center">
                                     <div className="font-mono">{o.product_plans?.duration_months || '-'}</div>
                                 </td>
-                                <td>₩{o.amount?.toLocaleString()}</td>
-                                <td>
+                                <td className="text-center">₩{o.amount?.toLocaleString()}</td>
+                                <td className="text-center">
                                     <div className="flex flex-col items-center">
                                         <span className={`px-2 py-1 rounded text-xs 
                                             ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
@@ -646,32 +780,34 @@ export default function OrderHistoryPage() {
                                                         'bg-yellow-100 text-yellow-800'}`}>
                                             {status}
                                         </span>
-                                        {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
-                                            <div className="text-[10px] text-gray-400 mt-1 font-mono whitespace-nowrap">
-                                                {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
-                                            </div>
-                                        )}
                                     </div>
                                 </td>
-                                <td>
-                                    <div className="flex flex-col gap-1">
+                                <td className="text-center font-medium">
+                                    {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                        <div className="text-sm whitespace-nowrap">
+                                            {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                        </div>
+                                    )}
+                                </td>
+                                <td className="text-center">
+                                    <div className="flex flex-col gap-1 items-center">
                                         {status === '주문신청' && (
-                                            <Button size="sm" variant="secondary" onClick={() => confirmPayment(o.id)}>입금확인</Button>
+                                            <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
                                         )}
                                         {status === '입금확인' && (
                                             <>
-                                                <Button size="sm" onClick={() => handleOpenMatchModal(o)}>계정배정</Button>
-                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleRevertPayment(o.id)}>입금취소</Button>
+                                                <Button size="sm" className="w-20" onClick={() => handleOpenMatchModal(o)} disabled={isProcessing}>계정배정</Button>
+                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleRevertPayment(o.id)} disabled={isProcessing}>입금취소</Button>
                                             </>
                                         )}
                                         {status === '배정완료' && (
                                             <>
-                                                <Button size="sm" variant="outline" onClick={() => markAsCompleted(o.id)}>작업완료</Button>
-                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)}>배정취소</Button>
+                                                <Button size="sm" variant="outline" className="w-20" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
+                                                <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)} disabled={isProcessing}>배정취소</Button>
                                             </>
                                         )}
                                         {o.order_accounts?.length === 0 && (
-                                            <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)}>삭제</Button>
+                                            <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                                         )}
                                     </div>
                                 </td>
@@ -683,53 +819,6 @@ export default function OrderHistoryPage() {
         </div>
     );
 
-    const filteredOrders = orders.filter(order => {
-        // Status filter
-        if (selectedStatuses.length > 0) {
-            const status = getOrderStatus(order);
-            if (!selectedStatuses.includes(status)) return false;
-        }
-
-        // Order Type filter
-        if (selectedOrderTypes.length > 0) {
-            const type = order.order_type || 'NEW';
-            if (!selectedOrderTypes.includes(type)) return false;
-        }
-
-        // Guest filter
-        if (selectedGuestTypes.length > 0) {
-            const guestType = order.is_guest ? 'guest' : 'member';
-            if (!selectedGuestTypes.includes(guestType)) return false;
-        }
-
-        // Phone number filter
-        if (phoneSearch) {
-            const phone = order.profiles?.phone || order.buyer_phone || '';
-            if (!phone.includes(phoneSearch)) return false;
-        }
-
-        return true;
-    }).sort((a, b) => {
-        if (!sortConfig.direction || !sortConfig.key) return 0;
-
-        let aValue: string | number = '';
-        let bValue: string | number = '';
-
-        if (sortConfig.key === 'created_at') {
-            aValue = new Date(a.created_at).getTime();
-            bValue = new Date(b.created_at).getTime();
-        } else if (sortConfig.key === 'name') {
-            aValue = a.profiles?.name || a.buyer_name || '';
-            bValue = b.profiles?.name || b.buyer_name || '';
-        } else if (sortConfig.key === 'status') {
-            aValue = getOrderStatus(a);
-            bValue = getOrderStatus(b);
-        }
-
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
 
     return (
         <main className={styles.main}>
@@ -741,37 +830,206 @@ export default function OrderHistoryPage() {
 
             <div className={`${styles.content} container`}>
                 <section className={styles.orderSection}>
-                    <div className="flex items-center gap-4 mb-4 justify-end">
-                        <Button onClick={exportToExcel} variant="outline" size="sm">
-                            <Download className="mr-2 h-4 w-4" />
-                            엑셀 다운로드
-                        </Button>
-                        <Input
-                            placeholder="전화번호 검색..."
-                            value={phoneSearch}
-                            onChange={(e) => setPhoneSearch(e.target.value)}
-                            className="max-w-xs"
-                        />
-                        <DataTableFacetedFilter
-                            title="구분"
-                            options={orderTypes}
-                            selectedValues={selectedOrderTypes}
-                            setFilter={setSelectedOrderTypes}
-                        />
-                        <DataTableFacetedFilter
-                            title="회원여부"
-                            options={guestTypes}
-                            selectedValues={selectedGuestTypes}
-                            setFilter={setSelectedGuestTypes}
-                        />
-                        <DataTableFacetedFilter
-                            title="Status"
-                            options={statuses}
-                            selectedValues={selectedStatuses}
-                            setFilter={setSelectedStatuses}
-                        />
+                    <div className={styles.headerActions}>
+                        <div className="flex gap-2 items-center flex-1">
+                            <Input
+                                placeholder="고객명/이메일/번호..."
+                                value={phoneSearch}
+                                onChange={(e) => setPhoneSearch(e.target.value)}
+                                className="max-w-[200px] h-9"
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearchClick()}
+                            />
+                            <Button onClick={handleSearchClick} size="sm" className="shrink-0 h-9 px-4">
+                                검색
+                            </Button>
+                            <Button onClick={exportToExcel} variant="outline" size="sm" className="shrink-0 h-9">
+                                <Download className="mr-1 h-4 w-4" />
+                                <span className="hidden sm:inline">엑셀</span>
+                            </Button>
+                        </div>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                            <DataTableFacetedFilter
+                                title="구분"
+                                options={orderTypes}
+                                selectedValues={selectedOrderTypes}
+                                setFilter={setSelectedOrderTypes}
+                            />
+                            <DataTableFacetedFilter
+                                title="회원"
+                                options={guestTypes}
+                                selectedValues={selectedGuestTypes}
+                                setFilter={setSelectedGuestTypes}
+                            />
+                            <DataTableFacetedFilter
+                                title="상태"
+                                options={statuses}
+                                selectedValues={selectedStatuses}
+                                setFilter={setSelectedStatuses}
+                            />
+                        </div>
                     </div>
-                    {renderTable(filteredOrders)}
+
+                    {isLoading ? (
+                        <div className="flex justify-center py-20">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : (
+                        <>
+                            {(() => {
+                                const sortedOrders = [...orders].sort((a, b) => {
+                                    if (!sortConfig.direction) return 0;
+                                    const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
+                                    
+                                    if (sortConfig.key === 'created_at') {
+                                        return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * multiplier;
+                                    }
+                                    if (sortConfig.key === 'name') {
+                                        const nameA = a.profiles?.name || a.buyer_name || '';
+                                        const nameB = b.profiles?.name || b.buyer_name || '';
+                                        return nameA.localeCompare(nameB, 'ko') * multiplier;
+                                    }
+                                    if (sortConfig.key === 'phone') {
+                                        const phoneA = a.profiles?.phone || a.buyer_phone || '';
+                                        const phoneB = b.profiles?.phone || b.buyer_phone || '';
+                                        return phoneA.localeCompare(phoneB, 'ko') * multiplier;
+                                    }
+                                    if (sortConfig.key === 'email') {
+                                        const emailA = a.profiles?.email || a.buyer_email || '';
+                                        const emailB = b.profiles?.email || b.buyer_email || '';
+                                        return emailA.localeCompare(emailB, 'ko') * multiplier;
+                                    }
+                                    if (sortConfig.key === 'status') {
+                                        const statusA = getOrderStatus(a);
+                                        const statusB = getOrderStatus(b);
+                                        return statusA.localeCompare(statusB, 'ko') * multiplier;
+                                    }
+                                    return 0;
+                                });
+
+                                return (
+                                    <>
+                                        {renderTable(sortedOrders)}
+                                        {renderCards(sortedOrders)}
+                                    </>
+                                );
+                            })()}
+
+                            {/* Pagination & Limit Selector */}
+                            {pagination && (
+                                <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 py-6 px-6 bg-white/50 backdrop-blur-sm rounded-xl border border-gray-100 shadow-sm">
+                                    {/* Left: Limit Selector */}
+                                    <div className="flex-1 flex items-center gap-2 justify-start">
+                                        <span className="text-xs text-gray-500 font-medium whitespace-nowrap">페이지당 표시:</span>
+                                        <Select
+                                            value={limit.toString()}
+                                            onValueChange={(value) => {
+                                                setLimit(parseInt(value));
+                                                setPage(1); // Reset to page 1 when limit changes
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-8 w-[80px] text-xs bg-white border-gray-200">
+                                                <SelectValue placeholder="25" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="25">25개</SelectItem>
+                                                <SelectItem value="50">50개</SelectItem>
+                                                <SelectItem value="100">100개</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/* Center: Pagination Buttons */}
+                                    <div className="flex items-center justify-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(1)}
+                                            disabled={page === 1}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                            title="첫 페이지"
+                                        >
+                                            <div className="flex -space-x-2">
+                                                <ChevronLeft className="h-4 w-4" />
+                                                <ChevronLeft className="h-4 w-4" />
+                                            </div>
+                                        </Button>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                            disabled={page === 1}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+
+                                        <div className="flex items-center gap-1">
+                                            {(() => {
+                                                const totalPages = pagination.totalPages;
+                                                const maxButtons = 5;
+                                                let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+                                                const endPageShown = Math.min(totalPages, startPage + maxButtons - 1);
+
+                                                if (endPageShown - startPage + 1 < maxButtons) {
+                                                    startPage = Math.max(1, endPageShown - maxButtons + 1);
+                                                }
+
+                                                const pages = [];
+                                                for (let i = startPage; i <= endPageShown; i++) {
+                                                    pages.push(i);
+                                                }
+
+                                                return pages.map(p => (
+                                                    <Button
+                                                        key={p}
+                                                        variant={page === p ? "outline" : "ghost"}
+                                                        onClick={() => setPage(p)}
+                                                        className={`h-9 w-9 rounded-md text-sm font-medium transition-all ${
+                                                            page === p
+                                                                ? "border-blue-500 text-blue-600 bg-white"
+                                                                : "text-gray-400 hover:text-gray-900 hover:bg-gray-100"
+                                                        }`}
+                                                    >
+                                                        {p}
+                                                    </Button>
+                                                ));
+                                            })()}
+                                        </div>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(prev => Math.min(pagination.totalPages, prev + 1))}
+                                            disabled={page === pagination.totalPages}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setPage(pagination.totalPages)}
+                                            disabled={page === pagination.totalPages}
+                                            className="h-9 w-9 rounded-md hover:bg-gray-100 disabled:opacity-30 text-gray-400"
+                                            title="마지막 페이지"
+                                        >
+                                            <div className="flex -space-x-2">
+                                                <ChevronRight className="h-4 w-4" />
+                                                <ChevronRight className="h-4 w-4" />
+                                            </div>
+                                        </Button>
+                                    </div>
+
+                                    {/* Right: Total Items */}
+                                    <div className="flex-1 flex justify-end text-xs text-gray-400 whitespace-nowrap font-medium">
+                                        전체 <span className="text-gray-900 mx-1">{pagination.total}</span>개의 항목
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </section>
             </div>
 
@@ -863,7 +1121,7 @@ export default function OrderHistoryPage() {
                                                         const baseDate = previousAssignment.end_date;
                                                         if (baseDate) {
                                                             try {
-                                                                const newEnd = format(addMonths(parseISO(baseDate), val), 'yyyy-MM-dd');
+                                                                const newEnd = format(addDays(parseISO(baseDate), val * 30), 'yyyy-MM-dd');
                                                                 setExtEndDate(newEnd);
                                                             } catch (err) {
                                                                 console.error('Calc Error:', err);
@@ -954,7 +1212,7 @@ export default function OrderHistoryPage() {
                                                             const start = e.target.value;
                                                             setNewStartDate(start);
                                                             try {
-                                                                const end = format(addMonths(parseISO(start), newDuration), 'yyyy-MM-dd');
+                                                                const end = format(addDays(parseISO(start), newDuration * 30), 'yyyy-MM-dd');
                                                                 setNewEndDate(end);
                                                             } catch (err) { console.error(err); }
                                                         }}
@@ -980,7 +1238,7 @@ export default function OrderHistoryPage() {
                                                                 const val = parseInt(e.target.value) || 0;
                                                                 setNewDuration(val);
                                                                 try {
-                                                                    const end = format(addMonths(parseISO(newStartDate), val), 'yyyy-MM-dd');
+                                                                    const end = format(addDays(parseISO(newStartDate), val * 30), 'yyyy-MM-dd');
                                                                     setNewEndDate(end);
                                                                 } catch (err) { console.error(err); }
                                                             }}
@@ -1001,7 +1259,9 @@ export default function OrderHistoryPage() {
                         )}
                     </div>
                     <DialogFooter>
-                        <Button onClick={confirmMatch} disabled={!selectedAccount}>배정 확인</Button>
+                        <Button onClick={confirmMatch} disabled={!selectedAccount || isProcessing}>
+                            {isProcessing ? '처리 중...' : '배정 확인'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -53,10 +53,10 @@ export async function GET(
         // Use .or to match either by order_id or order_number (fallback for imports)
         const query = supabaseAdmin
             .from('order_accounts')
-            .select('*')
+            .select('*, accounts ( login_id )')
             .or(`order_id.in.(${orderIds.join(',')}),order_number.in.(${orderNumbers.join(',')})`);
 
-        const { data: accounts, error: accountsError } = await query.order('assigned_at', { ascending: false });
+        const { data: accountsData, error: accountsError } = await query.order('assigned_at', { ascending: false });
 
         if (accountsError) {
             console.error('Error fetching order accounts:', accountsError);
@@ -64,7 +64,7 @@ export async function GET(
         }
 
         // 4. Transform data to include product/plan info from the orders list
-        const enrichedAccounts = accounts.map(account => {
+        const enrichedAccounts = accountsData.map(account => {
             const relatedOrder = orders.find(o => o.id === account.order_id || (account.order_number && o.order_number === account.order_number));
             return {
                 ...account,

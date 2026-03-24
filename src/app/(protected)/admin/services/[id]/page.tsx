@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import Link from 'next/link';
 import { ArrowLeft, Trash2, Plus } from 'lucide-react';
 import { Textarea } from "@/components/ui/textarea";
+import { apiFetch } from '@/lib/api';
 
 export default function EditServicePage() {
     const { isAdmin } = useServices();
@@ -19,6 +20,9 @@ export default function EditServicePage() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [submittingPlan, setSubmittingPlan] = useState(false);
+    const [deleteErrorPlanId, setDeleteErrorPlanId] = useState<string | null>(null);
+    const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
     interface AdminPlan {
         id: string;
@@ -55,7 +59,7 @@ export default function EditServicePage() {
     const fetchProduct = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/admin/products/${id}`);
+            const response = await apiFetch(`/api/admin/products/${id}`);
             if (!response.ok) throw new Error('Failed to fetch product');
             const data = await response.json();
             setProduct(data);
@@ -93,9 +97,8 @@ export default function EditServicePage() {
         setSaving(true);
         try {
             if (!product) return;
-            const response = await fetch(`/api/admin/products/${id}`, {
+            const response = await apiFetch(`/api/admin/products/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...product,
                     original_price: parseInt(product.original_price.toString()),
@@ -123,12 +126,11 @@ export default function EditServicePage() {
 
     const handleAddPlan = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!confirm('요금제를 추가하시겠습니까?')) return;
+        setSubmittingPlan(true);
 
         try {
-            const response = await fetch('/api/admin/plans', {
+            const response = await apiFetch('/api/admin/plans', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     product_id: id,
                     duration_months: parseInt(newPlan.duration_months.toString()),
@@ -138,22 +140,25 @@ export default function EditServicePage() {
                 })
             });
 
-            if (!response.ok) throw new Error('Failed to add plan');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to add plan');
+            }
 
-            alert('요금제가 추가되었습니다.');
             setNewPlan({ duration_months: 1, price: 0, discount_rate: 0, is_active: true }); // Reset form
             fetchProduct(); // Refresh list
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
             alert(`오류 발생: ${message}`);
+        } finally {
+            setSubmittingPlan(false);
         }
     };
 
     const handleTogglePlan = async (plan: AdminPlan) => {
         try {
-            const response = await fetch(`/api/admin/plans/${plan.id}`, {
+            const response = await apiFetch(`/api/admin/plans/${plan.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     is_active: !plan.is_active
                 })
@@ -167,21 +172,30 @@ export default function EditServicePage() {
     };
 
     const handleDeletePlan = async (planId: string) => {
-        if (!confirm('정말 삭제하시겠습니까?\n이 기간권으로 결제된 내역이 있을 경우 삭제가 실패할 수 있습니다. (이 경우 \'비활성화\'를 권장합니다)')) return;
+        setDeleteErrorPlanId(null);
+        setDeletingPlanId(planId);
         try {
-            const response = await fetch(`/api/admin/plans/${planId}`, {
+            const response = await apiFetch(`/api/admin/plans/${planId}`, {
                 method: 'DELETE',
             });
             if (response.ok) {
                 fetchProduct();
             } else {
-                const errorData = await response.json();
-                alert(`삭제 실패: ${errorData.error || '알 수 없는 오류'}`);
+                setDeleteErrorPlanId(planId);
+                // Attempt to parse error data silently for logging, but don't blow up the console
+                // if the UI is already showing a friendly message.
+                try {
+                    const errorData = await response.json();
+                    console.log('[Plan Deletion] Failed with status:', response.status, errorData);
+                } catch {
+                    console.log('[Plan Deletion] Failed with status:', response.status);
+                }
             }
         } catch (error: unknown) {
             console.error('Error deleting plan:', error);
-            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-            alert(`삭제 실패: ${message}`);
+            setDeleteErrorPlanId(planId);
+        } finally {
+            setDeletingPlanId(null);
         }
     };
 
@@ -190,13 +204,13 @@ export default function EditServicePage() {
     return (
         <main className={styles.main}>
             <header className={`${styles.header} glass`}>
-                <div className="container flex items-center gap-4">
+                <div className="container flex items-center gap-2 sm:gap-4 overflow-hidden">
                     <Link href="/admin/services">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="flex-shrink-0">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
                     </Link>
-                    <h1 className={styles.title}>서비스 수정: {product.name}</h1>
+                    <h1 className={`${styles.title} truncate`}>서비스 수정: {product.name}</h1>
                 </div>
             </header>
 
@@ -215,7 +229,7 @@ export default function EditServicePage() {
                             <Input id="slug" name="slug" value={product.slug} onChange={handleProductChange} required />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="original_price">기본 가격</Label>
                                 <Input id="original_price" name="original_price" type="number" value={product.original_price} onChange={handleProductChange} required />
@@ -278,27 +292,58 @@ export default function EditServicePage() {
                             <p className="text-gray-500 text-sm">등록된 요금제가 없습니다.</p>
                         ) : (
                             [...product.product_plans].sort((a, b) => a.duration_months - b.duration_months).map((plan) => (
-                                <div key={plan.id} className="flex items-center justify-between p-4 bg-white rounded-lg border shadow-sm">
-                                    <div>
-                                        <div className="font-semibold">{plan.duration_months}개월권</div>
-                                        <div className="text-sm text-gray-500">
-                                            {plan.discount_rate}% 할인 ➜ ₩{plan.price.toLocaleString()}
+                                <div key={plan.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white rounded-lg border shadow-sm gap-4">
+                                    <div className="flex justify-between items-center sm:block">
+                                        <div>
+                                            <div className="font-semibold text-base sm:text-lg">{plan.duration_months}개월권</div>
+                                            <div className="text-xs sm:text-sm text-gray-500">
+                                                {plan.discount_rate}% 할인 ➜ ₩{plan.price.toLocaleString()}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-between sm:justify-end gap-2 border-t pt-3 sm:border-t-0 sm:pt-0">
                                         <button
+                                            type="button"
                                             onClick={() => handleTogglePlan(plan)}
-                                            className={`text-xs px-2 py-1 rounded cursor-pointer transition-colors ${plan.is_active
-                                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                            className={`px-4 py-2 sm:px-3 sm:py-1 rounded-full text-xs font-bold sm:font-medium flex-1 sm:flex-none text-center ${plan.is_active
+                                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                 }`}
                                             title="상태 변경 (Active/Inactive)"
                                         >
                                             {plan.is_active ? 'Active' : 'Inactive'}
                                         </button>
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeletePlan(plan.id)}>
-                                            <Trash2 className="h-4 w-4 text-red-500" />
-                                        </Button>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className="flex items-center gap-1">
+                                                {deleteErrorPlanId === plan.id && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-9 px-3 text-xs text-gray-500 underline sm:h-8 sm:px-2"
+                                                        onClick={() => setDeleteErrorPlanId(null)}
+                                                    >
+                                                        닫기
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className={`h-10 w-10 sm:h-8 sm:w-8 ${deletingPlanId === plan.id ? 'animate-pulse' : ''}`}
+                                                    onClick={() => handleDeletePlan(plan.id)}
+                                                    disabled={deletingPlanId !== null}
+                                                >
+                                                    <Trash2 className={`h-5 w-5 sm:h-4 sm:w-4 ${deleteErrorPlanId === plan.id ? 'text-red-500' : 'text-red-500 opacity-60 hover:opacity-100'}`} />
+                                                </Button>
+                                            </div>
+                                            {deleteErrorPlanId === plan.id && (
+                                                <p className="text-[10px] text-red-500 text-right leading-tight max-w-[200px] bg-red-50 p-2 rounded border border-red-100 inline-block">
+                                                    이미 주문한 요금제는 삭제되지 않습니다.<br />
+                                                    주문내역에서 먼저 삭제 후 시도하세요.
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))
@@ -308,8 +353,11 @@ export default function EditServicePage() {
                     {/* Add Plan Form */}
                     <div className="bg-gray-50 p-4 rounded-lg border">
                         <h3 className="font-medium mb-3 text-sm">새 요금제 추가</h3>
-                        <form onSubmit={handleAddPlan} className="space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
+                        <form
+                            onSubmit={handleAddPlan}
+                            className="space-y-3"
+                        >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <Label className="text-xs">개월 수</Label>
                                     <Input
@@ -318,7 +366,7 @@ export default function EditServicePage() {
                                         value={newPlan.duration_months}
                                         onChange={handleNewPlanChange}
                                         required
-                                        className="h-8 text-sm"
+                                        className="h-10 sm:h-8 text-sm"
                                     />
                                 </div>
                                 <div>
@@ -329,11 +377,11 @@ export default function EditServicePage() {
                                         value={newPlan.price}
                                         onChange={handleNewPlanChange}
                                         required
-                                        className="h-8 text-sm"
+                                        className="h-10 sm:h-8 text-sm"
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <Label className="text-xs">할인율 (%)</Label>
                                     <Input
@@ -343,24 +391,36 @@ export default function EditServicePage() {
                                         onChange={handleNewPlanChange}
                                         step="0.1"
                                         required
-                                        className="h-8 text-sm"
+                                        className="h-10 sm:h-8 text-sm"
                                     />
                                 </div>
                                 <div className="flex items-end pb-2">
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 bg-white p-2 rounded border sm:bg-transparent sm:p-0 sm:border-0 w-full">
                                         <input
                                             type="checkbox"
                                             name="is_active"
+                                            id="new_plan_active"
                                             checked={newPlan.is_active}
                                             onChange={handleNewPlanChange}
-                                            className="h-4 w-4"
+                                            className="h-5 w-5 sm:h-4 sm:w-4"
                                         />
-                                        <Label className="text-xs">활성화</Label>
+                                        <Label htmlFor="new_plan_active" className="text-sm sm:text-xs font-semibold sm:font-normal">활성화</Label>
                                     </div>
                                 </div>
                             </div>
-                            <Button type="submit" size="sm" className="w-full">
-                                <Plus className="h-4 w-4 mr-1" /> 요금제 등록
+                            <Button
+                                type="submit"
+                                size="lg"
+                                className="w-full sm:size-sm h-12 sm:h-8 font-bold sm:font-medium"
+                                disabled={submittingPlan}
+                            >
+                                {submittingPlan ? (
+                                    <>등록 중...</>
+                                ) : (
+                                    <>
+                                        <Plus className="h-4 w-4 mr-1" /> 요금제 등록
+                                    </>
+                                )}
                             </Button>
                         </form>
                     </div>

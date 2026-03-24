@@ -4,12 +4,14 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
 import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import styles from './mypage.module.css';
 
 interface UserSubscription {
+    service_id: string;
     service_name: string;
     duration: string;
     start_date: string;
@@ -17,6 +19,8 @@ interface UserSubscription {
     account_id: string;
     account_pw: string;
     status: string;
+    order_id: string;
+    slot_number?: number;
 }
 
 interface OrderHistoryItem {
@@ -35,12 +39,14 @@ interface SupabaseOrder {
     amount: number;
     created_at: string;
     assignment_status: string;
+    product_id: string;
     products: { name: string } | null;
     product_plans: { duration_months: number } | null;
 }
 
 interface SupabaseAccountAssignment {
     id: string;
+    order_id: string;
     account_id: string;
     tidal_id?: string;
     tidal_password?: string;
@@ -48,6 +54,7 @@ interface SupabaseAccountAssignment {
     start_date: string | null;
     end_date: string | null;
     orders: {
+        product_id: string;
         products: {
             name: string;
         } | null;
@@ -55,6 +62,7 @@ interface SupabaseAccountAssignment {
             duration_months: number;
         } | null;
     } | null;
+    slot_number?: number;
 }
 
 export default function MyPage() {
@@ -111,22 +119,9 @@ export default function MyPage() {
         setLoading(true);
 
         try {
-            // Use getSession but be aware it might trigger refreshes
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            if (!token) {
-                if (isMounted.current) setLoading(false);
-                fetchingRef.current = false;
-                return;
-            }
-
             console.log('MyPage: Starting data fetch for user:', user.id);
 
-            // Using fetch instead of XHR for cleaner logic if possible, 
-            // but keeping simple for compatibility
-            const res = await fetch('/api/user/mypage', {
-                headers: { 'Authorization': `Bearer ${token}` },
+            const res = await apiFetch('/api/user/mypage', {
                 cache: 'no-store'
             });
 
@@ -151,30 +146,34 @@ export default function MyPage() {
                     }));
                     setOrders(history);
 
-                    const activeSubs: UserSubscription[] = orderData
-                        .filter(item => item.assignment_status === 'completed')
-                        .map(item => ({
-                            service_name: item.products?.name || 'Service',
-                            duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
-                            start_date: '-',
-                            end_date: '-',
-                            account_id: '정보 확인 중',
-                            account_pw: '정보 확인 중',
-                            status: '이용 중'
-                        }));
-
                     if (accountData && accountData.length > 0) {
                         const enrichedSubs: UserSubscription[] = accountData.map(acc => ({
+                            service_id: acc.orders?.product_id || '',
                             service_name: acc.orders?.products?.name || 'Service',
                             duration: acc.orders?.product_plans?.duration_months ? `${acc.orders.product_plans.duration_months}개월` : '-',
                             start_date: acc.start_date || '-',
                             end_date: acc.end_date || '-',
                             account_id: acc.tidal_id || acc.account_id || '정보 없음',
                             account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
-                            status: '이용 중'
+                            status: '이용 중',
+                            order_id: acc.order_id,
+                            slot_number: acc.slot_number
                         }));
                         setSubscriptions(enrichedSubs);
                     } else {
+                        const activeSubs: UserSubscription[] = orderData
+                            .filter(item => item.assignment_status === 'completed')
+                            .map(item => ({
+                                service_id: item.product_id,
+                                service_name: item.products?.name || 'Service',
+                                duration: item.product_plans?.duration_months ? `${item.product_plans.duration_months}개월` : '-',
+                                start_date: '-',
+                                end_date: '-',
+                                account_id: '정보 확인 중',
+                                account_pw: '정보 확인 중',
+                                status: '이용 중',
+                                order_id: item.id
+                            }));
                         setSubscriptions(activeSubs);
                     }
                 }
@@ -242,16 +241,16 @@ export default function MyPage() {
         setIsEditing(false);
     };
 
+    useEffect(() => {
+        if (isHydrated && !user) {
+            console.warn('Unauthorized access to MyPage. Redirecting to login...');
+            router.replace('/login');
+        }
+    }, [isHydrated, user, router]);
+
     if (!isHydrated || loading) return <div className="container py-20 text-center">Loading...</div>;
 
-    if (!user) {
-        return (
-            <div className="container py-20 text-center">
-                <p className="text-muted-foreground mb-4">로그인이 필요한 페이지입니다.</p>
-                <Button onClick={() => router.push('/login')}>로그인하러 가기</Button>
-            </div>
-        );
-    }
+    if (!user) return null;
 
     return (
         <main className={styles.main}>
@@ -279,6 +278,10 @@ export default function MyPage() {
                     {!isEditing ? (
                         <div className="grid gap-6 sm:grid-cols-2 max-w-2xl">
                             <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">이메일</p>
+                                <p className="font-medium text-lg">{profileForm.email}</p>
+                            </div>
+                            <div className="space-y-1">
                                 <p className="text-xs text-muted-foreground">이름</p>
                                 <p className="font-medium text-lg">{profileForm.name}</p>
                             </div>
@@ -290,13 +293,22 @@ export default function MyPage() {
                                 <p className="text-xs text-muted-foreground">연락처</p>
                                 <p className="font-medium text-lg">{profileForm.phone || '-'}</p>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-xs text-muted-foreground">이메일</p>
-                                <p className="font-medium text-lg">{profileForm.email}</p>
-                            </div>
                         </div>
                     ) : (
                         <div className="space-y-4 max-w-md">
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <Label htmlFor="email">이메일</Label>
+                                    <span className="text-[10px] text-muted-foreground">변경 불가 (계정 ID)</span>
+                                </div>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    value={profileForm.email}
+                                    readOnly
+                                    className="bg-muted/30 cursor-not-allowed"
+                                />
+                            </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <Label htmlFor="name">이름</Label>
@@ -310,16 +322,12 @@ export default function MyPage() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <Label htmlFor="birth_date">생년월일</Label>
-                                    <span className="text-[10px] text-muted-foreground">변경 불가 (관리자 문의)</span>
-                                </div>
+                                <Label htmlFor="birth_date">생년월일</Label>
                                 <Input
                                     id="birth_date"
                                     placeholder="YYYY.MM.DD"
                                     value={profileForm.birth_date}
-                                    readOnly
-                                    className="bg-muted/30 cursor-not-allowed"
+                                    onChange={(e) => setProfileForm({ ...profileForm, birth_date: e.target.value })}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -329,15 +337,6 @@ export default function MyPage() {
                                     type="tel"
                                     value={profileForm.phone}
                                     onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email">이메일</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={profileForm.email}
-                                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                                 />
                             </div>
                             <div className="flex gap-2 pt-2">
@@ -377,6 +376,9 @@ export default function MyPage() {
                                     <div className="text-sm space-y-1 text-muted-foreground">
                                         <p>기간: {sub.start_date} ~ {sub.end_date} ({sub.duration})</p>
                                         <p>만료일: {sub.end_date}</p>
+                                        {sub.slot_number !== undefined && (
+                                            <p className="font-bold text-primary">배정 슬롯: #{sub.slot_number + 1}</p>
+                                        )}
                                     </div>
                                     <div className="bg-white/50 p-3 rounded-lg text-sm font-mono space-y-1 border border-white/20">
                                         <div className="flex justify-between">
@@ -388,6 +390,20 @@ export default function MyPage() {
                                             <span className="font-bold">{sub.account_pw}</span>
                                         </div>
                                     </div>
+                                    <Button
+                                        className="w-full mt-2 text-xs h-9 font-bold"
+                                        variant="default"
+                                        onClick={() => {
+                                            const params = new URLSearchParams({
+                                                mode: 'EXT',
+                                                tidalId: sub.account_id,
+                                                orderId: sub.order_id
+                                            });
+                                            router.push(`/service/${sub.service_id}?${params.toString()}`);
+                                        }}
+                                    >
+                                        서비스 연장하기
+                                    </Button>
                                 </div>
                             ))}
                         </div>

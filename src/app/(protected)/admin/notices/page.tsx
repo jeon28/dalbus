@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useServices } from '@/lib/ServiceContext';
 import { Pencil, Trash2, Plus, Pin, PinOff } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface Notice {
     id: string;
@@ -47,8 +48,8 @@ export default function NoticeAdminPage() {
         setLoading(true);
         try {
             const [noticeRes, catRes] = await Promise.all([
-                fetch('/api/admin/notices'),
-                fetch('/api/admin/notice-categories')
+                apiFetch('/api/admin/notices'),
+                apiFetch('/api/admin/notice-categories')
             ]);
             if (noticeRes.ok) setNotices(await noticeRes.json());
             if (catRes.ok) {
@@ -77,9 +78,8 @@ export default function NoticeAdminPage() {
         const method = isEditing ? 'PUT' : 'POST';
 
         try {
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
 
@@ -113,7 +113,7 @@ export default function NoticeAdminPage() {
     const handleDelete = async (id: string) => {
         if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/notices/${id}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/notices/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 fetchData();
             } else {
@@ -126,9 +126,8 @@ export default function NoticeAdminPage() {
     };
 
     const handleTogglePin = async (notice: Notice) => {
-        const res = await fetch(`/api/admin/notices/${notice.id}`, {
+        const res = await apiFetch(`/api/admin/notices/${notice.id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ is_pinned: !notice.is_pinned })
         });
         if (res.ok) fetchData();
@@ -136,9 +135,8 @@ export default function NoticeAdminPage() {
 
     const handleAddCategory = async () => {
         if (!newCategory) return;
-        const res = await fetch('/api/admin/notice-categories', {
+        const res = await apiFetch('/api/admin/notice-categories', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newCategory, sort_order: categories.length + 1 })
         });
         if (res.ok) {
@@ -149,7 +147,7 @@ export default function NoticeAdminPage() {
 
     const handleDeleteCategory = async (id: string) => {
         if (!confirm('카테고리를 삭제하시겠습니까?')) return;
-        const res = await fetch(`/api/admin/notice-categories/${id}`, { method: 'DELETE' });
+        const res = await apiFetch(`/api/admin/notice-categories/${id}`, { method: 'DELETE' });
         if (res.ok) fetchData();
     };
 

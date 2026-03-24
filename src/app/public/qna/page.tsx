@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
+import { apiFetch } from '@/lib/api';
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
@@ -36,7 +37,7 @@ export default function QnAPage() {
             const params = new URLSearchParams();
             if (excludeSecret) params.append('exclude_secret', 'true');
 
-            const res = await fetch(`/api/qna?${params.toString()}`);
+            const res = await apiFetch(`/api/qna?${params.toString()}`);
             if (!res.ok) throw new Error('Failed to fetch Q&A');
 
             const data = await res.json();

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from 'next/link'; // Corrected import
 import { ArrowLeft } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 export default function NewServicePage() {
     const { isAdmin } = useServices();
@@ -44,9 +45,8 @@ export default function NewServicePage() {
         setLoading(true);
 
         try {
-            const response = await fetch('/api/admin/products', {
+            const response = await apiFetch('/api/admin/products', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...formData,
                     original_price: parseInt(formData.original_price),

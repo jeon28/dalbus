@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { apiFetch } from '@/lib/api';
 import { Badge } from "@/components/ui/badge";
 
 interface Notice {
@@ -22,7 +23,7 @@ export default function NoticesPage() {
 
         const fetchData = async () => {
             try {
-                const response = await fetch('/api/public/notices');
+                const response = await apiFetch('/api/public/notices');
                 if (!response.ok) throw new Error('Failed to fetch notices');
 
                 const data = await response.json();

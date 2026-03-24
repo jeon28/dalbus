@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendExpiryNotification } from '@/lib/email';
+import { getServerSession, isAdmin } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
     try {
-        // Simple admin check
-        await supabaseAdmin.auth.getUser(
-            req.headers.get('Authorization')?.replace('Bearer ', '') || ''
-        );
-
-        // This is a simplified check, adjust based on your actual auth logic
-        // If the user object is not available or not admin, you might need another way to verify
-        // For now, assuming middleware or other checks are in place, but let's be safe.
+        // 세션 확인 및 관리자 권한 체크
+        const session = await getServerSession(req);
+        if (!session || !isAdmin(session)) {
+            return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+        }
 
         const { recipients, messageTemplate } = await req.json();
 

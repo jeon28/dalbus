@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from "@/components/ui/badge";
+import { apiFetch } from '@/lib/api';
 
 interface FAQ {
     id: string;
@@ -30,8 +31,8 @@ export default function FAQPage() {
         const fetchData = async () => {
             try {
                 const [faqRes, catRes] = await Promise.all([
-                    fetch('/api/public/faqs'),
-                    fetch('/api/public/faq-categories')
+                    apiFetch('/api/public/faqs'),
+                    apiFetch('/api/public/faq-categories')
                 ]);
 
                 if (!faqRes.ok || !catRes.ok) {

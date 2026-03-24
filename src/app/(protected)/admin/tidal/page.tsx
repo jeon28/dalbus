@@ -4,7 +4,8 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +24,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { differenceInMonths, parseISO, format } from 'date-fns';
+import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 
 interface Assignment {
     id: string;
@@ -31,7 +32,14 @@ interface Assignment {
     tidal_password?: string;
     tidal_id?: string;
     order_id?: string;
-    orders?: Order;
+    orders?: Order & {
+        profiles?: {
+            name: string;
+            phone: string | null;
+            email: string;
+            memo?: string | null;
+        } | null;
+    };
     type?: 'master' | 'user';
     buyer_name?: string;
     buyer_phone?: string;
@@ -40,6 +48,8 @@ interface Assignment {
     start_date?: string;
     end_date?: string;
     period_months?: number;
+    amount?: number;
+    memo?: string;
 }
 
 interface Account {
@@ -91,6 +101,8 @@ interface GridValue {
     order_id?: string;
     full_order?: Order;
     period_months?: number;
+    amount?: number;
+    memo?: string;
 }
 
 function TidalAccountsContent() {
@@ -110,7 +122,10 @@ function TidalAccountsContent() {
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [isImportResultModalOpen, setIsImportResultModalOpen] = useState(false);
     const [importResults, setImportResults] = useState<{
-        success: { masters: number, slots: number },
+        success: {
+            masters: { created: number, updated: number },
+            slots: { created: number, updated: number }
+        },
         failed: { id: string, reason: string }[]
     } | null>(null);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -140,6 +155,57 @@ function TidalAccountsContent() {
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
+    const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
+    
+    // Memo Feature State
+    const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
+    const [currentMemoInput, setCurrentMemoInput] = useState('');
+    const [memoTargetAccountId, setMemoTargetAccountId] = useState('');
+    const [memoTargetSlotIdx, setMemoTargetSlotIdx] = useState<number | null>(null);
+    const [memoTargetAssignmentId, setMemoTargetAssignmentId] = useState('');
+
+    // --- DAL-20: Column Resizing and Filter States ---
+    const [expiredDays, setExpiredDays] = useState(7);
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+        'checkbox': 40,
+        'login_id': 100,
+        'slot': 60,
+        'type': 60,
+        'tidal_id': 200,
+        'tidal_password': 120,
+        'buyer_name': 100,
+        'buyer_email': 150,
+        'buyer_phone': 140,
+        'order_number': 120,
+        'start_date': 120,
+        'end_date': 120,
+        'period': 60,
+        'manage': 140
+    });
+    const [resizingCol, setResizingCol] = useState<string | null>(null);
+
+    const startResizing = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        setResizingCol(id);
+
+        const startX = e.pageX;
+        const startWidth = columnWidths[id];
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            const currentX = moveEvent.pageX;
+            const newWidth = Math.max(40, startWidth + (currentX - startX));
+            setColumnWidths((prev: Record<string, number>) => ({ ...prev, [id]: newWidth }));
+        };
+
+        const onMouseUp = () => {
+            setResizingCol(null);
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
 
     const defaultTemplate = React.useMemo(() => `{buyer_name}님 
 {tidal_id} 서비스가 {end_date}에 만료됩니다.
@@ -188,19 +254,22 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             accounts.forEach(acc => {
                 const hasExpired = acc.order_accounts?.some(oa => {
                     if (!oa.end_date) return false;
-                    return parseISO(oa.end_date) < today;
+                    const endDate = parseISO(oa.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays <= expiredDays;
                 });
                 if (hasExpired) newExpanded.add(acc.id);
             });
             setExpandedRows(newExpanded);
         }
-    }, [showExpiredOnly, accounts]);
+    }, [showExpiredOnly, accounts, expiredDays]);
 
 
     // --- Fetching Functions ---
     const fetchAccounts = async () => {
         try {
-            const res = await fetch('/api/admin/accounts', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/accounts?product=Tidal', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
@@ -224,6 +293,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'),
                         period_months: assignment?.period_months || 0,
+                        amount: assignment?.orders?.amount || 0,
+                        memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
                     };
                 }
             });
@@ -235,14 +306,21 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     const fetchPendingOrders = async () => {
         try {
-            const res = await fetch('/api/admin/orders', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/orders', { cache: 'no-store' });
             if (res.ok) {
-                const data = await res.json();
-                const waiting = data.filter((o: Order) =>
-                    o.payment_status === 'paid' &&
-                    o.assignment_status === 'waiting'
-                );
-                setPendingOrders(waiting);
+                const responseData = await res.json();
+                const ordersArray = Array.isArray(responseData) ? responseData : responseData.data;
+                
+                if (Array.isArray(ordersArray)) {
+                    const waiting = ordersArray.filter((o: Order) =>
+                        o.payment_status === 'paid' &&
+                        o.assignment_status === 'waiting'
+                    );
+                    setPendingOrders(waiting);
+                } else {
+                    console.error('Expected array from /api/admin/orders, got:', responseData);
+                    setPendingOrders([]);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -253,7 +331,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const getPeriodMonths = (start?: string, end?: string) => {
         if (!start || !end) return 0;
         try {
-            return differenceInMonths(parseISO(end), parseISO(start));
+            const startD = parseISO(start);
+            const endD = parseISO(end);
+            const days = differenceInDays(endD, startD);
+            return Math.floor(days / 30);
         } catch {
             return 0;
         }
@@ -262,12 +343,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const getAvailableSlots = (accountId: string) => {
         const acc = accounts.find(a => a.id === accountId);
         if (!acc) return [];
+        const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
         const taken = new Set((acc.order_accounts || [])
             .filter(oa => oa && typeof oa.slot_number === 'number')
             .map(oa => oa.slot_number));
         const available = [];
         for (let i = 0; i < 6; i++) {
-            if (!taken.has(i)) available.push(i);
+            if (!taken.has(i)) {
+                if (i > 0 && !hasMaster) continue;
+                available.push(i);
+            }
         }
         return available;
     };
@@ -284,24 +369,49 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }[] = [];
 
         accounts.forEach((acc, accIdx) => {
-            const assignments = [...(acc.order_accounts || [])];
-            assignments.forEach(assignment => {
+            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
+            for (let i = 0; i < acc.max_slots; i++) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i);
+                if (!assignment) {
+                    if (i > 0 && !hasMaster) continue;
+                    assignment = {
+                        id: `empty_${acc.id}_${i}`,
+                        slot_number: i,
+                        type: i === 0 ? 'master' : 'user',
+                        account_id: acc.id,
+                        is_active: true,
+                        tidal_id: null,
+                        tidal_password: null,
+                        buyer_name: null,
+                        buyer_email: null,
+                        buyer_phone: null,
+                        order_number: null,
+                        start_date: null,
+                        end_date: null
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    } as any;
+                }
+
                 // Search Filter
                 const query = searchQuery.toLowerCase().trim();
                 if (query) {
                     const buyerName = (assignment.buyer_name || assignment.orders?.buyer_name || '').toLowerCase();
+                    const buyerEmail = (assignment.buyer_email || assignment.orders?.buyer_email || '').toLowerCase();
                     const tidalId = (assignment.tidal_id || '').toLowerCase();
                     const buyerPhone = (assignment.buyer_phone || assignment.orders?.buyer_phone || '').toLowerCase();
-                    if (!buyerName.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) return;
+                    if (!buyerName.includes(query) && !buyerEmail.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) continue;
                 }
 
                 // Expired Filter
-                if (showExpiredOnly && assignment.end_date) {
+                if (showExpiredOnly) {
+                    if (!assignment.end_date) continue;
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    if (parseISO(assignment.end_date) >= today) return;
-                } else if (showExpiredOnly && !assignment.end_date) {
-                    return;
+                    const endDate = parseISO(assignment.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays > expiredDays) continue;
                 }
 
                 let periodNum = assignment.period_months || 0;
@@ -309,7 +419,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     try {
                         const start = parseISO(assignment.start_date);
                         const end = parseISO(assignment.end_date);
-                        periodNum = differenceInMonths(end, start);
+                        const days = differenceInDays(end, start);
+                        periodNum = Math.floor(days / 30);
                     } catch { }
                 }
 
@@ -320,7 +431,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     period: periodNum,
                     originalAccIndex: accIdx
                 });
-            });
+            }
         });
         return flattened;
     };
@@ -340,17 +451,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         const query = searchQuery.toLowerCase().trim();
 
         accounts.forEach(acc => {
+            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
                 const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
+                if (!assignment) {
+                    if (i > 0 && !hasMaster) continue;
+                }
                 const val = gridValues[`${acc.id}_${i}`] || {};
 
                 // Apply Search Filter
                 if (query) {
                     const buyerName = (val.buyer_name || '').toLowerCase();
+                    const buyerEmail = (val.buyer_email || '').toLowerCase();
                     const tidalId = (val.tidal_id || '').toLowerCase();
                     const buyerPhone = (val.buyer_phone || '').toLowerCase();
 
                     if (!buyerName.includes(query) &&
+                        !buyerEmail.includes(query) &&
                         !tidalId.includes(query) &&
                         !buyerPhone.includes(query)) {
                         continue;
@@ -361,7 +478,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 if (showExpiredOnly) {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    if (!val.end_date || parseISO(val.end_date) >= today) {
+                    if (!val.end_date) {
+                        continue;
+                    }
+                    const endDate = parseISO(val.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays > expiredDays) {
                         continue;
                     }
                 }
@@ -388,6 +511,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 if (sortConfig.key === 'period') {
                     valA = getPeriodMonths(a.start_date, a.end_date);
                     valB = getPeriodMonths(b.start_date, b.end_date);
+                } else if (sortConfig.key === 'buyer_email') {
+                    valA = a.buyer_email || '';
+                    valB = b.buyer_email || '';
                 }
 
                 if (valA === undefined || valA === null) valA = '';
@@ -489,16 +615,27 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 next.tidal_id = emailPrefix ? `${emailPrefix}@hifitidal.com` : null;
             }
 
-            if ((field === 'start_date' || field === 'period_months') && (next.start_date && next.period_months)) {
-                try {
-                    const start = parseISO(next.start_date);
-                    const months = parseInt(String(next.period_months)) || 0;
-                    if (months > 0) {
-                        const end = new Date(start);
-                        end.setMonth(end.getMonth() + months);
+            if (field === 'start_date' || field === 'period_months') {
+                const startStr = next.start_date;
+                const months = parseInt(String(next.period_months)) || 0;
+                if (startStr && months >= 0) {
+                    try {
+                        const start = parseISO(startStr);
+                        const end = addDays(start, months * 30);
                         next.end_date = end.toISOString().split('T')[0];
-                    }
-                } catch { }
+                    } catch { }
+                }
+            } else if (field === 'end_date') {
+                const startStr = next.start_date;
+                const endStr = next.end_date;
+                if (startStr && endStr) {
+                    try {
+                        const start = parseISO(startStr);
+                        const end = parseISO(endStr);
+                        const days = differenceInDays(end, start);
+                        next.period_months = Math.max(0, Math.floor(days / 30));
+                    } catch { }
+                }
             }
             return { ...prev, [key]: next };
         });
@@ -511,7 +648,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
         try {
             if (data.assignment_id) {
-                const res = await fetch(`/api/admin/assignments/${data.assignment_id}`, {
+                const res = await apiFetch(`/api/admin/assignments/${data.assignment_id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -522,7 +659,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     alert('이름 또는 ID(이메일)를 입력해주세요.');
                     return;
                 }
-                const res = await fetch(`/api/admin/accounts/${accountId}/assign`, {
+                const res = await apiFetch(`/api/admin/accounts/${accountId}/assign`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ...data, slot_number: slotIdx })
@@ -538,9 +675,30 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
     const handleDelete = async (assignmentId: string) => {
+        let isMaster = false;
+        let hasUsers = false;
+
+        for (const acc of accounts) {
+            const accAssignments = acc.order_accounts || [];
+            const found = accAssignments.find(oa => oa.id === assignmentId);
+            if (found) {
+                if (found.type === 'master') {
+                    isMaster = true;
+                    hasUsers = accAssignments.some(oa => oa.type === 'user' && oa.id !== assignmentId);
+                }
+                break;
+            }
+        }
+
+        if (isMaster && hasUsers) {
+            alert('그룹원이 존재하여 마스터 삭제 불가능 합니다');
+            setPendingDeleteIds(prev => new Set(prev).add(assignmentId));
+            return;
+        }
+
         if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             fetchPendingOrders();
@@ -552,7 +710,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleDeactivate = async (assignmentId: string) => {
         if (!confirm('배정을 종료하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/assignments/${assignmentId}`, {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_active: false })
@@ -571,11 +729,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return;
         }
         try {
-            const prodRes = await fetch('/api/admin/products');
+            const prodRes = await apiFetch('/api/admin/products');
             const products = await prodRes.json();
-            const tidal = products.find((p: { name: string }) => p.name.includes('Tidal')) || products[0];
+            const tidal = products.find((p: { name: string }) => p.name.includes('Tidal') && !p.name.toLowerCase().includes('hifi')) || products[0];
 
-            const res = await fetch('/api/admin/accounts', {
+            const res = await apiFetch('/api/admin/accounts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...newAccount, product_id: tidal?.id })
@@ -598,7 +756,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleUpdateMasterAccount = async () => {
         if (!editingAccount) return;
         try {
-            const res = await fetch(`/api/admin/accounts/${editingAccount.id}`, {
+            const res = await apiFetch(`/api/admin/accounts/${editingAccount.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(editingAccount)
@@ -619,7 +777,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
         if (!confirm('그룹을 삭제하시겠습니까?')) return;
         try {
-            const res = await fetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             alert('삭제되었습니다.');
@@ -631,24 +789,47 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const exportToExcel = () => {
         const excelData: Record<string, string | number>[] = [];
         const flatData = getFlatAssignments();
-        flatData.forEach((item, idx) => {
+        
+        if (flatData.length === 0) {
             excelData.push({
-                'No.': idx + 1,
-                '그룹 ID': item.accountLoginId,
-                '결제 계정': item.accountPaymentEmail,
-                '결제일': `${item.accountPaymentDay}일`,
-                '메모': item.accountMemo ?? '',
-                'Slot': `Slot ${item.slotIdx + 1}`,
-                '고객명': item.buyer_name || '',
-                '전화번호': item.buyer_phone || '',
-                '주문번호': item.order_number || '',
-                '소속 ID': item.tidal_id || '',
-                '소속 PW': item.tidal_password || '',
-                '시작일': item.start_date || '',
-                '종료일': item.end_date || '',
-                '개월': getPeriodMonths(item.start_date, item.end_date)
+                'No.': '',
+                '배정번호': '',
+                '결제 계정': '',
+                '결제일': '',
+                '메모': '',
+                '고객명': '',
+                '이메일': '',
+                '전화번호': '',
+                '주문번호': '',
+                '소속 ID': '',
+                '소속 PW': '',
+                '시작일': '',
+                '종료일': '',
+                '개월': '',
+                '계약금액': ''
             });
-        });
+        } else {
+            flatData.forEach((item, idx) => {
+                excelData.push({
+                    'No.': idx + 1,
+                    '배정번호': `${item.accountLoginId}-${item.slotIdx + 1}`,
+                    '결제 계정': item.accountPaymentEmail,
+                    '결제일': `${item.accountPaymentDay}일`,
+                    '메모': item.accountMemo ?? '',
+                    '고객명': item.buyer_name || '',
+                    '이메일': item.buyer_email || '',
+                    '전화번호': item.buyer_phone || '',
+                    '주문번호': item.order_number || '',
+                    '소속 ID': item.tidal_id || '',
+                    '소속 PW': item.tidal_password || '',
+                    '시작일': item.start_date || '',
+                    '종료일': item.end_date || '',
+                    '개월': getPeriodMonths(item.start_date, item.end_date),
+                    '계약금액': item.amount || 0
+                });
+            });
+        }
+        
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
         XLSX.utils.book_append_sheet(wb, ws, 'Tidal 계정');
@@ -664,18 +845,22 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 const data = new Uint8Array(event.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                const res = await fetch('/api/admin/accounts/import', {
+                const res = await apiFetch('/api/admin/accounts/import?product=Tidal', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ accounts: jsonData })
                 });
-                if (!res.ok) throw new Error('Import failed');
+                if (!res.ok) {
+                    const errObj = await res.json().catch(() => null);
+                    throw new Error(errObj?.error || `서버 오류 (${res.status})`);
+                }
                 const summary = await res.json();
                 setImportResults(summary);
                 setIsImportResultModalOpen(true);
                 fetchAccounts();
-            } catch {
-                alert('임포트 오류');
+            } catch (error: unknown) {
+                const e = error as Error;
+                alert(`엑셀 업로드 실패: ${e.message}`);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -725,25 +910,35 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
     const handleMove = async () => {
-        if (!selectedAssignment?.orders?.id) return;
+        if (!selectedAssignment) return;
+
         try {
-            const res = await fetch('/api/admin/accounts/move', {
+            const res = await apiFetch('/api/admin/accounts/move', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    order_id: selectedAssignment.orders.id,
+                    assignment_id: selectedAssignment.id,
+                    order_id: selectedAssignment.orders?.id,
                     target_account_id: selectedTargetAccount,
                     target_slot_number: selectedTargetSlot,
                     target_tidal_password: selectedAssignment.tidal_password
                 })
             });
-            if (!res.ok) throw new Error('Move failed');
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const reason = data?.error || '알 수 없는 오류가 발생했습니다.';
+                alert(`이동 실패: ${reason}`);
+                return;
+            }
+
             setIsMoveModalOpen(false);
             fetchAccounts();
         } catch {
-            alert('이동 실패');
+            alert('이동 실패: 네트워크 오류가 발생했습니다. 인터넷 연결을 확인 후 다시 시도해 주세요.');
         }
     };
+
 
     const openOrderDetail = (order?: Order) => {
         if (!order) return;
@@ -790,7 +985,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 }))
                 .filter(r => !!r.email);
 
-            const res = await fetch('/api/admin/tidal/notify', {
+            const res = await apiFetch('/api/admin/tidal/notify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ recipients, messageTemplate: notificationMessage })
@@ -830,6 +1025,49 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         fetchAccounts();
     };
 
+    const openMemoModal = (accountId: string, slotIdx: number, currentMemo: string, assignmentId: string) => {
+        setMemoTargetAccountId(accountId);
+        setMemoTargetSlotIdx(slotIdx);
+        setMemoTargetAssignmentId(assignmentId);
+        
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        const timestamp = `${yy}/${mm}/${dd} ${hh}:${mins} `;
+        
+        let newMemo = currentMemo || "";
+        if (newMemo) {
+            newMemo = timestamp + "\n" + newMemo;
+        } else {
+            newMemo = timestamp;
+        }
+        
+        setCurrentMemoInput(newMemo);
+        setIsMemoModalOpen(true);
+    };
+
+    const handleSaveMemo = async () => {
+        if (!memoTargetAssignmentId) return;
+        try {
+            const res = await apiFetch(`/api/admin/assignments/${memoTargetAssignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ memo: currentMemoInput })
+            });
+            if (!res.ok) throw new Error('Update failed');
+            
+            updateGridValue(memoTargetAccountId, memoTargetSlotIdx as number, 'memo', currentMemoInput);
+            setIsMemoModalOpen(false);
+            fetchAccounts();
+            alert('메모가 저장되었습니다.');
+        } catch (e) {
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
+        }
+    };
+
     if (!isAdmin) return null;
 
     return (
@@ -847,7 +1085,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="flex gap-2 items-center">
                         {/* 1. 검색창 */}
                         <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
-                            <Filter size={14} className="text-gray-400" />
+                            <Search size={14} className="text-gray-400" />
                             <Input
                                 type="text"
                                 placeholder="고객명, Tidal ID, 전화번호 검색..."
@@ -857,60 +1095,83 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             />
                         </div>
 
-                        {/* 2. 만료된 배정만 보기 */}
-                        <Button
-                            variant={showExpiredOnly ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setShowExpiredOnly(!showExpiredOnly)}
-                            className={showExpiredOnly ? "bg-red-600 hover:bg-red-700 text-white h-8" : "text-gray-600 h-8"}
-                        >
-                            만료된 배정만 보기
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 bg-white border rounded-md px-2 py-1">
+                                <span className="text-xs text-gray-500 whitespace-nowrap">잔여</span>
+                                <Input
+                                    type="number"
+                                    value={expiredDays}
+                                    onChange={(e) => setExpiredDays(parseInt(e.target.value) || 0)}
+                                    className="w-12 h-7 px-1 text-center text-sm border-none focus-visible:ring-0"
+                                />
+                                <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
+                            </div>
+                            <Button
+                                variant={showExpiredOnly ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <Filter className="w-4 h-4" />
+                                잔여일 조회
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push('/admin/tidal/inactive')}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <History className="w-4 h-4" />
+                                내역
+                            </Button>
+                            <div className="h-4 w-px bg-gray-200" />
+                            <div className="relative">
+                                <input
+                                    id="excel-import"
+                                    type="file"
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                    onChange={handleImportExcel}
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => document.getElementById('excel-import')?.click()}
+                                    className="flex items-center gap-2 h-8"
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    엑셀
+                                </Button>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={exportToExcel}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <Download className="w-4 h-4" />
+                                엑셀
+                            </Button>
 
-                        {/* 3. 지난 내역 */}
-                        <Button onClick={() => router.push('/admin/tidal/inactive')} variant="outline" className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50 h-8">
-                            <History size={16} /> 지난 내역
-                        </Button>
+                            {isGridView && (
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    disabled={selectedAssignmentIds.size === 0}
+                                    onClick={() => {
+                                        setNotificationMessage(defaultTemplate);
+                                        setIsNotifyModalOpen(true);
+                                    }}
+                                    className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}
+                                >
+                                    <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
+                                </Button>
+                            )}
 
-                        {/* 4. 엑셀 임포트 */}
-                        <div className="relative">
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                onChange={handleImportExcel}
-                            />
-                            <Button variant="outline" className="flex items-center gap-2 h-8">
-                                <Upload className="w-4 h-4" />
-                                엑셀 임포트
+                            <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8" size="sm">
+                                <Plus size={16} /> 그룹 추가
                             </Button>
                         </div>
-
-                        {/* 5. 엑셀 다운로드 */}
-                        <Button onClick={exportToExcel} variant="outline" className="gap-2 h-8">
-                            <Download size={16} /> 엑셀 다운로드
-                        </Button>
-
-                        {/* 6. 알림 보내기 */}
-                        {isGridView && (
-                            <Button
-                                variant="default"
-                                size="sm"
-                                disabled={selectedAssignmentIds.size === 0}
-                                onClick={() => {
-                                    setNotificationMessage(defaultTemplate);
-                                    setIsNotifyModalOpen(true);
-                                }}
-                                className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}
-                            >
-                                <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
-                            </Button>
-                        )}
-
-                        {/* 7. 그룹 추가 */}
-                        <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8">
-                            <Plus size={16} /> 그룹 추가
-                        </Button>
                     </div>
                 </div>
             </header>
@@ -918,53 +1179,89 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             <div className={`${styles.content} container`}>
                 {isGridView ? (
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
-                        <table className="w-full text-xs min-w-[1400px]">
+                        <table className="w-full text-sm min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100 border-b">
-                                    <th className="w-10 text-center py-2 border-r border-gray-200">
+                                    <th className="text-center py-2 border-r border-gray-200" style={{ width: columnWidths['checkbox'] }}>
                                         <input
                                             type="checkbox"
                                             checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length}
                                             onChange={() => toggleSelectAll(getFlattenedAssignments())}
                                         />
                                     </th>
-                                    <th className="w-[100px] text-center text-[10px] font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('login_id')}>
-                                        <div className="flex items-center justify-center gap-1">
-                                            GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                    <th className="relative text-center text-xs font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['login_id'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('login_id')}>
+                                            배정번호 {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('login_id', e)} />
                                     </th>
-                                    <th className="p-2 text-left border-r w-32">Tidal ID</th>
-                                    <th className="p-2 text-left border-r w-24">PW</th>
-                                    <th className="p-2 text-left border-r w-20">고객명</th>
-                                    <th className="p-2 text-left border-r w-24">전화번호</th>
-                                    <th className="p-2 text-center border-r w-24">주문번호</th>
-                                    <th className="p-2 text-center border-r w-24 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('start_date')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
+                                            타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('type', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_id'] }}>
+                                        Tidal ID
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_id', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_password'] }}>
+                                        PW
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_password', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_name'] }}>
+                                        고객명
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_name', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_email'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('buyer_email')}>
+                                            이메일 {sortConfig?.key === 'buyer_email' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_email', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_phone'] }}>
+                                        전화번호
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_phone', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['order_number'] }}>
+                                        주문번호
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('order_number', e)} />
+                                    </th>
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['start_date'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('start_date')}>
                                             시작일 {sortConfig?.key === 'start_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('start_date', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-24 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('end_date')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['end_date'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('end_date')}>
                                             종료일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('end_date', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-12 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('period')}>
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['period'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('period')}>
                                             개월 {sortConfig?.key === 'period' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('period', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-16">타입</th>
-                                    <th className="p-2 text-left border-r w-32 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('payment_email')}>
-                                        <div className="flex items-center justify-center gap-1">
-                                            결제계정 {sortConfig?.key === 'payment_email' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['amount'] || 80 }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('amount')}>
+                                            계약금액 {sortConfig?.key === 'amount' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('amount', e)} />
                                     </th>
-                                    <th className="p-2 text-center border-r w-16 cursor-pointer hover:bg-gray-200" onClick={() => handleSort('payment_day')}>
-                                        <div className="flex items-center justify-center gap-1">
-                                            결제일 {sortConfig?.key === 'payment_day' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
+                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
+                                            타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('type', e)} />
                                     </th>
-                                    <th className="p-2 text-center w-32">관리</th>
+
+                                    <th className="relative p-2 text-center" style={{ width: columnWidths['manage'] }}>
+                                        관리
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('manage', e)} />
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -999,9 +1296,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     aVal = a.account.payment_day;
                                                     bVal = b.account.payment_day;
                                                     break;
+                                                case 'type':
+                                                    aVal = a.assignment.type || '';
+                                                    bVal = b.assignment.type || '';
+                                                    break;
                                                 case 'login_id':
                                                     aVal = a.account.login_id;
                                                     bVal = b.account.login_id;
+                                                    break;
+                                                case 'buyer_email':
+                                                    aVal = a.assignment.buyer_email || a.assignment.orders?.buyer_email || '';
+                                                    bVal = b.assignment.buyer_email || b.assignment.orders?.buyer_email || '';
                                                     break;
                                                 default:
                                                     return 0;
@@ -1029,54 +1334,106 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         today.setHours(0, 0, 0, 0);
                                         const isExpired = assignment.end_date ? parseISO(assignment.end_date) < today : false;
 
+                                        const isEmpty = assignment.id.startsWith('empty_');
+
                                         return (
                                             <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
-                                                <td className="text-center py-1 border-r border-gray-100 bg-gray-50/10">
+                                                <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedAssignmentIds.has(assignment.id)}
                                                         onChange={() => handleToggleSelection(assignment.id)}
                                                     />
                                                 </td>
-                                                <td className="text-center text-[10px] py-1 border-r border-gray-100 bg-gray-50/50 font-medium">
-                                                    {item.account.login_id}
+                                                <td className="text-center text-xs py-1 border-r border-gray-100 bg-gray-50/50 font-bold whitespace-nowrap px-1" style={{ width: columnWidths['login_id'] }}>
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <span className={isEmpty ? "text-green-600" : "text-gray-900"}>
+                                                            {acc.login_id}-{assignment.slot_number + 1}
+                                                        </span>
+                                                        {sIdx === 0 && (acc.order_accounts?.length || 0) === 0 && (
+                                                            <button type="button" title="빈 마스터계정 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }} className="flex-shrink-0">
+                                                                <Trash2 size={12} className="text-red-400 hover:text-red-600 cursor-pointer" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="p-2 text-center border-r" style={{ width: columnWidths['type'] }}>
+                                                    {!isEmpty && (
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <span className={`px-1 rounded text-xs ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
+                                                                {assignment.type === 'master' ? 'Master' : 'User'}
+                                                            </span>
+                                                            <MessageSquareText
+                                                                size={14}
+                                                                className={`cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openMemoModal(acc.id, sIdx, val.memo || '', assignment.id);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 {isEditing ? (
                                                     <>
-                                                        <td className="p-1 border-r">
-                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['tidal_id'] }}>
+                                                            <Input className="h-7 text-xs bg-white px-1" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
-                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['tidal_password'] }}>
+                                                            <Input className="h-7 text-xs bg-white px-1" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
-                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['buyer_name'] }}>
+                                                            <Input className="h-7 text-xs bg-white px-1" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
-                                                            <Input className="h-7 text-[10px] bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['buyer_email'] }}>
+                                                            <Input className="h-7 text-xs bg-white px-1" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r text-center text-[10px]">{val.order_number || '-'}</td>
-                                                        <td className="p-1 border-r">
-                                                            <Input type="date" className="h-7 text-[10px] bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['buyer_phone'] }}>
+                                                            <Input className="h-7 text-xs bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r">
-                                                            <Input type="date" className="h-7 text-[10px] bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
+                                                        <td className="p-1 border-r text-center text-xs" style={{ width: columnWidths['order_number'] }}>{val.order_number || '-'}</td>
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['start_date'] }}>
+                                                            <Input type="date" className="h-7 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r w-12">
-                                                            <Input type="number" className="h-7 text-[10px] bg-white px-1" placeholder="개월" value={val.period_months !== undefined ? val.period_months : (item.period || '')} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['end_date'] }}>
+                                                            <Input type="date" className="h-7 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
                                                         </td>
+                                                        <td className="p-1 border-r w-12" style={{ width: columnWidths['period'] }}>
+                                                            <Input type="number" className="h-7 text-xs bg-white px-1" placeholder="개월" value={val.period_months !== undefined ? val.period_months : (item.period || '')} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
+                                                        </td>
+                                                        <td className="p-1 border-r w-16" style={{ width: columnWidths['amount'] || 80 }}>
+                                                            <Input type="number" className="h-7 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} />
+                                                        </td>
+                                                    </>
+                                                ) : isEmpty ? (
+                                                    <>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['tidal_id'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['tidal_password'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['buyer_name'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['buyer_email'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['buyer_phone'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['order_number'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['start_date'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['end_date'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['period'] }}></td>
+                                                        <td className="p-2 border-r" style={{ width: columnWidths['amount'] }}></td>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined}>{assignment.tidal_id || '-'}</td>
-                                                        <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined}>{assignment.tidal_password || '-'}</td>
-                                                        <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined}>
-                                                            {assignment.buyer_name || assignment.orders?.buyer_name || '-'}
+                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
+                                                            <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.tidal_id || '-'}</span>
                                                         </td>
-                                                        <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined}>
+                                                        <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined} style={{ width: columnWidths['tidal_password'] }}>{assignment.tidal_password || '-'}</td>
+                                                        <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
+                                                            <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</span>
+                                                        </td>
+                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.buyer_email || assignment.orders?.buyer_email || undefined} style={{ width: columnWidths['buyer_email'] }}>
+                                                            {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
+                                                        </td>
+                                                        <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
                                                             {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono text-[10px]">
+                                                        <td className="p-2 text-center border-r font-mono text-xs" style={{ width: columnWidths['order_number'] }}>
                                                             {assignment.order_number || assignment.orders?.order_number ? (
                                                                 <button
                                                                     className="text-blue-600 font-bold underline hover:text-blue-800"
@@ -1086,23 +1443,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 </button>
                                                             ) : '-'}
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono">{assignment.start_date ? format(parseISO(assignment.start_date), 'yyyy-MM-dd') : '-'}</td>
-                                                        <td className="p-2 text-center border-r font-mono">
+                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
+                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['end_date'] }}>
                                                             <span className={isExpired ? "text-red-600 font-bold" : ""}>
-                                                                {assignment.end_date ? format(parseISO(assignment.end_date), 'yyyy-MM-dd') : '-'}
+                                                                {assignment.end_date ? format(parseISO(assignment.end_date), 'yy-MM-dd') : '-'}
                                                             </span>
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono">{item.period}</td>
+                                                        <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
+                                                        <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                     </>
                                                 )}
-                                                <td className="p-2 text-center border-r">
-                                                    <span className={`px-1 rounded text-[10px] ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
-                                                        {assignment.type === 'master' ? 'Master' : 'User'}
-                                                    </span>
-                                                </td>
-                                                <td className="p-2 border-r truncate max-w-[150px]" title={acc.payment_email}>{acc.payment_email}</td>
-                                                <td className="p-2 text-center border-r font-mono">{acc.payment_day}일</td>
-                                                <td className="p-2 text-center">
+
+
+                                                <td className="p-2 text-center" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
                                                         {isEditing ? (
                                                             <>
@@ -1110,7 +1463,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <Save size={12} />
                                                                 </Button>
                                                                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, sIdx)}>
-                                                                    <Plus size={12} className="rotate-45" />
+                                                                    <X size={12} />
                                                                 </Button>
                                                             </>
                                                         ) : (
@@ -1118,15 +1471,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, sIdx)}>
                                                                     <Pencil size={12} />
                                                                 </Button>
-                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
-                                                                    <ArrowRightLeft size={12} />
-                                                                </Button>
-                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                    <PowerOff size={12} />
-                                                                </Button>
-                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                    <Trash2 size={12} />
-                                                                </Button>
+                                                                {!isEmpty && (
+                                                                    <>
+                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
+                                                                            <ArrowRightLeft size={12} />
+                                                                        </Button>
+                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
+                                                                            <PowerOff size={12} />
+                                                                        </Button>
+                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
+                                                                            <Trash2 size={12} />
+                                                                        </Button>
+                                                                    </>
+                                                                )}
                                                             </>
                                                         )}
                                                     </div>
@@ -1140,7 +1497,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </div>
                 ) : (
                     <div className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-sm">
+                        <div className="grid grid-cols-14 gap-4 p-4 bg-gray-50 font-bold border-b text-base">
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>
                                 GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
@@ -1152,6 +1509,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 종료예정일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
                             <div className="col-span-1 text-left">지속개월</div>
+                            <div className="col-span-1 text-right pr-2">계약금액</div>
                             <div className="col-span-1 text-center cursor-pointer hover:bg-gray-100 flex items-center justify-center gap-1" onClick={() => handleSort('used_slots')}>
                                 슬롯 {sortConfig?.key === 'used_slots' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
@@ -1164,10 +1522,38 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         {sortedAccounts
                             .map((acc) => {
                                 const isExpanded = expandedRows.has(acc.id);
-                                let sortedAssignments = [...(acc.order_accounts || [])].sort((a, b) => {
-                                    if (a.type === 'master') return -1;
-                                    if (b.type === 'master') return 1;
-                                    return (a.end_date || '').localeCompare(b.end_date || '');
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const paddedAssignments: any[] = [];
+                                const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
+                                for (let i = 0; i < acc.max_slots; i++) {
+                                    const existing = acc.order_accounts?.find(oa => oa.slot_number === i);
+                                    if (existing) {
+                                        paddedAssignments.push(existing);
+                                    } else {
+                                        if (i > 0 && !hasMaster) continue;
+                                        paddedAssignments.push({
+                                            id: `empty_${acc.id}_${i}`,
+                                            slot_number: i,
+                                            type: i === 0 ? 'master' : 'user',
+                                            account_id: acc.id,
+                                            is_active: true,
+                                            // Empty placeholders
+                                            tidal_id: null,
+                                            tidal_password: null,
+                                            buyer_name: null,
+                                            buyer_email: null,
+                                            buyer_phone: null,
+                                            order_number: null,
+                                            start_date: null,
+                                            end_date: null
+                                        });
+                                    }
+                                }
+
+                                let sortedAssignments = paddedAssignments.sort((a, b) => {
+                                    if (a.type === 'master' && b.type !== 'master') return -1;
+                                    if (b.type === 'master' && a.type !== 'master') return 1;
+                                    return (a.slot_number || 0) - (b.slot_number || 0);
                                 });
 
                                 // --- Expired Filter Functionality ---
@@ -1209,40 +1595,40 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     try {
                                         const start = parseISO(masterSlot.start_date);
                                         const now = new Date();
-                                        const diff = differenceInMonths(now, start);
+                                        const diff = Math.floor(differenceInDays(now, start) / 30);
                                         duration = `${diff}개월`;
                                     } catch { }
                                 }
 
                                 return (
                                     <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                                        <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm">
+                                        <div className="grid grid-cols-14 gap-4 p-4 items-center text-base">
                                             <div className="col-span-1 text-gray-700 font-medium cursor-pointer truncate" title={acc.login_id} onClick={() => toggleRow(acc.id)}>
                                                 {acc.login_id}
                                             </div>
-                                            <div className="col-span-2 truncate cursor-pointer" title={`${acc.login_id}-${acc.payment_email}`} onClick={() => toggleRow(acc.id)}>
-                                                <div className="font-medium text-[10px] leading-tight">
-                                                    <div className="text-gray-700 truncate">{acc.login_id}</div>
-                                                    <div className="text-blue-600 truncate">{acc.payment_email}</div>
-                                                </div>
+                                            <div className="col-span-2 truncate cursor-pointer flex items-center" title={acc.payment_email} onClick={() => toggleRow(acc.id)}>
+                                                <span className="text-blue-600 font-semibold text-base truncate">{acc.payment_email}</span>
                                             </div>
                                             <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 {acc.payment_day}일
                                             </div>
-                                            <div className="col-span-1 text-gray-500 text-[10px] text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
+                                            <div className="col-span-1 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
                                                 {acc.memo}
                                             </div>
-                                            <div className="col-span-2 text-gray-700 text-xs truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>
+                                            <div className="col-span-2 text-gray-700 text-sm truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>
                                                 {tidalId}
                                             </div>
-                                            <div className={`col-span-2 font-mono text-xs cursor-pointer ${isWarning ? 'text-red-600 font-bold' : 'text-gray-900'}`} onClick={() => toggleRow(acc.id)}>
+                                            <div className={`col-span-2 font-mono text-sm cursor-pointer ${isWarning ? 'text-red-600 font-bold' : 'text-gray-900'}`} onClick={() => toggleRow(acc.id)}>
                                                 {endDate}
                                             </div>
-                                            <div className="col-span-1 text-gray-500 font-mono text-xs cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                            <div className="col-span-1 text-gray-500 font-mono text-sm cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 {duration}
                                             </div>
+                                            <div className="col-span-1 text-right text-gray-500 font-mono text-sm pr-2 cursor-pointer" onClick={() => toggleRow(acc.id)}>
+                                                -
+                                            </div>
                                             <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                                <span className={`px-2 py-1 rounded-full text-sm font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                                     {acc.order_accounts?.length || 0}/6
                                                 </span>
                                             </div>
@@ -1262,13 +1648,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         {isExpanded && (
                                             <div className="bg-white border-t p-4 overflow-x-auto">
                                                 {(() => {
-                                                    const available = getAvailableSlots(acc.id);
-                                                    const availableSlotNum = available.length > 0 ? available[0] : -1;
                                                     return (
-                                                        <table className="w-full text-xs min-w-[1200px]">
+                                                        <table className="w-full text-sm min-w-[1200px]">
                                                             <thead>
                                                                 <tr className="text-gray-400 border-b">
-                                                                    <th className="py-2 text-center w-12">Slot</th>
+                                                                    <th className="py-2 text-center w-16">배정번호</th>
                                                                     <th className="py-2 text-center w-20">Type</th>
                                                                     <th className="py-2 text-left w-32">Tidal ID</th>
                                                                     <th className="py-2 text-left w-24">비밀번호</th>
@@ -1278,12 +1662,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <th className="py-2 text-left w-24">가입일</th>
                                                                     <th className="py-2 text-left w-24">종료일</th>
                                                                     <th className="py-2 text-center w-16">개월</th>
+                                                                    <th className="py-2 text-right w-20 pr-2">계약금액</th>
                                                                     <th className="py-2 text-center w-24">주문번호</th>
                                                                     <th className="py-2 text-center w-40">관리</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {sortedAssignments.map((assignment, index) => {
+                                                                {sortedAssignments.map((assignment) => {
                                                                     const sIdx = assignment.slot_number;
                                                                     const key = `${acc.id}_${sIdx}`;
                                                                     const val = gridValues[key] || {}; // Current Input Values
@@ -1296,7 +1681,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         try {
                                                                             const start = parseISO(val.start_date);
                                                                             const end = parseISO(val.end_date);
-                                                                            const diff = differenceInMonths(end, start);
+                                                                            const days = differenceInDays(end, start);
+                                                                            const diff = Math.floor(days / 30);
                                                                             if (diff > 0) period = `${diff}개월`;
 
                                                                             // Check expiry
@@ -1306,19 +1692,59 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         } catch { }
                                                                     }
 
+                                                                    const isEmpty = assignment.id.startsWith('empty_');
+
                                                                     return (
                                                                         <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
-                                                                            <td className="text-center font-bold text-gray-400">#{index + 1}</td>
+                                                                            <td className="text-center text-[10px] font-bold">
+                                                                                <span className={isEmpty ? "text-green-600" : "text-gray-900"}>
+                                                                                    {acc.login_id}-{assignment.slot_number + 1}
+                                                                                </span>
+                                                                            </td>
 
                                                                             {isEditing ? (
                                                                                 <>
                                                                                     <td className="px-1">
-                                                                                        <Select value={val.type || 'user'} onValueChange={(value) => {
+                                                                                        <Select value={val.type || 'user'} onValueChange={async (value) => {
                                                                                             if (value === 'master') {
                                                                                                 const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master' && oa.slot_number !== sIdx);
                                                                                                 if (hasMaster) {
                                                                                                     alert('이미 Master가 설정되어 있습니다.');
                                                                                                     return;
+                                                                                                }
+                                                                                                if (sIdx !== 0) {
+                                                                                                    const assignment = acc.order_accounts?.find(oa => oa.slot_number === sIdx);
+                                                                                                    const slot0InUse = acc.order_accounts?.some(oa => oa.slot_number === 0 && !oa.id.startsWith('empty_'));
+                                                                                                    
+                                                                                                    if (slot0InUse) {
+                                                                                                        alert('1번 슬롯이 이미 사용 중입니다. 기존 마스터 또는 1번 슬롯 사용자를 먼저 비워주세요.');
+                                                                                                        return;
+                                                                                                    }
+                                                                                                    
+                                                                                                    if (assignment && !assignment.id.startsWith('empty_')) {
+                                                                                                        if (confirm('마스터로 변경 시 즉시 1번 슬롯으로 이동합니다. 계속하시겠습니까?')) {
+                                                                                                            try {
+                                                                                                                const res = await apiFetch(`/api/admin/assignments/${assignment.id}`, {
+                                                                                                                    method: 'PUT',
+                                                                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                                                                    body: JSON.stringify({ type: 'master' })
+                                                                                                                });
+                                                                                                                if (!res.ok) {
+                                                                                                                    const errorData = await res.json().catch(() => null);
+                                                                                                                    throw new Error(errorData?.error || '변경에 실패했습니다.');
+                                                                                                                }
+                                                                                                                cancelEdit(acc.id, sIdx);
+                                                                                                                fetchAccounts();
+                                                                                                                alert('마스터로 변경되었습니다.');
+                                                                                                            } catch (error) {
+                                                                                                                alert('변경 실패: ' + (error instanceof Error ? error.message : String(error)));
+                                                                                                            }
+                                                                                                        }
+                                                                                                        return;
+                                                                                                    } else {
+                                                                                                        alert('신규 마스터 배정은 1번 슬롯의 "수정" 또는 "배정" 버튼을 통해 진행해주세요.');
+                                                                                                        return;
+                                                                                                    }
                                                                                                 }
                                                                                             }
                                                                                             updateGridValue(acc.id, sIdx, 'type', value);
@@ -1329,7 +1755,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                             <SelectContent>
                                                                                                 <SelectItem value="master">Master</SelectItem>
                                                                                                 <SelectItem value="user">User</SelectItem>
-                                                                                            </SelectContent>
+                                                                                             </SelectContent>
                                                                                         </Select>
                                                                                     </td>
                                                                                     <td className="px-1">
@@ -1356,17 +1782,50 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                     <td className="px-1">
                                                                                         <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
                                                                                     </td>
+                                                                                    <td className="px-1 w-12">
+                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
+                                                                                    </td>
+                                                                                    <td className="px-1 w-16">
+                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} />
+                                                                                    </td>
+                                                                                </>
+                                                                            ) : isEmpty ? (
+                                                                                <>
+                                                                                    <td className="px-2 text-center"></td>
+                                                                                    <td className="px-2"></td>
+                                                                                    <td className="px-2"></td>
+                                                                                    <td className="px-2"></td>
+                                                                                    <td className="px-2"></td>
+                                                                                    <td className="px-2"></td>
+                                                                                    <td className="px-2"></td>
+                                                                                    <td className="px-2"></td>
                                                                                 </>
                                                                             ) : (
                                                                                 <>
                                                                                     <td className="px-2 text-center">
-                                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                                                            {val.type === 'master' ? 'Master' : 'User'}
-                                                                                        </span>
+                                                                                        <div className="flex items-center justify-center gap-1">
+                                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                                                {val.type === 'master' ? 'Master' : 'User'}
+                                                                                            </span>
+                                                                                            {assignment.id && !assignment.id.startsWith('empty') && (
+                                                                                                <MessageSquareText
+                                                                                                    size={14}
+                                                                                                    className={`cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        openMemoModal(acc.id, sIdx, val.memo || '', assignment.id);
+                                                                                                    }}
+                                                                                                />
+                                                                                            )}
+                                                                                        </div>
                                                                                     </td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>{val.tidal_id || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>
+                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.tidal_id || '-'}</span>
+                                                                                    </td>
                                                                                     <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password || undefined}>{val.tidal_password || '-'}</td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>{val.buyer_name || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>
+                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.buyer_name || '-'}</span>
+                                                                                    </td>
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
                                                                                     <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
@@ -1380,10 +1839,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             )}
 
                                                                             <td className="text-center text-gray-500 font-mono">
-                                                                                {period}
+                                                                                {!isEmpty ? period : ''}
+                                                                            </td>
+                                                                            <td className="text-right text-gray-700 font-mono px-2">
+                                                                                {!isEmpty ? (val.amount ? val.amount.toLocaleString() : '-') : ''}
                                                                             </td>
                                                                             <td className="text-center text-gray-400 font-mono text-[10px]">
-                                                                                {val.order_number ? (
+                                                                                {val.order_number && !isEmpty ? (
                                                                                     <button
                                                                                         className="text-blue-600 font-bold underline hover:text-blue-800"
                                                                                         onClick={() => {
@@ -1397,8 +1859,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                     <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openAssignModal(acc, assignment.slot_number)}>
                                                                                         배정
                                                                                     </Button>
-                                                                                ) : (
+                                                                                ) : !isEmpty ? (
                                                                                     <span>-</span>
+                                                                                ) : (
+                                                                                    <span></span>
                                                                                 )}
                                                                             </td>
                                                                             <td>
@@ -1418,18 +1882,28 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                                 <Pencil size={14} />
                                                                                             </Button>
 
-                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
-                                                                                                <ArrowRightLeft size={14} />
-                                                                                            </Button>
+                                                                                            {isEmpty && (
+                                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="배정" onClick={() => openAssignModal(acc, assignment.slot_number)}>
+                                                                                                    <Plus size={14} />
+                                                                                                </Button>
+                                                                                            )}
 
-                                                                                            {/* Deactivate Button for Expired/Active Accounts */}
-                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                                                <PowerOff size={14} />
-                                                                                            </Button>
+                                                                                            {!isEmpty && (
+                                                                                                <>
+                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
+                                                                                                        <ArrowRightLeft size={14} />
+                                                                                                    </Button>
 
-                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                                                <Trash2 size={14} />
-                                                                                            </Button>
+                                                                                                    {/* Deactivate Button for Expired/Active Accounts */}
+                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
+                                                                                                        <PowerOff size={14} />
+                                                                                                    </Button>
+
+                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
+                                                                                                        <Trash2 size={14} />
+                                                                                                    </Button>
+                                                                                                </>
+                                                                                            )}
                                                                                         </>
                                                                                     )}
                                                                                 </div>
@@ -1438,23 +1912,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     );
                                                                 })}
 
-                                                                {sortedAssignments.length < 6 && availableSlotNum !== -1 && (
-                                                                    <tr className="border-b last:border-0 h-10 bg-blue-50/30">
-                                                                        <td className="text-center font-bold text-gray-300">#{sortedAssignments.length + 1}</td>
-                                                                        <td colSpan={10} className="px-4 py-1">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <span className="text-gray-400 italic">신규 슬롯을 추가하려면 우측 &apos;배정&apos; 버튼을 클릭하세요.</span>
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="text-center">
-                                                                            <Button size="sm" variant="outline" className="h-7 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white"
-                                                                                onClick={() => openAssignModal(acc, availableSlotNum)}
-                                                                            >
-                                                                                <Plus size={14} className="mr-1" /> 배정
-                                                                            </Button>
-                                                                        </td>
-                                                                    </tr>
-                                                                )}
+
                                                             </tbody>
 
                                                         </table>
@@ -1640,7 +2098,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     {viewOrder.products?.name}
                                     {viewOrder.start_date && viewOrder.end_date && (
                                         <span className="ml-1 text-blue-600">
-                                            ({differenceInMonths(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date))}개월)
+                                            ({Math.round(differenceInDays(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date)) / 30)}개월)
                                         </span>
                                     )}
                                 </span>
@@ -1682,12 +2140,32 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <div className="space-y-4 py-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-green-50 p-4 rounded-lg text-center">
-                                    <div className="text-sm text-green-600">성공 마스터</div>
-                                    <div className="text-2xl font-bold text-green-700">{importResults.success.masters}</div>
+                                    <div className="text-sm text-green-600 font-bold mb-2">마스터 계정</div>
+                                    <div className="flex justify-around items-end">
+                                        <div>
+                                            <div className="text-[10px] text-green-500">신규</div>
+                                            <div className="text-xl font-bold text-green-700">{importResults.success.masters.created}</div>
+                                        </div>
+                                        <div className="text-gray-300 mb-1">/</div>
+                                        <div>
+                                            <div className="text-[10px] text-green-500">업데이트</div>
+                                            <div className="text-xl font-bold text-green-700">{importResults.success.masters.updated}</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="bg-blue-50 p-4 rounded-lg text-center">
-                                    <div className="text-sm text-blue-600">성공 슬롯</div>
-                                    <div className="text-2xl font-bold text-blue-700">{importResults.success.slots}</div>
+                                    <div className="text-sm text-blue-600 font-bold mb-2">슬롯</div>
+                                    <div className="flex justify-around items-end">
+                                        <div>
+                                            <div className="text-[10px] text-blue-500">신규</div>
+                                            <div className="text-xl font-bold text-blue-700">{importResults.success.slots.created}</div>
+                                        </div>
+                                        <div className="text-gray-300 mb-1">/</div>
+                                        <div>
+                                            <div className="text-[10px] text-blue-500">업데이트</div>
+                                            <div className="text-xl font-bold text-blue-700">{importResults.success.slots.updated}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1762,6 +2240,26 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <Button onClick={handleBulkNotify} disabled={isSendingNotify} className="bg-orange-600 hover:bg-orange-700">
                             {isSendingNotify ? '발송 중...' : '메일 발송하기'}
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* Memo Modal */}
+            <Dialog open={isMemoModalOpen} onOpenChange={setIsMemoModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>메모 편집</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <textarea
+                            className="w-full min-h-[100px] p-3 border rounded-md text-sm outline-none focus:ring-2 focus:ring-primary"
+                            placeholder="메모를 입력하세요..."
+                            value={currentMemoInput}
+                            onChange={(e) => setCurrentMemoInput(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsMemoModalOpen(false)}>취소</Button>
+                        <Button onClick={handleSaveMemo}>저장</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

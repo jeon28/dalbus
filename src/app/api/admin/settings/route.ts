@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession, isAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,13 @@ interface SettingRow {
     updated_at?: string;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    // 세션 확인 및 관리자 권한 체크
+    const session = await getServerSession(req);
+    if (!session || !isAdmin(session)) {
+        return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
+
     const { data, error } = await supabaseAdmin
         .from('site_settings')
         .select('*');
@@ -31,6 +38,12 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
     try {
+        // 세션 확인 및 관리자 권한 체크
+        const session = await getServerSession(req);
+        if (!session || !isAdmin(session)) {
+            return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+        }
+
         const body = await req.json();
         // body is expected to be { key1: value1, key2: value2, ... }
         const updates = Object.entries(body);

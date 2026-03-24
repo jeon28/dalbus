@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 export function ForgotPasswordDialog() {
     const [open, setOpen] = useState(false);
@@ -52,9 +53,8 @@ export function ForgotPasswordDialog() {
 
         setLoading(true);
         try {
-            const res = await fetch('/api/auth/password-reset/request', {
+            const res = await apiFetch('/api/auth/password-reset/request', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, name, phone })
             });
             const data = await res.json();
@@ -78,9 +78,8 @@ export function ForgotPasswordDialog() {
         setStatusMsg({ text: '', isError: false });
         setLoading(true);
         try {
-            const res = await fetch('/api/auth/password-reset/verify', {
+            const res = await apiFetch('/api/auth/password-reset/verify', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, code })
             });
             const data = await res.json();
@@ -113,9 +112,8 @@ export function ForgotPasswordDialog() {
 
         setLoading(true);
         try {
-            const res = await fetch('/api/auth/password-reset/confirm', {
+            const res = await apiFetch('/api/auth/password-reset/confirm', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, code, newPassword: passwords.new })
             });
             const data = await res.json();

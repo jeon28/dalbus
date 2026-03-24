@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Lock, Mail, User, Phone, Calendar } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 import styles from '../login/auth.module.css';
 
 export default function SignupPage() {
@@ -111,9 +112,8 @@ export default function SignupPage() {
 
         setCheckingEmail(true);
         try {
-            const response = await fetch('/api/auth/check-email', {
+            const response = await apiFetch('/api/auth/check-email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
             });
 
@@ -230,8 +230,14 @@ export default function SignupPage() {
             // [참고] profiles 테이블은 DB 트리거(on_auth_user_created)에 의해 자동 생성되므로 
             // 별도의 upsert 로직을 제거하여 RLS 위반 문제를 방지합니다.
 
-            alert('회원가입이 완료되었습니다. 로그인해주세요.');
-            router.push('/login');
+            if (data.session) {
+                alert('회원가입이 완료되었습니다! 자동으로 로그인합니다.');
+                // session exists, so user is already logged in (auto-confirm enabled)
+                window.location.replace('/');
+            } else {
+                alert('회원가입 요청이 완료되었습니다.\n이메일 인증이 필요한 경우 메일을 확인해주세요.\n그렇지 않으면 바로 로그인하실 수 있습니다.');
+                router.push('/login');
+            }
         }
         setLoading(false);
     };

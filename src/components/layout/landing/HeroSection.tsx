@@ -31,7 +31,7 @@ export default function HeroSection() {
                         <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400 whitespace-pre-line leading-relaxed">
                             복잡한 우회 가입은 이제 그만,{"\n"}
                             달버스에서 타이달을 만나보세요{"\n"}
-                            음악에만 집중하세요, 나머지는 달버스가 책임집니다.
+                            음악에만 집중하세요, 달버스가 책임집니다.
                         </p>
                     </div>
                 </div>
