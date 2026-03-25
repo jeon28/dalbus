@@ -48,10 +48,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (period_months !== undefined) oaUpdates.period_months = period_months;
         if (memo !== undefined) {
             oaUpdates.memo = memo;
-            // Sync with profiles.memo if a user_id exists for this order
             
             // Sync with profiles.memo if a user_id exists for this order
             const { data: assignmentData } = await supabaseAdmin
+
                 .from('order_accounts')
                 .select('orders(user_id)')
                 .eq('id', id)

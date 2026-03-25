@@ -13,15 +13,25 @@ export interface ServerSessionUser {
 export async function getServerSession(req: NextRequest): Promise<ServerSessionUser | null> {
     try {
         const authHeader = req.headers.get('Authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!authHeader) {
+            console.log('[getServerSession] No Authorization header');
+            return null;
+        }
+        if (!authHeader.startsWith('Bearer ')) {
+            console.log('[getServerSession] Authorization header does not start with Bearer');
             return null;
         }
 
         const token = authHeader.split(' ')[1];
+        if (!token) {
+            console.log('[getServerSession] Token is empty');
+            return null;
+        }
 
         // 1. Verify token with Supabase Auth
         const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
         if (authError || !user) {
+            console.log('[getServerSession] authError or no user:', authError?.message || 'No user');
             return null;
         }
 
@@ -33,6 +43,7 @@ export async function getServerSession(req: NextRequest): Promise<ServerSessionU
             .single();
 
         if (profileError || !profile) {
+            console.log('[getServerSession] Profile error or no profile for ID:', user.id, profileError?.message || 'No profile');
             // If profile is missing but user is authenticated, default to 'user'
             // or return null if we want to be strict.
             return {
@@ -42,6 +53,7 @@ export async function getServerSession(req: NextRequest): Promise<ServerSessionU
             };
         }
 
+        console.log('[getServerSession] Authenticated as:', user.email, 'Role:', profile.role);
         return {
             id: user.id,
             email: user.email,
