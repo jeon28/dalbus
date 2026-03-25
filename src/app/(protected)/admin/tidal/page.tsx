@@ -780,7 +780,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     '소속 PW': item.tidal_password || '',
                     '시작일': item.start_date || '',
                     '종료일': item.end_date || '',
-                    '개월': getPeriodMonths(item.start_date, item.end_date),
+                    '개월': (() => { const m = getPeriodMonths(item.start_date, item.end_date); return m > 1 ? m : ''; })(),
                     '계약금액': item.amount || 0
                 });
             });
@@ -1235,8 +1235,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 case 'amount': aVal = a.assignment.orders?.amount; bVal = b.assignment.orders?.amount; break;
                                                 default: return 0;
                                             }
-                                            const safeA = aVal || '';
-                                            const safeB = bVal || '';
+                                            const safeA = (sortConfig.key === 'end_date' && !aVal) ? '9999-12-31' : (aVal || '');
+                                            const safeB = (sortConfig.key === 'end_date' && !bVal) ? '9999-12-31' : (bVal || '');
                                             if (safeA < safeB) return sortConfig.direction === 'asc' ? -1 : 1;
                                             if (safeA > safeB) return sortConfig.direction === 'asc' ? 1 : -1;
                                             return 0;
