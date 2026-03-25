@@ -422,6 +422,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     } catch { }
                 }
 
+                if (showExpiredOnly && periodNum === 1) continue;
+                if (periodNum < 1) continue;
+
                 flattened.push({
                     id: assignment.id,
                     assignment,
@@ -651,7 +654,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
     const handleDeactivate = async (assignmentId: string) => {
-        // Find current status from accounts state
+        // Find current status
         let currentActive = true;
         for (const acc of accounts) {
             const found = acc.order_accounts?.find(oa => oa.id === assignmentId);
@@ -661,9 +664,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             }
         }
 
-        if (currentActive) {
-            alert('비활성화 합니다');
-        }
+        const msg = currentActive ? '비활성화 하시겠습니까?' : '다시 활성화 하시겠습니까?';
+        if (!confirm(msg)) return;
 
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
@@ -673,13 +675,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             });
             if (!res.ok) throw new Error('Action failed');
             
-            if (!currentActive) {
-                alert('활성화 되었습니다.');
-            }
-            
+            alert(currentActive ? '비활성화 되었습니다.' : '활성화 되었습니다.');
             fetchAccounts();
         } catch (error) {
-            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+            alert('오류: ' + (error instanceof Error ? error.message : String(error)));
         }
     };
 
@@ -780,7 +779,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     '소속 PW': item.tidal_password || '',
                     '시작일': item.start_date || '',
                     '종료일': item.end_date || '',
-                    '개월': (() => { const m = getPeriodMonths(item.start_date, item.end_date); return m > 1 ? m : ''; })(),
+                    '개월': getPeriodMonths(item.start_date, item.end_date),
                     '계약금액': item.amount || 0
                 });
             });
@@ -1263,7 +1262,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const isDeactivated = val.is_active === false;
 
                                         return (
-                                            <tr key={assignment.id} className={`${isDeactivated ? 'bg-red-50 text-red-500' : (isExpired ? 'bg-orange-50' : (isLastSaved ? 'bg-blue-50 animate-pulse' : 'hover:bg-gray-50'))} border-b`}>
+                                            <tr key={assignment.id} className={`${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-orange-50' : (isLastSaved ? 'bg-blue-50 animate-pulse' : 'hover:bg-gray-50'))} border-b transition-colors`}>
                                                 <td className="text-center py-2 border-r border-gray-200">
                                                     <input type="checkbox" checked={selectedAssignmentIds.has(assignment.id)} onChange={() => handleToggleSelection(assignment.id)} />
                                                 </td>
@@ -1304,7 +1303,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 <td className="p-2 border-r text-center text-xs font-mono">{val.order_number || '-'}</td>
                                                 <td className="p-2 border-r text-center text-xs">{val.start_date || '-'}</td>
                                                 <td className="p-2 border-r text-center text-xs">{val.end_date || '-'}</td>
-                                                <td className="p-2 border-r text-center">{getPeriodMonths(val.start_date, val.end_date) > 1 ? `${getPeriodMonths(val.start_date, val.end_date)}개월` : '-'}</td>
+                                                <td className="p-2 border-r text-center">{getPeriodMonths(val.start_date, val.end_date)}</td>
                                                 <td className="p-2 border-r text-right">{val.amount?.toLocaleString() || '0'}</td>
 
                                                 <td className="p-2 text-center">
@@ -1315,8 +1314,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                             <>
                                                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditAssignModal(key, val)}><Pencil size={14} /></Button>
                                                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}><ArrowRightLeft size={14} /></Button>
-                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화" onClick={() => handleDeactivate(assignment.id)}><PowerOff size={14} /></Button>
-                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제" onClick={() => handleDelete(assignment.id)}><Trash2 size={14} /></Button>
+                                                                <Button size="sm" variant="ghost" className={`${isDeactivated ? 'text-red-500 hover:text-green-600' : 'text-gray-400 hover:text-orange-600'} h-7 w-7 p-0`} title={isDeactivated ? '활성화' : '비활성화'} onClick={() => handleDeactivate(assignment.id)}>
+                                                                    {isDeactivated ? <CheckCircle2 size={14} /> : <PowerOff size={14} />}
+                                                                </Button>
+                                                                {isDeactivated && (
+                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600" title="삭제" onClick={() => handleDelete(assignment.id)}><Trash2 size={14} /></Button>
+                                                                )}
                                                             </>
                                                         )}
                                                     </div>

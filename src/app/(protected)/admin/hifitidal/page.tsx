@@ -446,6 +446,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     } catch { }
                 }
 
+                if (showExpiredOnly && periodNum === 1) continue;
+                if (periodNum < 1) continue;
+
                 flattened.push({
                     id: assignment.id,
                     assignment,
@@ -734,7 +737,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
     const handleDeactivate = async (assignmentId: string) => {
-        // Find current status from gridValues
+        // Find current status
         let currentActive = true;
         Object.keys(gridValues).forEach(key => {
             if (gridValues[key].assignment_id === assignmentId) {
@@ -742,9 +745,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             }
         });
 
-        if (currentActive) {
-            alert('비활성화 합니다');
-        }
+        const msg = currentActive ? '비활성화 하시겠습니까?' : '다시 활성화 하시겠습니까?';
+        if (!confirm(msg)) return;
 
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
@@ -754,13 +756,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             });
             if (!res.ok) throw new Error('Action failed');
             
-            if (!currentActive) {
-                alert('활성화 되었습니다.');
-            }
-            
+            alert(currentActive ? '비활성화 되었습니다.' : '활성화 되었습니다.');
             fetchAccounts();
         } catch (error) {
-            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+            alert('오류: ' + (error instanceof Error ? error.message : String(error)));
         }
     };
 
@@ -865,10 +864,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     '소속 PW': item.tidal_password || '',
                     '시작일': item.start_date || '',
                     '종료일': item.end_date || '',
-                    '개월': (() => {
-                        const m = item.period_months || getPeriodMonths(item.start_date, item.end_date);
-                        return m > 1 ? m : '';
-                    })(),
+                    '개월': item.period_months || getPeriodMonths(item.start_date, item.end_date),
                     '계약금액': item.amount || 0
                 });
             });
@@ -1350,8 +1346,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     bVal = b.assignment.start_date || '0000-00-00';
                                                     break;
                                                 case 'end_date':
-                                                    aVal = a.assignment.end_date || '0000-00-00';
-                                                    bVal = b.assignment.end_date || '0000-00-00';
+                                                    aVal = a.assignment.end_date || '9999-12-31';
+                                                    bVal = b.assignment.end_date || '9999-12-31';
                                                     break;
                                                 case 'period':
                                                     aVal = a.period;
@@ -1388,6 +1384,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             if (safeA > safeB) return sortConfig.direction === 'asc' ? 1 : -1;
                                             return 0;
                                         });
+                                    } else {
+                                        // Default sort: end_date ASC (nulls/empty at end)
+                                        flattened.sort((a, b) => {
+                                            const dateA = a.assignment.end_date || '9999-12-31';
+                                            const dateB = b.assignment.end_date || '9999-12-31';
+                                            if (dateA !== dateB) return dateA.localeCompare(dateB);
+                                            // Secondary sort by login_id
+                                            return a.account.login_id.localeCompare(b.account.login_id);
+                                        });
                                     }
 
                                     // 3. Render
@@ -1410,7 +1415,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         if (!showInactive && isDeactivated) return null; // Hide deleted by default
 
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isDeactivated ? 'bg-red-200' : (isExpired ? 'bg-red-50/30' : '')} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/30' : '')} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                 <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
@@ -1549,12 +1554,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
                                                                             <ArrowRightLeft size={12} />
                                                                         </Button>
-                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                            <PowerOff size={12} />
+                                                                        <Button size="sm" variant="ghost" className={`${isDeactivated ? 'text-red-500 hover:text-green-600' : 'text-gray-400 hover:text-orange-600'} h-6 w-6 p-0`} title={isDeactivated ? '활성화' : '비활성화'} onClick={() => handleDeactivate(assignment.id)}>
+                                                                            {isDeactivated ? <CheckCircle2 size={12} /> : <PowerOff size={12} />}
                                                                         </Button>
-                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                            <Trash2 size={12} />
-                                                                        </Button>
+                                                                        {isDeactivated && (
+                                                                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:text-red-600" title="삭제" onClick={() => handleDelete(assignment.id)}>
+                                                                                <Trash2 size={12} />
+                                                                            </Button>
+                                                                        )}
                                                                     </>
                                                                 )}
                                                             </>
@@ -1677,7 +1684,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const start = parseISO(masterSlot.start_date);
                                         const now = new Date();
                                         const diff = Math.floor(differenceInDays(now, start) / 30);
-                                        duration = diff > 1 ? `${diff}개월` : '-';
+                                        duration = `${diff}개월`;
                                     } catch { }
                                 }
 
@@ -1764,7 +1771,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             const end = parseISO(val.end_date);
                                                                             const days = differenceInDays(end, start);
                                                                             const diff = Math.floor(days / 30);
-                                                                            if (diff > 1) period = `${diff}개월`;
+                                                                            if (diff > 0) period = `${diff}개월`;
 
                                                                             // Check expiry
                                                                             const today = new Date();
@@ -1778,7 +1785,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const isDeactivated = assignment.is_active === false;
 
                                                                     return (
-                                                                        <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${isDeactivated ? 'bg-red-100' : ''}`}>
+                                                                        <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/20' : '')}`}>
                                                                             <td className="text-center text-[10px] font-bold">
                                                                                 <span className={isEmpty ? "text-green-600" : "text-gray-900"}>
                                                                                     {acc.login_id}-{assignment.slot_number + 1}
@@ -1979,16 +1986,18 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                                                                                     {/* Deactivate Button for Expired/Active Accounts */}
                                                                                                     <Button size="sm" variant="ghost" 
-                                                                                                        className={`h-7 w-7 p-0 ${val.is_active === false ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-orange-600'}`} 
-                                                                                                        title={val.is_active === false ? "활성화" : "비활성화 (종료)"} 
+                                                                                                        className={`h-7 w-7 p-0 ${isDeactivated ? 'text-red-500 hover:text-green-600' : 'text-gray-400 hover:text-orange-600'}`} 
+                                                                                                        title={isDeactivated ? "활성화" : "비활성화"} 
                                                                                                         onClick={() => handleDeactivate(assignment.id)}
                                                                                                     >
-                                                                                                        {val.is_active === false ? <Save size={14} /> : <PowerOff size={14} />}
+                                                                                                        {isDeactivated ? <CheckCircle2 size={14} /> : <PowerOff size={14} />}
                                                                                                     </Button>
 
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                                                        <Trash2 size={14} />
-                                                                                                    </Button>
+                                                                                                    {isDeactivated && (
+                                                                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" title="삭제" onClick={() => handleDelete(assignment.id)}>
+                                                                                                            <Trash2 size={14} />
+                                                                                                        </Button>
+                                                                                                    )}
                                                                                                 </>
                                                                                             )}
                                                                                         </>
