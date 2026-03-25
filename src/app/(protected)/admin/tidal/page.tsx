@@ -5,7 +5,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -422,7 +422,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     } catch { }
                 }
 
-                if (showExpiredOnly && periodNum === 1) continue;
+                if ((showExpiredOnly || showInactive) && periodNum === 1) continue;
                 if (periodNum < 1) continue;
 
                 flattened.push({
