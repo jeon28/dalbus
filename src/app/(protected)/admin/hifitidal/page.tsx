@@ -582,16 +582,20 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
         } else if (!sortConfig) {
-            // Default Sort for List View
+            // Default Sort: end_date ASC (nulls/empty at end)
+            const masterA = a.order_accounts?.find(oa => oa.type === 'master');
+            const masterB = b.order_accounts?.find(oa => oa.type === 'master');
+            const endA = masterA?.end_date || '9999-12-31';
+            const endB = masterB?.end_date || '9999-12-31';
+            
+            if (endA !== endB) {
+                return endA.localeCompare(endB);
+            }
+            
+            // Secondary sort by usage
             const usedA = a.order_accounts?.length || 0;
             const usedB = b.order_accounts?.length || 0;
-            if (usedA !== usedB) return usedA - usedB;
-
-            const endA = a.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
-            const endB = b.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
-            if (endA < endB) return 1;
-            if (endA > endB) return -1;
-            return 0;
+            return usedA - usedB;
         }
         return 0;
     });
@@ -1670,7 +1674,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const start = parseISO(masterSlot.start_date);
                                         const now = new Date();
                                         const diff = Math.floor(differenceInDays(now, start) / 30);
-                                        duration = `${diff}개월`;
+                                        duration = diff > 1 ? `${diff}개월` : '-';
                                     } catch { }
                                 }
 
@@ -1757,7 +1761,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             const end = parseISO(val.end_date);
                                                                             const days = differenceInDays(end, start);
                                                                             const diff = Math.floor(days / 30);
-                                                                            if (diff > 0) period = `${diff}개월`;
+                                                                            if (diff > 1) period = `${diff}개월`;
 
                                                                             // Check expiry
                                                                             const today = new Date();

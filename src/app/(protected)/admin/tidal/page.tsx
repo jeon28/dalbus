@@ -1241,6 +1241,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             if (safeA > safeB) return sortConfig.direction === 'asc' ? 1 : -1;
                                             return 0;
                                         });
+                                    } else {
+                                        // Default sort: end_date ASC (nulls/empty at end)
+                                        flattened.sort((a, b) => {
+                                            const dateA = a.assignment.end_date || '9999-12-31';
+                                            const dateB = b.assignment.end_date || '9999-12-31';
+                                            return dateA.localeCompare(dateB);
+                                        });
                                     }
                                     return flattened.map((item) => {
                                         const assignment = item.assignment;
@@ -1297,7 +1304,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 <td className="p-2 border-r text-center text-xs font-mono">{val.order_number || '-'}</td>
                                                 <td className="p-2 border-r text-center text-xs">{val.start_date || '-'}</td>
                                                 <td className="p-2 border-r text-center text-xs">{val.end_date || '-'}</td>
-                                                <td className="p-2 border-r text-center">{getPeriodMonths(val.start_date, val.end_date)}</td>
+                                                <td className="p-2 border-r text-center">{getPeriodMonths(val.start_date, val.end_date) > 1 ? `${getPeriodMonths(val.start_date, val.end_date)}개월` : '-'}</td>
                                                 <td className="p-2 border-r text-right">{val.amount?.toLocaleString() || '0'}</td>
 
                                                 <td className="p-2 text-center">
