@@ -110,6 +110,8 @@ interface GridValue {
     memo?: string;
     is_active: boolean;
     assignment_number?: string;
+    orders?: any;
+    full_order?: Order;
 }
 
 function TidalAccountsContent() {
@@ -136,6 +138,8 @@ function TidalAccountsContent() {
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+    const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
+    const [viewOrder, setViewOrder] = useState<Order | null>(null);
     const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
     const [moveTargets, setMoveTargets] = useState<Account[]>([]);
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
@@ -364,11 +368,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
         accounts.forEach((acc, accIdx) => {
             const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
-            for (let i = 0; i < acc.max_slots; i++) {
+            for (let i = 0; i < 6; i++) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i);
                 if (!assignment) {
-                    if (i > 0 && !hasMaster) continue;
                     assignment = {
                         id: `empty_${acc.id}_${i}`,
                         slot_number: i,
@@ -895,6 +898,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
 
 
+    const openOrderDetail = (order?: Order) => {
+        if (!order) return;
+        setViewOrder(order);
+        setIsOrderDetailOpen(true);
+    };
+
+    const getStatusLabel = (order: Order) => {
+        if (order.assignment_status === 'completed') return '작업완료';
+        if (order.assignment_status === 'assigned') return '배정완료';
+        if (order.payment_status === 'paid') return '입금확인';
+        return '주문신청';
+    };
+
     const toggleSelectAll = (filteredFlat: { id: string }[]) => {
         if (selectedAssignmentIds.size === filteredFlat.length) {
             setSelectedAssignmentIds(new Set());
@@ -1165,7 +1181,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         Tidal ID
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_id', e)} />
                                     </th>
-                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_password'] }}>
+                                    <th className="hidden relative p-2 text-left border-r" style={{ width: columnWidths['tidal_password'] }}>
                                         PW
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_password', e)} />
                                     </th>
@@ -1183,7 +1199,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         전화번호
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_phone', e)} />
                                     </th>
-                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['order_number'] }}>
+                                    <th className="hidden relative p-2 text-center border-r" style={{ width: columnWidths['order_number'] }}>
                                         주문번호
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('order_number', e)} />
                                     </th>
@@ -1294,13 +1310,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     )}
                                                 </td>
                                                 <td className="p-2 border-r text-left overflow-hidden text-ellipsis whitespace-nowrap">{val.tidal_id || '-'}</td>
-                                                <td className="p-2 border-r text-left font-mono text-xs">{val.tidal_password || '-'}</td>
+                                                <td className="hidden p-2 border-r text-left font-mono text-xs">{val.tidal_password || '-'}</td>
                                                 <td className="p-2 border-r text-left">
                                                     <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.buyer_name || '-'}</span>
                                                 </td>
                                                 <td className="p-2 border-r text-left text-xs overflow-hidden text-ellipsis whitespace-nowrap">{val.buyer_email || '-'}</td>
                                                 <td className="p-2 border-r text-left text-xs">{val.buyer_phone || '-'}</td>
-                                                <td className="p-2 border-r text-center text-xs font-mono">{val.order_number || '-'}</td>
+                                                <td className="hidden p-2 border-r text-center text-xs font-mono">{val.order_number || '-'}</td>
                                                 <td className="p-2 border-r text-center text-xs">{val.start_date || '-'}</td>
                                                 <td className="p-2 border-r text-center text-xs">{val.end_date || '-'}</td>
                                                 <td className="p-2 border-r text-center">{getPeriodMonths(val.start_date, val.end_date)}</td>
@@ -1588,13 +1604,26 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             <Dialog open={isEditAssignModalOpen} onOpenChange={setIsEditAssignModalOpen}>
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                        <DialogTitle>정보수정 {editAssignData?.assignment_number ? `/ ${editAssignData.assignment_number}` : ''}</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <span>정보수정 / {editAssignData?.assignment_number}</span>
+                            {editAssignData?.order_number && (
+                                <button 
+                                    className="text-blue-600 font-bold underline text-sm hover:text-blue-800"
+                                    onClick={() => {
+                                        const orderToView = editAssignData.full_order || editAssignData.orders;
+                                        if (orderToView) openOrderDetail(orderToView);
+                                    }}
+                                >
+                                    / {editAssignData.order_number}
+                                </button>
+                            )}
+                        </DialogTitle>
                     </DialogHeader>
                     {editAssignData && (
                         <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
                             {/* Row 1: 고객명 / Tidal ID / PW */}
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="space-y-1">
+                            <div className="flex gap-4">
+                                <div className="w-[20%] space-y-1">
                                     <Label htmlFor="edit-buyer-name" className="text-xs text-gray-500">이름</Label>
                                     <Input
                                         id="edit-buyer-name"
@@ -1603,7 +1632,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="flex-1 space-y-1">
                                     <Label htmlFor="edit-tidal-id" className="text-xs text-gray-500">Tidal ID</Label>
                                     <Input
                                         id="edit-tidal-id"
@@ -1612,7 +1641,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="w-[20%] space-y-1">
                                     <Label htmlFor="edit-tidal-pw" className="text-xs text-gray-500">PW</Label>
                                     <Input
                                         id="edit-tidal-pw"
@@ -1646,8 +1675,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             </div>
 
                             {/* Row 3: 시작일 / 종료일 / 개월 / 계약금액 */}
-                            <div className="grid grid-cols-4 gap-2">
-                                <div className="space-y-1">
+                            <div className="flex gap-2">
+                                <div className="flex-1 space-y-1">
                                     <Label htmlFor="edit-start-date" className="text-[10px] text-gray-500">시작일</Label>
                                     <Input
                                         id="edit-start-date"
@@ -1668,7 +1697,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="flex-1 space-y-1">
                                     <Label htmlFor="edit-end-date" className="text-[10px] text-gray-500">종료일</Label>
                                     <Input
                                         id="edit-end-date"
@@ -1690,7 +1719,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="w-12 space-y-1">
                                     <Label htmlFor="edit-months" className="text-[10px] text-gray-500">개월</Label>
                                     <Input
                                         id="edit-months"
@@ -1711,13 +1740,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="edit-amount" className="text-[10px] text-gray-500">계약금액</Label>
+                                <div className="w-24 space-y-1">
+                                    <Label htmlFor="edit-amount" className="text-[10px] text-gray-500">계약금액(원)</Label>
                                     <Input
                                         id="edit-amount"
-                                        type="number"
-                                        value={editAssignData.amount || ''}
-                                        onChange={(e) => setEditAssignData({ ...editAssignData, amount: parseInt(e.target.value) || 0 })}
+                                        type="text"
+                                        value={editAssignData.amount ? editAssignData.amount.toLocaleString() : ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^0-9]/g, '');
+                                            setEditAssignData({ ...editAssignData, amount: parseInt(val) || 0 });
+                                        }}
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
@@ -1742,6 +1774,73 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <Dialog open={isOrderDetailOpen} onOpenChange={setIsOrderDetailOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>주문 상세 정보</DialogTitle></DialogHeader>
+                    {viewOrder && (
+                        <div className="py-4 space-y-2 text-sm">
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">날짜</span>
+                                <span className="col-span-2">{viewOrder.created_at ? new Date(viewOrder.created_at).toLocaleString() : '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">주문번호</span>
+                                <span className="col-span-2 font-mono">{viewOrder.order_number}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">이름</span>
+                                <span className="col-span-2">{viewOrder.profiles?.name || viewOrder.buyer_name || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">이메일</span>
+                                <span className="col-span-2">{viewOrder.profiles?.email || viewOrder.buyer_email || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">연락처</span>
+                                <span className="col-span-2">{viewOrder.profiles?.phone || viewOrder.buyer_phone || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">회원 ID</span>
+                                <span className="col-span-2 font-mono">{viewOrder.profiles?.email || viewOrder.user_id || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">서비스 (기간)</span>
+                                <span className="col-span-2">
+                                    {viewOrder.products?.name}
+                                    {viewOrder.start_date && viewOrder.end_date && (
+                                        <span className="ml-1 text-blue-600">
+                                            ({Math.round(differenceInDays(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date)) / 30)}개월)
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">금액</span>
+                                <span className="col-span-2">₩{viewOrder.amount?.toLocaleString()}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">상태</span>
+                                <span className="col-span-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${viewOrder.assignment_status === 'completed' ? 'bg-green-100 text-green-700' :
+                                        viewOrder.assignment_status === 'assigned' ? 'bg-blue-100 text-blue-700' :
+                                            viewOrder.payment_status === 'paid' ? 'bg-blue-50 text-blue-600' :
+                                                'bg-gray-100 text-gray-600'
+                                        }`}>
+                                        {getStatusLabel(viewOrder)}
+                                    </span>
+                                    <span className="ml-2 text-xs text-gray-400">
+                                        ({viewOrder.payment_status} / {viewOrder.assignment_status})
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setIsOrderDetailOpen(false)}>닫기</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Memo Modal */}
             <Dialog open={isMemoModalOpen} onOpenChange={setIsMemoModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">

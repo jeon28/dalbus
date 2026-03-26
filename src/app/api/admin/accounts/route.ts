@@ -8,8 +8,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
     try {
         const session = await getServerSession(req);
+        if (!session) {
+            return NextResponse.json({ error: 'Session not found or invalid' }, { status: 401 });
+        }
         if (!isAdmin(session)) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+            console.warn('[Accounts API] User is not an admin:', session.email, 'Role:', (session as any).role);
+            return NextResponse.json({ error: 'Admin role required', role: (session as any).role }, { status: 403 });
         }
 
         const productName = req.nextUrl.searchParams.get('product');
@@ -95,8 +99,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(req);
+        if (!session) {
+            return NextResponse.json({ error: 'Session not found or invalid' }, { status: 401 });
+        }
         if (!isAdmin(session)) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+            console.warn('[Accounts API POST] User is not an admin:', session.email, 'Role:', (session as any).role);
+            return NextResponse.json({ error: 'Admin role required', role: (session as any).role }, { status: 403 });
         }
 
         const body = await req.json();

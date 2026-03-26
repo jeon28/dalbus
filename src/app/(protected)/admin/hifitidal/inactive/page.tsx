@@ -37,7 +37,7 @@ interface AssignmentHistory {
     };
 }
 
-function InactiveAccountsContent() {
+function HifiTidalInactiveAccountsContent() {
     const router = useRouter();
     const [assignments, setAssignments] = useState<AssignmentHistory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -171,10 +171,10 @@ function InactiveAccountsContent() {
     );
 }
 
-export default function InactiveAccountsPage() {
+export default function HifiTidalInactiveAccountsPage() {
     return (
         <Suspense fallback={<div>Loading...</div>}>
-            <InactiveAccountsContent />
+            <HifiTidalInactiveAccountsContent />
         </Suspense>
     );
 }

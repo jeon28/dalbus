@@ -31,7 +31,7 @@ export async function getServerSession(req: NextRequest): Promise<ServerSessionU
         // 1. Verify token with Supabase Auth
         const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
         if (authError || !user) {
-            console.log('[getServerSession] authError or no user:', authError?.message || 'No user');
+            console.error('[getServerSession] authError or no user:', authError?.message || 'No user', 'Token prefix:', token.substring(0, 10));
             return null;
         }
 

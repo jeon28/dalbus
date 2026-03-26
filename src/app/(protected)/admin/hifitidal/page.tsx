@@ -111,9 +111,10 @@ interface GridValue {
     is_active: boolean;
     is_deleted?: boolean;
     assignment_number?: string;
+    orders?: any;
 }
 
-function TidalAccountsContent() {
+function HifiTidalAccountsContent() {
     const { isAdmin, isHydrated } = useServices();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -286,7 +287,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to fetch accounts');
+                console.error('[HifiTidal] Fetch error:', res.status, errorData);
+                throw new Error(errorData.error || `Failed to fetch accounts (${res.status})`);
             }
             const data = await res.json();
             setAccounts(data);
@@ -340,6 +342,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     console.error('Expected array from /api/admin/orders, got:', responseData);
                     setPendingOrders([]);
                 }
+            } else {
+                const errorData = await res.json().catch(() => ({}));
+                console.error('[HifiTidal] fetchPendingOrders error:', res.status, errorData);
             }
         } catch (error) {
             console.error(error);
@@ -389,10 +394,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
         accounts.forEach((acc, accIdx) => {
             const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
-            for (let i = 0; i < acc.max_slots; i++) {
+            for (let i = 0; i < 6; i++) {
                 let assignmentObj = acc.order_accounts?.find(oa => oa.slot_number === i);
                 if (!assignmentObj) {
-                    if (i > 0 && !hasMaster) continue;
                     assignmentObj = {
                         id: `empty_${acc.id}_${i}`,
                         slot_number: i,
@@ -1310,7 +1314,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         Tidal ID
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_id', e)} />
                                     </th>
-                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_password'] }}>
+                                    {/* PW Column Hidden for space */}
+                                    <th className="hidden relative p-2 text-left border-r" style={{ width: columnWidths['tidal_password'] }}>
                                         PW
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_password', e)} />
                                     </th>
@@ -1328,7 +1333,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         전화번호
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_phone', e)} />
                                     </th>
-                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['order_number'] }}>
+                                    {/* Order Number Column Hidden for space */}
+                                    <th className="hidden relative p-2 text-center border-r" style={{ width: columnWidths['order_number'] }}>
                                         주문번호
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('order_number', e)} />
                                     </th>
@@ -1491,7 +1497,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-1 border-r" style={{ width: columnWidths['tidal_id'] }}>
                                                             <Input className="h-7 text-xs bg-white px-1" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths['tidal_password'] }}>
+                                                        <td className="hidden p-1 border-r" style={{ width: columnWidths['tidal_password'] }}>
                                                             <Input className="h-7 text-xs bg-white px-1" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
                                                         </td>
                                                         <td className="p-1 border-r" style={{ width: columnWidths['buyer_name'] }}>
@@ -1503,7 +1509,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-1 border-r" style={{ width: columnWidths['buyer_phone'] }}>
                                                             <Input className="h-7 text-xs bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r text-center text-xs" style={{ width: columnWidths['order_number'] }}>{val.order_number || '-'}</td>
+                                                        <td className="hidden p-1 border-r text-center text-xs" style={{ width: columnWidths['order_number'] }}>{val.order_number || '-'}</td>
                                                         <td className="p-1 border-r" style={{ width: columnWidths['start_date'] }}>
                                                             <Input type="date" className="h-7 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
                                                         </td>
@@ -1524,7 +1530,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 border-r" style={{ width: columnWidths['buyer_name'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['buyer_email'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['buyer_phone'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['order_number'] }}></td>
+                                                        <td className="hidden p-2 border-r" style={{ width: columnWidths['order_number'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['start_date'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['end_date'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['period'] }}></td>
@@ -1535,7 +1541,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
                                                             <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.tidal_id || '-'}</span>
                                                         </td>
-                                                        <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined} style={{ width: columnWidths['tidal_password'] }}>{assignment.tidal_password || '-'}</td>
+                                                        <td className="hidden p-2 border-r font-mono truncate max-w-[80px]" title={val.tidal_password || undefined} style={{ width: columnWidths['tidal_password'] }}>{val.tidal_password || '-'}</td>
                                                         <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
                                                             <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</span>
                                                         </td>
@@ -1545,7 +1551,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
                                                             {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono text-xs" style={{ width: columnWidths['order_number'] }}>
+                                                        <td className="hidden p-2 text-center border-r font-mono text-xs" style={{ width: columnWidths['order_number'] }}>
                                                             {assignment.order_number || assignment.orders?.order_number ? (
                                                                 <button
                                                                     className="text-blue-600 font-bold underline hover:text-blue-800"
@@ -2376,13 +2382,26 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             <Dialog open={isEditAssignModalOpen} onOpenChange={setIsEditAssignModalOpen}>
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                        <DialogTitle>정보수정 {editAssignData?.assignment_number ? `/ ${editAssignData.assignment_number}` : ''}</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <span>정보수정 / {editAssignData?.assignment_number}</span>
+                            {editAssignData?.order_number && (
+                                <button 
+                                    className="text-blue-600 font-bold underline text-sm hover:text-blue-800"
+                                    onClick={() => {
+                                        const orderToView = editAssignData.full_order || editAssignData.orders;
+                                        if (orderToView) openOrderDetail(orderToView);
+                                    }}
+                                >
+                                    / {editAssignData.order_number}
+                                </button>
+                            )}
+                        </DialogTitle>
                     </DialogHeader>
                     {editAssignData && (
                         <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
                             {/* Row 1: 고객명 / Tidal ID / PW */}
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="space-y-1">
+                            <div className="flex gap-4">
+                                <div className="w-[20%] space-y-1">
                                     <Label htmlFor="edit-buyer-name" className="text-xs text-gray-500">이름</Label>
                                     <Input
                                         id="edit-buyer-name"
@@ -2391,7 +2410,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="flex-1 space-y-1">
                                     <Label htmlFor="edit-tidal-id" className="text-xs text-gray-500">Tidal ID</Label>
                                     <Input
                                         id="edit-tidal-id"
@@ -2400,7 +2419,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="w-[20%] space-y-1">
                                     <Label htmlFor="edit-tidal-pw" className="text-xs text-gray-500">PW</Label>
                                     <Input
                                         id="edit-tidal-pw"
@@ -2434,8 +2453,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             </div>
 
                             {/* Row 3: 시작일 / 종료일 / 개월 / 계약금액 */}
-                            <div className="grid grid-cols-4 gap-2">
-                                <div className="space-y-1">
+                            <div className="flex gap-2">
+                                <div className="flex-1 space-y-1">
                                     <Label htmlFor="edit-start-date" className="text-[10px] text-gray-500">시작일</Label>
                                     <Input
                                         id="edit-start-date"
@@ -2456,7 +2475,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="flex-1 space-y-1">
                                     <Label htmlFor="edit-end-date" className="text-[10px] text-gray-500">종료일</Label>
                                     <Input
                                         id="edit-end-date"
@@ -2478,7 +2497,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="w-12 space-y-1">
                                     <Label htmlFor="edit-months" className="text-[10px] text-gray-500">개월</Label>
                                     <Input
                                         id="edit-months"
@@ -2499,13 +2518,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="edit-amount" className="text-[10px] text-gray-500">계약금액</Label>
+                                <div className="w-24 space-y-1">
+                                    <Label htmlFor="edit-amount" className="text-[10px] text-gray-500">계약금액(원)</Label>
                                     <Input
                                         id="edit-amount"
-                                        type="number"
-                                        value={editAssignData.amount || ''}
-                                        onChange={(e) => setEditAssignData({ ...editAssignData, amount: parseInt(e.target.value) || 0 })}
+                                        type="text"
+                                        value={editAssignData.amount ? editAssignData.amount.toLocaleString() : ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/[^0-9]/g, '');
+                                            setEditAssignData({ ...editAssignData, amount: parseInt(val) || 0 });
+                                        }}
                                         className="h-9 text-xs px-1"
                                     />
                                 </div>
@@ -2555,10 +2577,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     );
 }
 
-export default function TidalAccountsPage() {
+export default function HifiTidalAccountsPage() {
     return (
         <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
-            <TidalAccountsContent />
+            <HifiTidalAccountsContent />
         </Suspense>
     );
 }
