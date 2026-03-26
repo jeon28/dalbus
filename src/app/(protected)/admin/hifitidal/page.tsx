@@ -313,6 +313,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         amount: assignment?.amount || assignment?.orders?.amount || 0,
                         memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
                         is_active: assignment?.is_active ?? true,
+                        is_deleted: assignment?.is_deleted ?? false,
                     };
                 }
             });
@@ -513,6 +514,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         continue;
                     }
                 }
+
+                // Inactive/Deleted Filter
+                if (!showInactive && val.is_deleted === true) continue;
+                if (showInactive && val.is_deleted !== true) continue;
 
                 flat.push({
                     accountId: acc.id,
@@ -725,6 +730,18 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return;
         }
 
+        // --- DAL-20: Restrict deletion to deactivated accounts ---
+        let currentAssignment: Assignment | undefined;
+        for (const acc of accounts) {
+            currentAssignment = acc.order_accounts?.find(oa => oa.id === assignmentId);
+            if (currentAssignment) break;
+        }
+
+        if (currentAssignment && currentAssignment.is_active !== false) {
+            alert('비활성화(빨간 행) 상태인 계정만 삭제 가능합니다.');
+            return;
+        }
+
         if (!confirm('삭제 하시겠습니까?')) return;
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
@@ -739,24 +756,32 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleDeactivate = async (assignmentId: string) => {
         // Find current status
         let currentActive = true;
+        let isDeleted = false;
         Object.keys(gridValues).forEach(key => {
             if (gridValues[key].assignment_id === assignmentId) {
                 currentActive = gridValues[key].is_active !== false;
+                isDeleted = gridValues[key].is_deleted === true;
             }
         });
 
-        const msg = currentActive ? '비활성화 하시겠습니까?' : '다시 활성화 하시겠습니까?';
+        const msg = isDeleted ? '다시 활성화(복구) 하시겠습니까?' : (currentActive ? '비활성화 하시겠습니까?' : '다시 활성화 하시겠습니까?');
         if (!confirm(msg)) return;
 
         try {
+            const updates: any = { is_active: !currentActive };
+            if (isDeleted) {
+                updates.is_deleted = false;
+                updates.is_active = true;
+            }
+
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: !currentActive })
+                body: JSON.stringify(updates)
             });
             if (!res.ok) throw new Error('Action failed');
             
-            alert(currentActive ? '비활성화 되었습니다.' : '활성화 되었습니다.');
+            alert(isDeleted ? '복구되었습니다.' : (currentActive ? '비활성화 되었습니다.' : '활성화 되었습니다.'));
             fetchAccounts();
         } catch (error) {
             alert('오류: ' + (error instanceof Error ? error.message : String(error)));
@@ -1140,6 +1165,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
                             {isGridView ? 'List View' : 'Grid View'}
                         </Button>
+                        <Button 
+                            variant={showInactive ? "default" : "outline"} 
+                            size="sm" 
+                            onClick={() => setShowInactive(!showInactive)} 
+                            className={`h-8 ${showInactive ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 font-bold' : ''}`}
+                            title="삭제된 데이터(빨간 행) 표시/숨기기"
+                        >
+                            <Trash2 size={16} className="mr-2" />
+                            {showInactive ? '전체 보기' : '삭제 데이터'}
+                        </Button>
                     </div>
 
                     <div className="flex gap-2 items-center">
@@ -1188,7 +1223,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => router.push('/admin/tidal/inactive')}
+                                onClick={() => router.push('/admin/hifitidal/inactive')}
                                 className="flex items-center gap-2 h-8"
                             >
                                 <History className="w-4 h-4" />
@@ -1411,8 +1446,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const isEmpty = assignment.id.startsWith('empty_');
 
                                         const isDeactivated = val.is_active === false;
-                                        if (showInactive && !isDeactivated) return null; // Show ONLY deleted if filter is ON
-                                        if (!showInactive && isDeactivated) return null; // Hide deleted by default
+                                        // Redundant filtering removed to allow seeing deactivated rows in normal list
 
                                         return (
                                             <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/30' : '')} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>

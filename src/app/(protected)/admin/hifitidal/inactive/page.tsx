@@ -92,7 +92,7 @@ function InactiveAccountsContent() {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
         XLSX.utils.book_append_sheet(wb, ws, '지난 내역');
-        XLSX.writeFile(wb, `Tidal_지난내역_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+        XLSX.writeFile(wb, `HifiTidal_지난내역_${format(new Date(), 'yyyyMMdd')}.xlsx`);
     };
 
     if (isLoading) return <div className="p-8 text-center">Loading...</div>;
@@ -105,7 +105,7 @@ function InactiveAccountsContent() {
                         <Button variant="ghost" size="sm" onClick={() => router.back()}>
                             <ArrowLeft size={20} />
                         </Button>
-                        <h1 className={styles.title}>Tidal 지난 배정 내역 (비활성)</h1>
+                        <h1 className={styles.title}>HifiTidal 지난 배정 내역 (비활성)</h1>
                     </div>
                     <div>
                         <Button onClick={exportToExcel} variant="outline" className="gap-2">
