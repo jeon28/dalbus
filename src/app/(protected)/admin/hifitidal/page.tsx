@@ -773,6 +773,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if (!confirm(msg)) return;
 
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const updates: any = { is_active: !currentActive };
             if (isDeleted) {
                 updates.is_deleted = false;
