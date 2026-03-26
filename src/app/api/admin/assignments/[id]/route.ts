@@ -20,7 +20,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             end_date,
             type,
             is_active,
-            is_deleted,
             tidal_id,
             amount,
             period_months,

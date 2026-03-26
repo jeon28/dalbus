@@ -12,7 +12,9 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Session not found or invalid' }, { status: 401 });
         }
         if (!isAdmin(session)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             console.warn('[Accounts API] User is not an admin:', session.email, 'Role:', (session as any).role);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return NextResponse.json({ error: 'Admin role required', role: (session as any).role }, { status: 403 });
         }
 
@@ -103,7 +105,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Session not found or invalid' }, { status: 401 });
         }
         if (!isAdmin(session)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             console.warn('[Accounts API POST] User is not an admin:', session.email, 'Role:', (session as any).role);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return NextResponse.json({ error: 'Admin role required', role: (session as any).role }, { status: 403 });
         }
 

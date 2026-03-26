@@ -104,13 +104,14 @@ interface GridValue {
     order_number: string;
     type: 'master' | 'user';
     order_id?: string;
-    full_order?: Order;
     period_months?: number;
     amount?: number;
     memo?: string;
     is_active: boolean;
     assignment_number?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     orders?: any;
+    full_order?: Order;
 }
 
 function TidalAccountsContent() {
@@ -366,7 +367,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }[] = [];
 
         accounts.forEach((acc, accIdx) => {
-            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < 6; i++) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i);

@@ -111,6 +111,7 @@ interface GridValue {
     is_active: boolean;
     is_deleted?: boolean;
     assignment_number?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     orders?: any;
 }
 
@@ -393,7 +394,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }[] = [];
 
         accounts.forEach((acc, accIdx) => {
-            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < 6; i++) {
                 let assignmentObj = acc.order_accounts?.find(oa => oa.slot_number === i);
                 if (!assignmentObj) {
@@ -717,7 +717,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         let hasUsers = false;
 
         for (const acc of accounts) {
-            const accAssignments = acc.order_accounts || [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const accAssignments: any[] = acc.order_accounts || [];
             const found = accAssignments.find(oa => oa.id === assignmentId);
             if (found) {
                 if (found.type === 'master') {
