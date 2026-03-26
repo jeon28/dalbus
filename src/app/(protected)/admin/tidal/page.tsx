@@ -111,7 +111,6 @@ interface GridValue {
     is_active: boolean;
     assignment_number?: string;
     orders?: any;
-    full_order?: Order;
 }
 
 function TidalAccountsContent() {
