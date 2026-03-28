@@ -20,60 +20,100 @@ export async function GET(req: NextRequest) {
 
         const productName = req.nextUrl.searchParams.get('product');
 
-        const { data, error } = await supabaseAdmin
-            .from('accounts')
-            .select(`
-                *,
-                products ( name, slug ),
-                order_accounts(
-                    id,
-                    assigned_at,
-                    slot_number,
-                    tidal_password,
-                    tidal_id,
-                    type,
-                    buyer_name,
-                    buyer_phone,
-                    buyer_email,
-                    order_number,
-                    start_date,
-                    end_date,
-                    period_months,
-                    amount,
-                    memo,
-                    is_active,
-                    is_deleted,
-                    orders(
+        let processedData;
+
+        if (productName?.toLowerCase().includes('hifi')) {
+            const { data, error } = await supabaseAdmin
+                .from('accounts')
+                .select(`
+                    *,
+                    products!inner(name, slug),
+                    legacy_tidal_account(
                         id,
+                        assigned_at,
+                        slot_number,
+                        tidal_password,
+                        tidal_id,
+                        type,
+                        buyer_name,
+                        buyer_phone,
+                        buyer_email,
                         order_number,
-                        created_at,
+                        start_date,
+                        end_date,
+                        period_months,
                         amount,
-                        payment_status,
-                        assignment_status,
-                        user_id,
-                        profiles(name, phone, email, memo),
-                        product_plans(duration_months),
-                        products(name)
+                        memo,
+                        is_active,
+                        is_deleted
                     )
-                )
-            `)
-            .neq('status', 'disabled')
-            .order('created_at', { ascending: false });
+                `)
+                .neq('status', 'disabled')
+                .ilike('products.slug', '%hifitidal%')
+                .order('created_at', { ascending: false });
 
-
-
-        if (error) throw error;
-        
-        let processedData = data;
-        if (productName && processedData) {
-            processedData = processedData.filter(account => {
+            if (error) throw error;
+            
+            processedData = data?.map(acc => ({
+                ...acc,
+                order_accounts: acc.legacy_tidal_account || []
+            }));
+            
+            // Filter the outer array just in case
+            processedData = processedData?.filter(account => {
                 const pSlug = account.products?.slug || '';
-                if (productName.toLowerCase().includes('hifi')) {
-                    return pSlug === 'hifitidal';
-                } else {
-                    return pSlug !== 'hifitidal';
-                }
+                return pSlug === 'hifitidal';
             });
+        } else {
+            const { data, error } = await supabaseAdmin
+                .from('accounts')
+                .select(`
+                    *,
+                    products ( name, slug ),
+                    order_accounts(
+                        id,
+                        assigned_at,
+                        slot_number,
+                        tidal_password,
+                        tidal_id,
+                        type,
+                        buyer_name,
+                        buyer_phone,
+                        buyer_email,
+                        order_number,
+                        start_date,
+                        end_date,
+                        period_months,
+                        amount,
+                        memo,
+                        is_active,
+                        is_deleted,
+                        orders(
+                            id,
+                            order_number,
+                            created_at,
+                            amount,
+                            payment_status,
+                            assignment_status,
+                            user_id,
+                            profiles(name, phone, email, memo),
+                            product_plans(duration_months),
+                            products(name)
+                        )
+                    )
+                `)
+                .neq('status', 'disabled')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            
+            processedData = data;
+            if (productName && processedData) {
+                processedData = processedData.filter(account => {
+                    const pSlug = account.products?.slug || '';
+                    return pSlug !== 'hifitidal';
+                });
+            }
         }
 
         // Filter out inactive assignments, re-sort by slot_number, and recalculate used_slots locally for accuracy

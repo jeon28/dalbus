@@ -13,6 +13,7 @@ export const menuItems = [
     { title: "Q&A 관리", href: "/admin/qna" },
     { title: "Tidal 계정", href: "/admin/tidal" },
     { title: "HifiTidal 관리", href: "/admin/hifitidal" },
+    { title: "기존 Tidal 계정", href: "/admin/legacy-tidal" },
     { title: "메일 발송 이력", href: "/admin/mail-history" },
 ];
 

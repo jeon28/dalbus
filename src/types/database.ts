@@ -161,6 +161,76 @@ export interface Database {
           }
         ]
       }
+      legacy_tidal_account: {
+        Row: {
+          id: string
+          account_id: string
+          assigned_at: string
+          slot_number: number
+          tidal_password: string | null
+          tidal_id: string | null
+          type: 'master' | 'user'
+          buyer_name: string | null
+          buyer_phone: string | null
+          buyer_email: string | null
+          order_number: string | null
+          start_date: string | null
+          end_date: string | null
+          period_months: number | null
+          amount: number | null
+          memo: string | null
+          is_active: boolean
+          is_deleted: boolean
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          assigned_at?: string
+          slot_number?: number
+          tidal_password?: string | null
+          tidal_id?: string | null
+          type?: 'master' | 'user'
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          period_months?: number | null
+          amount?: number | null
+          memo?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          assigned_at?: string
+          slot_number?: number
+          tidal_password?: string | null
+          tidal_id?: string | null
+          type?: 'master' | 'user'
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          period_months?: number | null
+          amount?: number | null
+          memo?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legacy_tidal_account_account_id_fkey"
+            columns: ["account_id"]
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       order_accounts: {
         Row: {
           id: string

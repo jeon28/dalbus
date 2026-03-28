@@ -9,7 +9,7 @@ import styles from '../../admin.module.css';
 import * as XLSX from 'xlsx';
 import { apiFetch } from '@/lib/api';
 
-interface AssignmentHistory {
+interface LegacyTidalHistory {
     id: string;
     slot_number: number;
     tidal_id: string;
@@ -25,34 +25,24 @@ interface AssignmentHistory {
     accounts?: {
         login_id: string;
     };
-    orders?: {
-        order_number: string;
-        buyer_name: string;
-        buyer_email: string;
-        buyer_phone: string;
-        profiles?: {
-            name: string;
-            phone: string;
-        };
-    };
 }
 
-function HifiTidalInactiveAccountsContent() {
+function LegacyTidalInactiveContent() {
     const router = useRouter();
-    const [assignments, setAssignments] = useState<AssignmentHistory[]>([]);
+    const [records, setRecords] = useState<LegacyTidalHistory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetchInactiveAssignments();
+        fetchInactiveRecords();
     }, []);
 
-    const fetchInactiveAssignments = async () => {
+    const fetchInactiveRecords = async () => {
         try {
             setIsLoading(true);
             const res = await apiFetch('/api/admin/legacy-tidal-account/inactive', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
-            setAssignments(data);
+            setRecords(data);
         } catch (error) {
             console.error(error);
             alert('데이터 로딩 실패');
@@ -68,7 +58,7 @@ function HifiTidalInactiveAccountsContent() {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');
-            fetchInactiveAssignments();
+            fetchInactiveRecords();
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '삭제 실패';
             alert('삭제 실패: ' + message);
@@ -76,14 +66,15 @@ function HifiTidalInactiveAccountsContent() {
     };
 
     const exportToExcel = () => {
-        const excelData = assignments.map((a, idx) => ({
+        const excelData = records.map((a, idx) => ({
             'No.': idx + 1,
             '그룹 ID': a.accounts?.login_id || '-',
             'Slot': a.slot_number + 1,
             'Tidal ID': a.tidal_id,
-            '구매자명': a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-',
-            '연락처': a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-',
-            '주문번호': a.order_number || a.orders?.order_number || '-',
+            '구매자명': a.buyer_name || '-',
+            '연락처': a.buyer_phone || '-',
+            '이메일': a.buyer_email || '-',
+            '주문번호': a.order_number || '-',
             '시작일': a.start_date || '-',
             '종료일': a.end_date || '-',
             '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-'
@@ -92,7 +83,7 @@ function HifiTidalInactiveAccountsContent() {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
         XLSX.utils.book_append_sheet(wb, ws, '지난 내역');
-        XLSX.writeFile(wb, `HifiTidal_지난내역_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+        XLSX.writeFile(wb, `기존Tidal_지난내역_${format(new Date(), 'yyyyMMdd')}.xlsx`);
     };
 
     if (isLoading) return <div className="p-8 text-center">Loading...</div>;
@@ -105,7 +96,7 @@ function HifiTidalInactiveAccountsContent() {
                         <Button variant="ghost" size="sm" onClick={() => router.back()}>
                             <ArrowLeft size={20} />
                         </Button>
-                        <h1 className={styles.title}>HifiTidal 지난 배정 내역 (비활성)</h1>
+                        <h1 className={styles.title}>기존 Tidal 지난 배정 내역 (비활성)</h1>
                     </div>
                     <div>
                         <Button onClick={exportToExcel} variant="outline" className="gap-2">
@@ -126,6 +117,7 @@ function HifiTidalInactiveAccountsContent() {
                                 <th className="p-3 text-left">Tidal ID</th>
                                 <th className="p-3 text-left">구매자</th>
                                 <th className="p-3 text-left">연락처</th>
+                                <th className="p-3 text-left">이메일</th>
                                 <th className="p-3 text-center">주문번호</th>
                                 <th className="p-3 text-center">기간</th>
                                 <th className="p-3 text-center">배정일시</th>
@@ -133,22 +125,23 @@ function HifiTidalInactiveAccountsContent() {
                             </tr>
                         </thead>
                         <tbody>
-                            {assignments.length === 0 ? (
+                            {records.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="p-8 text-center text-gray-500">
+                                    <td colSpan={11} className="p-8 text-center text-gray-500">
                                         지난 내역이 없습니다.
                                     </td>
                                 </tr>
                             ) : (
-                                assignments.map((a, idx) => (
+                                records.map((a, idx) => (
                                     <tr key={a.id} className="border-b hover:bg-gray-50">
                                         <td className="p-2 text-center text-gray-500">{idx + 1}</td>
                                         <td className="p-2">{a.accounts?.login_id || '-'}</td>
                                         <td className="p-2 text-center">{a.slot_number + 1}</td>
                                         <td className="p-2">{a.tidal_id}</td>
-                                        <td className="p-2">{a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-'}</td>
-                                        <td className="p-2">{a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'}</td>
-                                        <td className="p-2 text-center font-mono">{a.order_number || a.orders?.order_number || '-'}</td>
+                                        <td className="p-2">{a.buyer_name || '-'}</td>
+                                        <td className="p-2">{a.buyer_phone || '-'}</td>
+                                        <td className="p-2">{a.buyer_email || '-'}</td>
+                                        <td className="p-2 text-center font-mono">{a.order_number || '-'}</td>
                                         <td className="p-2 text-center">
                                             {a.start_date} ~ {a.end_date}
                                         </td>
@@ -171,10 +164,10 @@ function HifiTidalInactiveAccountsContent() {
     );
 }
 
-export default function HifiTidalInactiveAccountsPage() {
+export default function LegacyTidalInactivePage() {
     return (
         <Suspense fallback={<div>Loading...</div>}>
-            <HifiTidalInactiveAccountsContent />
+            <LegacyTidalInactiveContent />
         </Suspense>
     );
 }

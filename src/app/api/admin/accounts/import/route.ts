@@ -254,6 +254,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 // 2. Handle Slot Assignments
+                const isHifiTidal = productData.name.toLowerCase().includes('hifitidal');
                 for (const slot of master.slots) {
                     // Skip completely empty slots (no tidal_id AND no tidal_password AND no order_number AND no buyer_name AND no buyer_email AND no buyer_phone)
                     // If any identifying information exists, we import it.
@@ -273,9 +274,9 @@ export async function POST(req: NextRequest) {
                             }
                         }
                         
-                        // Check if the slot already exists to reuse its order_id if no explicit order_number was provided
+                        // Check if the slot already exists
                         const { data: existingSlot } = await supabaseAdmin
-                            .from('order_accounts')
+                            .from(isHifiTidal ? 'legacy_tidal_account' : 'order_accounts')
                             .select('id, tidal_id, order_id')
                             .eq('account_id', masterAccountId)
                             .eq('slot_number', slot.slot_number)
@@ -287,7 +288,6 @@ export async function POST(req: NextRequest) {
 
                         // If no order found, and we have an amount or customer info, let's create a guest order
                         // This mirrors the behavior in assign/route.ts, BUT ONLY for Tidal
-                        const isHifiTidal = productData.name.toLowerCase().includes('hifitidal');
                         if (!isHifiTidal) {
                             if (!orderId) {
                                 const { data: newOrder, error: orderErr } = await supabaseAdmin
@@ -374,42 +374,51 @@ export async function POST(req: NextRequest) {
 
                         // 2. Clear existing tidal_id if it belongs to another slot
                         if (safeTidalId) {
+                            const slotTable = isHifiTidal ? 'legacy_tidal_account' : 'order_accounts';
                             const { data: existingByTidal } = await supabaseAdmin
-                                .from('order_accounts')
+                                .from(slotTable)
                                 .select('id, account_id, slot_number')
                                 .eq('tidal_id', safeTidalId)
                                 .maybeSingle();
-                                
+
                             if (existingByTidal && (!existingSlot || existingByTidal.id !== existingSlot.id)) {
                                 console.log(`[Import] Tidal ID ${safeTidalId} is already in use at another slot. Removing old binding.`);
-                                // Remove tidal_id from the old slot to prevent Unique Constraint Violation
                                 await supabaseAdmin
-                                    .from('order_accounts')
+                                    .from(slotTable)
                                     .update({ tidal_id: null, tidal_password: null })
                                     .eq('id', existingByTidal.id);
                             }
                         }
 
-                        const refinedSlotData = {
+                        const refinedSlotDataBase = {
                             ...slotData,
                             tidal_id: safeTidalId || null,
                             tidal_password: slotData.tidal_password || null
                         };
+                        // legacy_tidal_account has no order_id column
+                        let refinedSlotData: typeof refinedSlotDataBase | Omit<typeof refinedSlotDataBase, 'order_id'>;
+                        if (isHifiTidal) {
+                            const { order_id: _, ...rest } = refinedSlotDataBase;
+                            void _;
+                            refinedSlotData = rest;
+                        } else {
+                            refinedSlotData = refinedSlotDataBase;
+                        }
 
                         if (existingSlot) {
                             // Update existing slot
                             const { error: updateError } = await supabaseAdmin
-                                .from('order_accounts')
+                                .from(isHifiTidal ? 'legacy_tidal_account' : 'order_accounts')
                                 .update(refinedSlotData)
                                 .eq('id', existingSlot.id);
-                            
+
                             if (updateError) throw updateError;
                         } else {
                             // Insert new slot
                             const { error: insertError } = await supabaseAdmin
-                                .from('order_accounts')
+                                .from(isHifiTidal ? 'legacy_tidal_account' : 'order_accounts')
                                 .insert(refinedSlotData);
-                            
+
                             if (insertError) throw insertError;
                         }
 
@@ -442,8 +451,9 @@ export async function POST(req: NextRequest) {
                 }
 
                 // 3. Re-index slots for this account to ensure sequentiality and master at 0
+                const slotTable = isHifiTidal ? 'legacy_tidal_account' : 'order_accounts';
                 const { data: finalSlots, error: finalFetchError } = await supabaseAdmin
-                    .from('order_accounts')
+                    .from(slotTable)
                     .select('id, slot_number, type')
                     .eq('account_id', masterAccountId)
                     .order('slot_number', { ascending: true });
@@ -458,7 +468,7 @@ export async function POST(req: NextRequest) {
                     // Pass 1: Move to temporary high slots
                     for (let i = 0; i < sorted.length; i++) {
                         await supabaseAdmin
-                            .from('order_accounts')
+                            .from(slotTable)
                             .update({ slot_number: sorted[i].slot_number + 1000 })
                             .eq('id', sorted[i].id);
                     }
@@ -469,7 +479,7 @@ export async function POST(req: NextRequest) {
                         if (i > 0 && sorted[i].type === 'master') updates.type = 'user';
 
                         await supabaseAdmin
-                            .from('order_accounts')
+                            .from(slotTable)
                             .update(updates)
                             .eq('id', sorted[i].id);
                     }
@@ -477,7 +487,7 @@ export async function POST(req: NextRequest) {
 
                 // 4. Sync used_slots count after all slot operations
                 const { count: actualCount } = await supabaseAdmin
-                    .from('order_accounts')
+                    .from(slotTable)
                     .select('*', { count: 'exact', head: true })
                     .eq('account_id', masterAccountId);
 

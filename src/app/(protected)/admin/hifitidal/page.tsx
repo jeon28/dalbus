@@ -686,7 +686,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
  
         try {
             if (data.assignment_id) {
-                const res = await apiFetch(`/api/admin/assignments/${data.assignment_id}`, {
+                const res = await apiFetch(`/api/admin/legacy-tidal-account/${data.assignment_id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -697,7 +697,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     alert('이름 또는 ID(이메일)를 입력해주세요.');
                     return;
                 }
-                const res = await apiFetch(`/api/admin/accounts/${accountId}/assign`, {
+                const res = await apiFetch(`/api/admin/legacy-tidal-account/assign/${accountId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ...data, slot_number: slotIdx })
@@ -749,7 +749,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
         if (!confirm('삭제 하시겠습니까?')) return;
         try {
-            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/legacy-tidal-account/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             fetchPendingOrders();
@@ -780,7 +780,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 updates.is_active = true;
             }
 
-            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
+            const res = await apiFetch(`/api/admin/legacy-tidal-account/${assignmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates)
@@ -992,7 +992,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     order_id: selectedAssignment.orders?.id,
                     target_account_id: selectedTargetAccount,
                     target_slot_number: selectedTargetSlot,
-                    target_tidal_password: selectedAssignment.tidal_password
+                    target_tidal_password: selectedAssignment.tidal_password,
+                    source_table: 'legacy_tidal_account'
                 })
             });
 
@@ -1143,7 +1144,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleSaveMemo = async () => {
         if (!memoTargetAssignmentId) return;
         try {
-            const res = await apiFetch(`/api/admin/assignments/${memoTargetAssignmentId}`, {
+            const res = await apiFetch(`/api/admin/legacy-tidal-account/${memoTargetAssignmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ memo: currentMemoInput })
@@ -1856,7 +1857,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                                     if (assignment && !assignment.id.startsWith('empty_')) {
                                                                                                         if (confirm('마스터로 변경 시 즉시 1번 슬롯으로 이동합니다. 계속하시겠습니까?')) {
                                                                                                             try {
-                                                                                                                const res = await apiFetch(`/api/admin/assignments/${assignment.id}`, {
+                                                                                                                const res = await apiFetch(`/api/admin/legacy-tidal-account/${assignment.id}`, {
                                                                                                                     method: 'PUT',
                                                                                                                     headers: { 'Content-Type': 'application/json' },
                                                                                                                     body: JSON.stringify({ type: 'master' })
