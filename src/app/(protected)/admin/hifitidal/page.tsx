@@ -173,20 +173,18 @@ function HifiTidalAccountsContent() {
     const [expiredDays, setExpiredDays] = useState(7);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         'checkbox': 40,
-        'login_id': 100,
         'slot': 60,
         'manage': 60,
         'type': 40,
-        'tidal_id': 200,
-        'tidal_password': 120,
-        'buyer_name': 100,
-        'buyer_email': 150,
+        'tidal_id': 250,
+        'buyer_name': 120,
+        'buyer_email': 200,
         'buyer_phone': 140,
-        'order_number': 120,
         'start_date': 120,
         'end_date': 120,
         'period': 60,
-        'memo_col': 200
+        'amount': 100,
+        'memo_col': 400
     });
     const [resizingCol, setResizingCol] = useState<string | null>(null);
 
@@ -1184,12 +1182,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             onChange={() => toggleSelectAll(getFlattenedAssignments())}
                                         />
                                     </th>
-                                    <th className="relative text-center text-xs font-bold py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['login_id'] }}>
-                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('login_id')}>
-                                            배정번호 {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                                        </div>
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('login_id', e)} />
-                                    </th>
                                     <th className="relative p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                         관리
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('manage', e)} />
@@ -1204,10 +1196,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         Tidal ID
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_id', e)} />
                                     </th>
-                                    <th className="relative p-2 text-left border-r" style={{ width: columnWidths['tidal_password'] }}>
-                                        PW
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('tidal_password', e)} />
-                                    </th>
+
                                     <th className="relative p-2 text-left border-r" style={{ width: columnWidths['buyer_name'] }}>
                                         고객명
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_name', e)} />
@@ -1222,10 +1211,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         전화번호
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('buyer_phone', e)} />
                                     </th>
-                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['order_number'] }}>
-                                        주문번호
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('order_number', e)} />
-                                    </th>
+
                                     <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['start_date'] }}>
                                         <div className="flex items-center justify-center gap-1" onClick={() => handleSort('start_date')}>
                                             시작일 {sortConfig?.key === 'start_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
@@ -1337,18 +1323,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         onChange={() => handleToggleSelection(assignment.id)}
                                                     />
                                                 </td>
-                                                <td className="text-center text-xs py-1 border-r border-gray-100 bg-gray-50/50 font-bold whitespace-nowrap px-1" style={{ width: columnWidths['login_id'] }}>
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <span className={isEmpty ? "text-green-600" : "text-gray-900"}>
-                                                            {acc.login_id}-{assignment.slot_number + 1}
-                                                        </span>
-                                                        {sIdx === 0 && (acc.order_accounts?.length || 0) === 0 && (
-                                                            <button type="button" title="빈 마스터계정 삭제" onClick={(e) => { e.stopPropagation(); handleDeleteMasterAccount(acc); }} className="flex-shrink-0">
-                                                                <Trash2 size={12} className="text-red-400 hover:text-red-600 cursor-pointer" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
                                                 <td className="p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
                                                         {isEditing ? (
@@ -1413,9 +1387,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-1 border-r" style={{ width: columnWidths['tidal_id'] }}>
                                                             <Input className="h-7 text-xs bg-white px-1" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths['tidal_password'] }}>
-                                                            <Input className="h-7 text-xs bg-white px-1" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
-                                                        </td>
+
                                                         <td className="p-1 border-r" style={{ width: columnWidths['buyer_name'] }}>
                                                             <Input className="h-7 text-xs bg-white px-1" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
                                                         </td>
@@ -1425,7 +1397,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-1 border-r" style={{ width: columnWidths['buyer_phone'] }}>
                                                             <Input className="h-7 text-xs bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} />
                                                         </td>
-                                                        <td className="p-1 border-r text-center text-xs" style={{ width: columnWidths['order_number'] }}>{val.order_number || '-'}</td>
+
                                                         <td className="p-1 border-r" style={{ width: columnWidths['start_date'] }}>
                                                             <Input type="date" className="h-7 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
                                                         </td>
@@ -1442,11 +1414,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 ) : isEmpty ? (
                                                     <>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['tidal_id'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['tidal_password'] }}></td>
+
                                                         <td className="p-2 border-r" style={{ width: columnWidths['buyer_name'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['buyer_email'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['buyer_phone'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['order_number'] }}></td>
+
                                                         <td className="p-2 border-r" style={{ width: columnWidths['start_date'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['end_date'] }}></td>
                                                         <td className="p-2 border-r" style={{ width: columnWidths['period'] }}></td>
@@ -1457,7 +1429,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
                                                             <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.tidal_id || '-'}</span>
                                                         </td>
-                                                        <td className="p-2 border-r font-mono truncate max-w-[80px]" title={assignment.tidal_password || undefined} style={{ width: columnWidths['tidal_password'] }}>{assignment.tidal_password || '-'}</td>
+
                                                         <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
                                                             <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</span>
                                                         </td>
@@ -1467,16 +1439,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
                                                             {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
                                                         </td>
-                                                        <td className="p-2 text-center border-r font-mono text-xs" style={{ width: columnWidths['order_number'] }}>
-                                                            {assignment.order_number || assignment.orders?.order_number ? (
-                                                                <button
-                                                                    className="text-blue-600 font-bold underline hover:text-blue-800"
-                                                                    onClick={() => openOrderDetail(assignment.orders || val.full_order)}
-                                                                >
-                                                                    {assignment.order_number || assignment.orders?.order_number}
-                                                                </button>
-                                                            ) : '-'}
-                                                        </td>
+
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['end_date'] }}>
                                                             <span className={isExpired ? "text-red-600 font-bold" : ""}>
@@ -1485,8 +1448,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         </td>
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                         <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
-                                                        <td className="p-2 text-left border-r truncate max-w-[200px] text-xs text-gray-500" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
-                                                            {val.memo?.split('\n')[0] || '-'}
+                                                        <td className="p-2 text-left border-r truncate max-w-[400px] text-xs" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
+                                                            <span className="text-blue-600 font-bold mr-2 text-[10px] whitespace-nowrap">[{acc.login_id}-{sIdx + 1}]</span>
+                                                            <span className="text-gray-500">{val.memo?.split('\n')[0] || '-'}</span>
                                                         </td>
                                                     </>
                                                 )}
