@@ -23,7 +23,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             tidal_id,
             amount,
             period_months,
-            memo
+            memo: _memo
         } = body;
 
         // 1. Update order_accounts
@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (is_active !== undefined) oaUpdates.is_active = is_active;
         if (amount !== undefined && amount !== null) oaUpdates.amount = Number(amount);
         if (period_months !== undefined && period_months !== null) oaUpdates.period_months = Number(period_months);
-        if (memo !== undefined) {
+        if (_memo !== undefined) {
             // memo is updated in profiles.memo, not order_accounts
             
             // Sync with profiles.memo if a user_id exists for this order
@@ -58,7 +58,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             if (userId) {
                 await supabaseAdmin
                     .from('profiles')
-                    .update({ memo })
+                    .update({ memo: _memo })
                     .eq('id', userId);
             }
         }

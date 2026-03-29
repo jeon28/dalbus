@@ -5,7 +5,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, MoreVertical, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,11 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -170,7 +175,8 @@ function TidalAccountsContent() {
         'checkbox': 40,
         'login_id': 100,
         'slot': 60,
-        'type': 60,
+        'manage': 60,
+        'type': 40,
         'tidal_id': 200,
         'tidal_password': 120,
         'buyer_name': 100,
@@ -180,7 +186,7 @@ function TidalAccountsContent() {
         'start_date': 120,
         'end_date': 120,
         'period': 60,
-        'manage': 140
+        'memo_col': 200
     });
     const [resizingCol, setResizingCol] = useState<string | null>(null);
 
@@ -350,7 +356,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         const available = [];
         for (let i = 0; i < 6; i++) {
             if (!taken.has(i)) {
-                if (i > 0 && !hasMaster) continue;
                 available.push(i);
             }
         }
@@ -374,7 +379,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i);
                 if (!assignment) {
-                    if (i > 0 && !hasMaster) continue;
                     assignment = {
                         id: `empty_${acc.id}_${i}`,
                         slot_number: i,
@@ -454,9 +458,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
                 const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
-                if (!assignment) {
-                    if (i > 0 && !hasMaster) continue;
-                }
                 const val = gridValues[`${acc.id}_${i}`] || {};
 
                 // Apply Search Filter
@@ -1195,6 +1196,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         </div>
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('login_id', e)} />
                                     </th>
+                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
+                                        관리
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('manage', e)} />
+                                    </th>
                                     <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
                                         <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
                                             타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
@@ -1251,16 +1256,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         </div>
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('amount', e)} />
                                     </th>
-                                    <th className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths['type'] }}>
-                                        <div className="flex items-center justify-center gap-1" onClick={() => handleSort('type')}>
-                                            타입 {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                                        </div>
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('type', e)} />
-                                    </th>
-
-                                    <th className="relative p-2 text-center" style={{ width: columnWidths['manage'] }}>
-                                        관리
-                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('manage', e)} />
+                                    <th className="relative p-2 text-center" style={{ width: columnWidths['memo_col'] }}>
+                                        메모
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('memo_col', e)} />
                                     </th>
                                 </tr>
                             </thead>
@@ -1357,11 +1355,53 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         )}
                                                     </div>
                                                 </td>
+                                                <td className="p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
+                                                    <div className="flex justify-center gap-1 items-center">
+                                                        {isEditing ? (
+                                                            <>
+                                                                <Button size="sm" variant="default" className="h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700" title="저장" onClick={() => handleSaveRow(acc.id, sIdx)}>
+                                                                    <Save size={12} />
+                                                                </Button>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, sIdx)}>
+                                                                    <X size={12} />
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            <Popover>
+                                                                <PopoverTrigger asChild>
+                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600">
+                                                                        <Settings size={14} />
+                                                                    </Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="w-32 p-1" align="start">
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => startEdit(acc.id, sIdx)}>
+                                                                            <Pencil size={12} /> 수정
+                                                                        </Button>
+                                                                        {!isEmpty && (
+                                                                            <>
+                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => openMoveModal(assignment)}>
+                                                                                    <ArrowRightLeft size={12} /> 이동
+                                                                                </Button>
+                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-orange-600 hover:text-orange-700" onClick={() => handleDeactivate(assignment.id)}>
+                                                                                    <PowerOff size={12} /> 종료
+                                                                                </Button>
+                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(assignment.id)}>
+                                                                                    <Trash2 size={12} /> 삭제
+                                                                                </Button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="p-2 text-center border-r" style={{ width: columnWidths['type'] }}>
                                                     {!isEmpty && (
                                                         <div className="flex items-center justify-center gap-1">
-                                                            <span className={`px-1 rounded text-xs ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
-                                                                {assignment.type === 'master' ? 'Master' : 'User'}
+                                                            <span className={`px-1 rounded text-[10px] w-4 h-4 flex items-center justify-center ${assignment.type === 'master' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-blue-50 text-blue-600'}`}>
+                                                                {assignment.type === 'master' ? 'M' : 'U'}
                                                             </span>
                                                             <MessageSquareText
                                                                 size={14}
@@ -1451,43 +1491,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         </td>
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                         <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
+                                                        <td className="p-2 text-left border-r truncate max-w-[200px] text-xs text-gray-500" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
+                                                            {val.memo?.split('\n')[0] || '-'}
+                                                        </td>
                                                     </>
                                                 )}
-
-
-                                                <td className="p-2 text-center" style={{ width: columnWidths['manage'] }}>
-                                                    <div className="flex justify-center gap-1 items-center">
-                                                        {isEditing ? (
-                                                            <>
-                                                                <Button size="sm" variant="default" className="h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700" title="저장" onClick={() => handleSaveRow(acc.id, sIdx)}>
-                                                                    <Save size={12} />
-                                                                </Button>
-                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700" title="취소" onClick={() => cancelEdit(acc.id, sIdx)}>
-                                                                    <X size={12} />
-                                                                </Button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, sIdx)}>
-                                                                    <Pencil size={12} />
-                                                                </Button>
-                                                                {!isEmpty && (
-                                                                    <>
-                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
-                                                                            <ArrowRightLeft size={12} />
-                                                                        </Button>
-                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                            <PowerOff size={12} />
-                                                                        </Button>
-                                                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                            <Trash2 size={12} />
-                                                                        </Button>
-                                                                    </>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
                                             </tr>
                                         );
                                     });
@@ -1530,7 +1538,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     if (existing) {
                                         paddedAssignments.push(existing);
                                     } else {
-                                        if (i > 0 && !hasMaster) continue;
                                         paddedAssignments.push({
                                             id: `empty_${acc.id}_${i}`,
                                             slot_number: i,

@@ -142,7 +142,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { id, memo } = body;
+        const { id, memo: _memo } = body;
 
         if (!id) {
             return NextResponse.json({ error: '사용자 ID가 필요합니다.' }, { status: 400 });
@@ -150,7 +150,7 @@ export async function PATCH(request: NextRequest) {
 
         const { error } = await supabaseAdmin
             .from('profiles')
-            .update({ memo })
+            .update({ memo: _memo })
             .eq('id', id);
 
         if (error) {
