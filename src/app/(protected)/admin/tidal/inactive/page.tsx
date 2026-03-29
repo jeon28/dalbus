@@ -83,7 +83,6 @@ function InactiveAccountsContent() {
             'Tidal ID': a.tidal_id,
             '구매자명': a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-',
             '연락처': a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-',
-            '주문번호': a.order_number || a.orders?.order_number || '-',
             '시작일': a.start_date || '-',
             '종료일': a.end_date || '-',
             '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-'
@@ -126,7 +125,6 @@ function InactiveAccountsContent() {
                                 <th className="p-3 text-left">Tidal ID</th>
                                 <th className="p-3 text-left">구매자</th>
                                 <th className="p-3 text-left">연락처</th>
-                                <th className="p-3 text-center">주문번호</th>
                                 <th className="p-3 text-center">기간</th>
                                 <th className="p-3 text-center">배정일시</th>
                                 <th className="p-3 text-center">관리</th>
@@ -135,7 +133,7 @@ function InactiveAccountsContent() {
                         <tbody>
                             {assignments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="p-8 text-center text-gray-500">
+                                    <td colSpan={9} className="p-8 text-center text-gray-500">
                                         지난 내역이 없습니다.
                                     </td>
                                 </tr>
@@ -148,7 +146,6 @@ function InactiveAccountsContent() {
                                         <td className="p-2">{a.tidal_id}</td>
                                         <td className="p-2">{a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-'}</td>
                                         <td className="p-2">{a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'}</td>
-                                        <td className="p-2 text-center font-mono">{a.order_number || a.orders?.order_number || '-'}</td>
                                         <td className="p-2 text-center">
                                             {a.start_date} ~ {a.end_date}
                                         </td>

@@ -74,7 +74,6 @@ function LegacyTidalInactiveContent() {
             '구매자명': a.buyer_name || '-',
             '연락처': a.buyer_phone || '-',
             '이메일': a.buyer_email || '-',
-            '주문번호': a.order_number || '-',
             '시작일': a.start_date || '-',
             '종료일': a.end_date || '-',
             '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-'
@@ -118,7 +117,6 @@ function LegacyTidalInactiveContent() {
                                 <th className="p-3 text-left">구매자</th>
                                 <th className="p-3 text-left">연락처</th>
                                 <th className="p-3 text-left">이메일</th>
-                                <th className="p-3 text-center">주문번호</th>
                                 <th className="p-3 text-center">기간</th>
                                 <th className="p-3 text-center">배정일시</th>
                                 <th className="p-3 text-center">관리</th>
@@ -127,7 +125,7 @@ function LegacyTidalInactiveContent() {
                         <tbody>
                             {records.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} className="p-8 text-center text-gray-500">
+                                    <td colSpan={10} className="p-8 text-center text-gray-500">
                                         지난 내역이 없습니다.
                                     </td>
                                 </tr>
@@ -141,7 +139,6 @@ function LegacyTidalInactiveContent() {
                                         <td className="p-2">{a.buyer_name || '-'}</td>
                                         <td className="p-2">{a.buyer_phone || '-'}</td>
                                         <td className="p-2">{a.buyer_email || '-'}</td>
-                                        <td className="p-2 text-center font-mono">{a.order_number || '-'}</td>
                                         <td className="p-2 text-center">
                                             {a.start_date} ~ {a.end_date}
                                         </td>
