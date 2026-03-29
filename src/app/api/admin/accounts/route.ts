@@ -8,74 +8,125 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
     try {
         const session = await getServerSession(req);
+        if (!session) {
+            return NextResponse.json({ error: 'Session not found or invalid' }, { status: 401 });
+        }
         if (!isAdmin(session)) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            console.warn('[Accounts API] User is not an admin:', session.email, 'Role:', (session as any).role);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return NextResponse.json({ error: 'Admin role required', role: (session as any).role }, { status: 403 });
         }
 
         const productName = req.nextUrl.searchParams.get('product');
 
-        const { data, error } = await supabaseAdmin
-            .from('accounts')
-            .select(`
-                *,
-                products ( name ),
-                order_accounts(
-                    id,
-                    assigned_at,
-                    slot_number,
-                    tidal_password,
-                    tidal_id,
-                    type,
-                    buyer_name,
-                    buyer_phone,
-                    buyer_email,
-                    order_number,
-                    start_date,
-                    end_date,
-                    is_active,
-                    amount,
-                    period_months,
-                    orders(
+        let processedData;
+
+        if (productName?.toLowerCase().includes('hifi')) {
+            const { data, error } = await supabaseAdmin
+                .from('accounts')
+                .select(`
+                    *,
+                    products!inner(name, slug),
+                    legacy_tidal_account(
                         id,
+                        assigned_at,
+                        slot_number,
+                        tidal_password,
+                        tidal_id,
+                        type,
+                        buyer_name,
+                        buyer_phone,
+                        buyer_email,
                         order_number,
-                        created_at,
+                        start_date,
+                        end_date,
+                        period_months,
                         amount,
-                        payment_status,
-                        assignment_status,
-                        user_id,
-                        profiles(name, phone, email, memo),
-                        products(name)
+                        memo,
+                        is_active,
+                        is_deleted
                     )
-                )
-            `)
-            .neq('status', 'disabled')
-            .order('created_at', { ascending: false });
+                `)
+                .neq('status', 'disabled')
+                .ilike('products.slug', '%hifitidal%')
+                .order('created_at', { ascending: false });
 
-
-
-        if (error) throw error;
-        
-        let processedData = data;
-        if (productName && processedData) {
-            processedData = processedData.filter(account => {
-                const pName = account.products?.name?.toLowerCase() || '';
-                if (productName.toLowerCase().includes('hifi')) {
-                    return pName.includes('hifitidal');
-                } else {
-                    return pName.includes('tidal') && !pName.includes('hifitidal');
-                }
+            if (error) throw error;
+            
+            processedData = data?.map(acc => ({
+                ...acc,
+                order_accounts: acc.legacy_tidal_account || []
+            }));
+            
+            // Filter the outer array just in case
+            processedData = processedData?.filter(account => {
+                const pSlug = account.products?.slug || '';
+                return pSlug === 'hifitidal';
             });
+        } else {
+            const { data, error } = await supabaseAdmin
+                .from('accounts')
+                .select(`
+                    *,
+                    products ( name, slug ),
+                    order_accounts(
+                        id,
+                        assigned_at,
+                        slot_number,
+                        tidal_password,
+                        tidal_id,
+                        type,
+                        buyer_name,
+                        buyer_phone,
+                        buyer_email,
+                        order_number,
+                        start_date,
+                        end_date,
+                        period_months,
+                        amount,
+                        memo,
+                        is_active,
+                        is_deleted,
+                        orders(
+                            id,
+                            order_number,
+                            created_at,
+                            amount,
+                            payment_status,
+                            assignment_status,
+                            user_id,
+                            profiles(name, phone, email, memo),
+                            product_plans(duration_months),
+                            products(name)
+                        )
+                    )
+                `)
+                .neq('status', 'disabled')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            
+            processedData = data;
+            if (productName && processedData) {
+                processedData = processedData.filter(account => {
+                    const pSlug = account.products?.slug || '';
+                    return pSlug !== 'hifitidal';
+                });
+            }
         }
 
         // Filter out inactive assignments, re-sort by slot_number, and recalculate used_slots locally for accuracy
         const filteredData = processedData?.map(account => {
-            const activeAssignments = (account.order_accounts || [])
-                .filter((oa: { is_active?: boolean }) => oa.is_active !== false)
+            const { searchParams } = new URL(req.url);
+            const showAll = searchParams.get('showInactive') === 'true';
+            const assignments = (account.order_accounts || [])
+                .filter((oa: { is_active?: boolean }) => showAll || oa.is_active !== false)
                 .sort((a: { slot_number: number }, b: { slot_number: number }) => a.slot_number - b.slot_number);
             return {
                 ...account,
-                order_accounts: activeAssignments,
-                used_slots: activeAssignments.length
+                order_accounts: assignments,
+                used_slots: assignments.filter((oa: { is_active?: boolean }) => oa.is_active !== false).length
             };
         });
 
@@ -90,8 +141,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(req);
+        if (!session) {
+            return NextResponse.json({ error: 'Session not found or invalid' }, { status: 401 });
+        }
         if (!isAdmin(session)) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            console.warn('[Accounts API POST] User is not an admin:', session.email, 'Role:', (session as any).role);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return NextResponse.json({ error: 'Admin role required', role: (session as any).role }, { status: 403 });
         }
 
         const body = await req.json();

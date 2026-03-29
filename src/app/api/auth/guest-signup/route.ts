@@ -10,13 +10,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: '필수 정보가 누락되었습니다.' }, { status: 400 });
         }
 
+        const normalizedEmail = email.toLowerCase();
+
         // Normalize data
         const normalizedPhone = normalizePhone(phone);
         const normalizedBirthDate = normalizeBirthDate(birthdate);
 
         // 1. Create user in auth.users
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email,
+            email: normalizedEmail,
             password,
             email_confirm: true,
             user_metadata: {

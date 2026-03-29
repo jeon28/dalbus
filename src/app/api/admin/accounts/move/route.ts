@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { order_id, assignment_id, target_account_id, target_slot_number, target_tidal_password } = body;
+        const { order_id, assignment_id, target_account_id, target_slot_number, target_tidal_password, source_table } = body;
+        const assignmentTable = source_table === 'legacy_tidal_account' ? 'legacy_tidal_account' : 'order_accounts';
 
         if ((!order_id && !assignment_id) || !target_account_id) {
             return NextResponse.json({ error: '필수 정보가 누락되었습니다. 이동할 대상을 확인해 주세요.' }, { status: 400 });
@@ -14,9 +15,9 @@ export async function POST(req: NextRequest) {
 
         // 1. Get current assignment to find source account
         let query = supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .select('account_id, id');
-        
+
         if (assignment_id) {
             query = query.eq('id', assignment_id);
         } else {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
         // 2. Check Target Account availability and accurately count active slots
         const { count: activeCount } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .select('*', { count: 'exact', head: true })
             .eq('account_id', target_account_id)
             .eq('is_active', true);
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
         // Check unique slot on target
         if (target_slot_number !== undefined) {
             const { data: collision } = await supabaseAdmin
-                .from('order_accounts')
+                .from(assignmentTable)
                 .select('id, is_active')
                 .eq('account_id', target_account_id)
                 .eq('slot_number', target_slot_number)
@@ -63,15 +64,14 @@ export async function POST(req: NextRequest) {
                 if (collision.is_active) {
                     return NextResponse.json({ error: `선택한 슬롯(Slot #${target_slot_number + 1})은 이미 사용 중입니다. 다른 슬롯 번호를 선택해 주세요.` }, { status: 400 });
                 } else {
-                    // The slot contains an inactive assignment. We can delete it to make room for the new one.
-                    await supabaseAdmin.from('order_accounts').delete().eq('id', collision.id);
+                    await supabaseAdmin.from(assignmentTable).delete().eq('id', collision.id);
                 }
             }
         }
 
 
         // 3. Perform Move (Update order_accounts)
-        const updatePayload: Record<string, any> = {
+        const updatePayload: Record<string, string | number | undefined> = {
             account_id: target_account_id,
             slot_number: target_slot_number,
             tidal_password: target_tidal_password,
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         }
 
         const { error: moveError } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .update(updatePayload)
             .eq('id', currentAssignment.id);
 

@@ -18,11 +18,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const normalizedEmail = email.toLowerCase();
+
         // 1. Check if user exists (using admin client to bypass RLS/Auth)
         const { data: userCheck, error: userCheckError } = await supabaseAdmin
             .from('profiles')
             .select('id, role')
-            .eq('email', email)
+            .eq('email', normalizedEmail)
             .single();
 
         if (userCheckError || !userCheck) {
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
         });
 
         const { data, error } = await supabase.auth.signInWithPassword({
-            email,
+            email: normalizedEmail,
             password,
         });
 

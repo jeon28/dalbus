@@ -13,6 +13,7 @@ export async function GET() {
             `)
             .eq('is_active', true)
             .eq('product_plans.is_active', true)
+            .not('name', 'ilike', '%HifiTidal%')
             .order('sort_order', { ascending: true });
 
         if (error) {

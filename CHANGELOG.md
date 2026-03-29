@@ -1,6 +1,43 @@
 # Changelog
 
 
+## v1.7.0 - 2026-03-29
+
+### 🗂️ 기존 Tidal 계정 관리 (legacy_tidal_account) 분리 및 신규 구축
+
+#### 데이터베이스
+- **`legacy_tidal_account` 테이블 신설**: HifiTidal 계정을 주문 시스템(`order_accounts`)과 완전히 분리하여 독립 테이블로 관리합니다. `order_id` FK 없이 독립적으로 운영됩니다.
+- **마이그레이션 파일 추가**: `supabase/migrations/20260329_create_legacy_tidal_account.sql`
+
+#### API 라우트 신설
+- `GET/POST /api/admin/legacy-tidal-account` — 페이지네이션·검색·필터 지원 목록 조회
+- `PUT/DELETE /api/admin/legacy-tidal-account/[id]` — 슬롯 수정·비활성화·삭제, used_slots 자동 동기화
+- `GET /api/admin/legacy-tidal-account/inactive` — 비활성 내역 조회
+- `POST /api/admin/legacy-tidal-account/assign/[accountId]` — 슬롯 배정 (주문 시스템 연동 없음)
+
+#### HifiTidal 페이지 분리
+- **`/admin/hifitidal`**: 모든 쓰기 API를 `legacy-tidal-account` 라우트로 전환 (기존 `assignments` 라우트에서 분리)
+- **`/admin/hifitidal/inactive`**: 비활성 내역 API 경로 전환
+
+#### Excel Import 분기 처리
+- `isHifiTidal` 플래그로 `legacy_tidal_account` / `order_accounts` 분기 처리
+- HifiTidal 임포트 시 `order_id` 필드 제외, 독립 테이블에 Upsert
+
+#### Move API 범용화
+- `/api/admin/accounts/move` — `source_table` 파라미터 추가로 `order_accounts` / `legacy_tidal_account` 모두 지원
+
+#### 기존 Tidal 계정 관리 페이지 (`/admin/legacy-tidal`)
+- **Grid View / List View** 전환 지원 (hifitidal과 동일한 기능 수준)
+- 인라인 편집, 그룹 추가/수정/삭제, 슬롯 배정, 이동, 비활성화, 메모
+- 일괄 알림 발송 (이메일), Excel 가져오기/내보내기
+- **`/admin/legacy-tidal/inactive`**: 비활성 내역 페이지 (영구 삭제, Excel 내보내기)
+- 어드민 사이드바 메뉴 "기존 Tidal 계정" 항목 추가
+
+### 🛠️ 시스템 안정성
+- **tsconfig.json**: `tmp/` 디렉토리를 TypeScript 컴파일 대상에서 제외
+- **드롭다운 서브메뉴**: 상단 부가 기능 버튼(삭제 데이터, 내역, 엑셀 가져오기/내보내기)을 `⋯` 버튼 드롭다운으로 통합하여 UI 간소화
+
+
 ## v1.6.1 - 2026-03-15
 
 ### 🌊 Tidal 계정 관리 시스템 고도화
@@ -31,6 +68,10 @@
 - **Tidal 관리 UI 버그 수정**: List View의 "슬롯 추가" 행에서 다음에 배정될 슬롯 번호가 실제와 다르게 표시되던 문제를 해결했습니다.
 
 ## [Unreleased]
+
+### 🌊 Tidal 계정 관리 이메일 필드 추가 및 빌드 안정화
+- **이메일 필드 통합**: Tidal 계정 관리 Gridview 목록에 고객명과 전화번호 문자열 사이에 이메일 필드를 추가하여 고객 식별을 용이하게 했습니다.
+- **Vercel 빌드 오류 수정**: `any` 타입 사용, 미사용 변수, `null` 객체 참조 등으로 인해 발생하던 프로덕션 빌드 에러를 모두 수정하여 배포 품질을 확보했습니다.
 
 ## v1.5.8 - 2026-03-07
 - **Vercel 빌드 오류 재수정**: Banks API에서 미사용 매개변수(`_req`)와 관련 import를 완전히 제거하여 엄격한 린트 규칙을 통과하도록 수정했습니다.

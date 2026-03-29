@@ -4,13 +4,12 @@ import { normalizePhone } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
-// PUT: Update assignment and linked order details
+// PUT: Update legacy_tidal_account entry
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params; // order_accounts.id
+        const { id } = await params;
         const body = await req.json();
 
-        // body contains: tidal_password, buyer_name, buyer_phone, buyer_email, start_date, end_date, type, is_active
         const {
             tidal_password,
             buyer_name,
@@ -23,65 +22,40 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             tidal_id,
             amount,
             period_months,
-            memo: _memo
+            memo
         } = body;
 
-        // 1. Update order_accounts
-        const oaUpdates: Record<string, string | number | boolean | null> = {};
-        if (tidal_password !== undefined) oaUpdates.tidal_password = tidal_password;
-        if (tidal_id !== undefined) oaUpdates.tidal_id = tidal_id ? tidal_id.toLowerCase().trim() : null;
-        if (body.order_number !== undefined) oaUpdates.order_number = body.order_number;
-        if (type !== undefined) {
-            oaUpdates.type = type;
-            // Removed: oaUpdates.slot_number = 0; here to avoid immediate constraint violation.
-            // Re-indexing logic below will handle the move to slot 0 safely.
-        }
-        if (buyer_name !== undefined) oaUpdates.buyer_name = buyer_name;
-        if (buyer_phone !== undefined) oaUpdates.buyer_phone = normalizePhone(buyer_phone);
-        if (buyer_email !== undefined) oaUpdates.buyer_email = buyer_email;
-        if (start_date !== undefined) oaUpdates.start_date = start_date;
-        if (end_date !== undefined) oaUpdates.end_date = end_date;
-        if (is_active !== undefined) oaUpdates.is_active = is_active;
-        if (body.is_deleted !== undefined) oaUpdates.is_deleted = body.is_deleted;
-        if (amount !== undefined && amount !== null) oaUpdates.amount = Number(amount);
-        if (period_months !== undefined && period_months !== null) oaUpdates.period_months = Number(period_months);
-        if (_memo !== undefined) {
-            // memo is updated in profiles.memo, not order_accounts
-            
-            // Sync with profiles.memo if a user_id exists for this order
-            const { data: assignmentData } = await supabaseAdmin
+        const updates: Record<string, string | number | boolean | null> = {};
+        if (tidal_password !== undefined) updates.tidal_password = tidal_password;
+        if (tidal_id !== undefined) updates.tidal_id = tidal_id ? tidal_id.toLowerCase().trim() : null;
+        if (body.order_number !== undefined) updates.order_number = body.order_number;
+        if (type !== undefined) updates.type = type;
+        if (buyer_name !== undefined) updates.buyer_name = buyer_name;
+        if (buyer_phone !== undefined) updates.buyer_phone = normalizePhone(buyer_phone);
+        if (buyer_email !== undefined) updates.buyer_email = buyer_email;
+        if (start_date !== undefined) updates.start_date = start_date;
+        if (end_date !== undefined) updates.end_date = end_date;
+        if (is_active !== undefined) updates.is_active = is_active;
+        if (body.is_deleted !== undefined) updates.is_deleted = body.is_deleted;
+        if (amount !== undefined) updates.amount = amount;
+        if (period_months !== undefined) updates.period_months = period_months;
+        if (memo !== undefined) updates.memo = memo;
 
-                .from('order_accounts')
-                .select('orders(user_id)')
+        if (Object.keys(updates).length > 0) {
+            const { data: updatedData, error: updateError } = await supabaseAdmin
+                .from('legacy_tidal_account')
+                .update(updates)
                 .eq('id', id)
-                .single();
-                
-            const userId = (assignmentData?.orders as { user_id?: string } | null)?.user_id;
-            if (userId) {
-                await supabaseAdmin
-                    .from('profiles')
-                    .update({ memo: _memo })
-                    .eq('id', userId);
-            }
-        }
-
-
-        if (Object.keys(oaUpdates).length > 0) {
-            const { data: updatedData, error: oaError } = await supabaseAdmin
-                .from('order_accounts')
-                .update(oaUpdates)
-                .eq('id', id)
-                .select('account_id') // Fetch account_id to update slots
+                .select('account_id')
                 .single();
 
-            if (oaError) throw oaError;
+            if (updateError) throw updateError;
 
-            // 2. Re-index slots if type or is_active changed
+            // Re-index slots if type or is_active changed
             const shouldReindex = type !== undefined || is_active !== undefined;
             if (shouldReindex && updatedData) {
-                // Fetch all assignments for this account
                 const { data: allSlots, error: fetchAllError } = await supabaseAdmin
-                    .from('order_accounts')
+                    .from('legacy_tidal_account')
                     .select('id, slot_number, type')
                     .eq('account_id', updatedData.account_id)
                     .order('slot_number', { ascending: true });
@@ -99,31 +73,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                         return a.slot_number - b.slot_number;
                     });
 
-                    // Pass 1: Move to temporary high slots to avoid unique constraint collisions
+                    // Pass 1: Move to temporary high slots
                     for (let i = 0; i < sorted.length; i++) {
                         await supabaseAdmin
-                            .from('order_accounts')
+                            .from('legacy_tidal_account')
                             .update({ slot_number: sorted[i].slot_number + 1000 })
                             .eq('id', sorted[i].id);
                     }
 
-                    // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
+                    // Pass 2: Assign final sequential slot numbers
                     for (let i = 0; i < sorted.length; i++) {
-                        const updates: { slot_number: number; type?: string } = { slot_number: i };
+                        const slotUpdates: { slot_number: number; type?: string } = { slot_number: i };
                         if (i > 0 && sorted[i].type === 'master') {
-                            updates.type = 'user'; // Force others to be user
+                            slotUpdates.type = 'user';
                         }
-                        
                         await supabaseAdmin
-                            .from('order_accounts')
-                            .update(updates)
+                            .from('legacy_tidal_account')
+                            .update(slotUpdates)
                             .eq('id', sorted[i].id);
                     }
                 }
 
                 // Sync used_slots
                 const { count: actualCount } = await supabaseAdmin
-                    .from('order_accounts')
+                    .from('legacy_tidal_account')
                     .select('*', { count: 'exact', head: true })
                     .eq('account_id', updatedData.account_id)
                     .eq('is_deleted', false);
@@ -145,33 +118,31 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-// DELETE: Unassign (Remove from order_accounts) or Hard Delete history
+// DELETE: Soft-delete legacy_tidal_account entry
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params; // order_accounts.id
+        const { id } = await params;
 
         // 1. Get info before delete
         const { data: assignment, error: fetchError } = await supabaseAdmin
-            .from('order_accounts')
-            .select('account_id, order_id')
+            .from('legacy_tidal_account')
+            .select('account_id')
             .eq('id', id)
             .single();
 
         if (fetchError || !assignment) throw new Error('Assignment not found');
 
-        // 2. Soft Delete assignment
+        // 2. Soft delete
         const { error: delError } = await supabaseAdmin
-            .from('order_accounts')
+            .from('legacy_tidal_account')
             .update({ is_deleted: true, is_active: false })
             .eq('id', id);
 
-
         if (delError) throw delError;
 
-        // 3. Re-index remaining slots to maintain sequence (1, 2, 3...)
-        // Fetch all remaining active assignments for this account, ordered by their current slot_number
+        // 3. Re-index remaining slots
         const { data: remainingSlots, error: fetchRemainingError } = await supabaseAdmin
-            .from('order_accounts')
+            .from('legacy_tidal_account')
             .select('id, slot_number, type')
             .eq('account_id', assignment.account_id)
             .eq('is_deleted', false)
@@ -186,31 +157,30 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
                 return (a.slot_number ?? 0) - (b.slot_number ?? 0);
             });
 
-            // Pass 1: Move to temporary high slots
+            // Pass 1: Temporary high slots
             for (let i = 0; i < sorted.length; i++) {
                 await supabaseAdmin
-                    .from('order_accounts')
+                    .from('legacy_tidal_account')
                     .update({ slot_number: (sorted[i].slot_number ?? 0) + 1000 })
                     .eq('id', sorted[i].id);
             }
 
-            // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
+            // Pass 2: Final sequential slots
             for (let i = 0; i < sorted.length; i++) {
-                const updates: { slot_number: number; type?: string } = { slot_number: i };
+                const slotUpdates: { slot_number: number; type?: string } = { slot_number: i };
                 if (i > 0 && sorted[i].type === 'master') {
-                    updates.type = 'user'; // Force others to be user
+                    slotUpdates.type = 'user';
                 }
-
                 await supabaseAdmin
-                    .from('order_accounts')
-                    .update(updates)
+                    .from('legacy_tidal_account')
+                    .update(slotUpdates)
                     .eq('id', sorted[i].id);
             }
         }
 
-        // 4. Update Account Used Slots (Robust Sync)
+        // 4. Sync used_slots
         const { count: actualCount } = await supabaseAdmin
-            .from('order_accounts')
+            .from('legacy_tidal_account')
             .select('*', { count: 'exact', head: true })
             .eq('account_id', assignment.account_id)
             .eq('is_active', true);
@@ -219,18 +189,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             .from('accounts')
             .update({ used_slots: actualCount || 0 })
             .eq('id', assignment.account_id);
-
-        // 5. Update Order Status logic
-        // If it was an active assignment, we might want to set order to 'waiting' if we are "Unassigning".
-        // But if we are deleting history, order might be old.
-        // For now, if order_id exists, we set it to 'waiting' if it was paid?
-        // Let's keep existing logic: Reset order status.
-        if (assignment.order_id) {
-            await supabaseAdmin
-                .from('orders')
-                .update({ assignment_status: 'waiting', assigned_at: null })
-                .eq('id', assignment.order_id);
-        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

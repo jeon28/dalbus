@@ -12,9 +12,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const normalizedEmail = email.toLowerCase();
+
         // Check email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        if (!emailRegex.test(normalizedEmail)) {
             return NextResponse.json(
                 { available: false, message: '올바른 이메일 형식이 아닙니다.' },
                 { status: 400 }
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
         const { data, error } = await supabaseAdmin
             .from('profiles')
             .select('email')
-            .eq('email', email);
+            .eq('email', normalizedEmail);
 
         if (error) {
             console.error('Email check error:', error);

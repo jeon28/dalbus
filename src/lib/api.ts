@@ -42,7 +42,8 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
         }
 
         const token = session?.access_token;
-        if (!token) console.log('[apiFetch] Warning: No access token found');
+        if (!token) console.warn('[apiFetch] Missing access token! Session:', session ? 'Found but no token' : 'None');
+        else console.log('[apiFetch] Token prefix:', token.substring(0, 10));
 
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();

@@ -37,15 +37,18 @@ export default function ProductsPage() {
                 if (!response.ok) throw new Error('Failed to fetch products');
 
                 const data: ProductResponse[] = await response.json();
-
-                const mapped: Product[] = data.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    icon: p.image_url || 'default',
-                    price: p.original_price.toLocaleString(),
-                    description: p.description || '가장 저렴하고 안전한 공유 계정 이용.',
-                    tag: (p.tags && p.tags.length > 0) ? p.tags[0] : ''
-                }));
+                
+                // Hifitidal 상품은 노출되지 않도록 필터링
+                const mapped: Product[] = data
+                    .filter((p) => !p.name.toLowerCase().includes('hifitidal'))
+                    .map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        icon: p.image_url || 'default',
+                        price: p.original_price.toLocaleString(),
+                        description: p.description || '가장 저렴하고 안전한 공유 계정 이용.',
+                        tag: (p.tags && p.tags.length > 0) ? p.tags[0] : ''
+                    }));
 
                 setProducts(mapped);
             } catch (error) {

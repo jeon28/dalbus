@@ -95,7 +95,7 @@ export default function SignupPage() {
     };
 
     const handleCheckEmail = async () => {
-        const email = formData.id;
+        const email = formData.id.toLowerCase();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (!email) {
@@ -197,9 +197,11 @@ export default function SignupPage() {
 
         setLoading(true);
 
+        const normalizedEmail = formData.id.toLowerCase();
+
         // 1. Supabase Auth Signup
         const { data, error } = await supabase.auth.signUp({
-            email: formData.id,
+            email: normalizedEmail,
             password: formData.password,
             options: {
                 emailRedirectTo: `${window.location.origin}/login`,
@@ -207,7 +209,7 @@ export default function SignupPage() {
                     name: formData.name,
                     birthdate: `${formData.birthYear}.${formData.birthMonth.padStart(2, '0')}.${formData.birthDay.padStart(2, '0')}`,
                     phone: formData.phone,
-                    login_id: formData.id
+                    login_id: normalizedEmail
                 }
             }
         });
