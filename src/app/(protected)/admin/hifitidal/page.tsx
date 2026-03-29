@@ -1621,7 +1621,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <th className="py-2 text-center w-16">배정번호</th>
                                                                     <th className="py-2 text-center w-20">Type</th>
                                                                     <th className="py-2 text-left w-32">Tidal ID</th>
-                                                                    <th className="py-2 text-left w-24">비밀번호</th>
                                                                     <th className="py-2 text-left w-20">이름</th>
                                                                     <th className="py-2 text-left w-28">이메일</th>
                                                                     <th className="py-2 text-left w-28">전화번호</th>
@@ -1629,7 +1628,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <th className="py-2 text-left w-24">종료일</th>
                                                                     <th className="py-2 text-center w-16">개월</th>
                                                                     <th className="py-2 text-right w-20 pr-2">계약금액</th>
-                                                                    <th className="py-2 text-center w-24">주문번호</th>
                                                                     <th className="py-2 text-center w-40">관리</th>
                                                                 </tr>
                                                             </thead>
@@ -1728,9 +1726,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                         <Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} />
                                                                                     </td>
                                                                                     <td className="px-1">
-                                                                                        <Input className="h-8 text-xs bg-white" placeholder="PW" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} />
-                                                                                    </td>
-                                                                                    <td className="px-1">
                                                                                         <Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} />
                                                                                     </td>
                                                                                     <td className="px-1">
@@ -1788,7 +1783,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>
                                                                                         <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.tidal_id || '-'}</span>
                                                                                     </td>
-                                                                                    <td className="px-2 text-gray-700 font-mono truncate max-w-[80px]" title={val.tidal_password || undefined}>{val.tidal_password || '-'}</td>
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>
                                                                                         <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.buyer_name || '-'}</span>
                                                                                     </td>
@@ -1809,27 +1803,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             </td>
                                                                             <td className="text-right text-gray-700 font-mono px-2">
                                                                                 {!isEmpty ? (val.amount ? val.amount.toLocaleString() : '-') : ''}
-                                                                            </td>
-                                                                            <td className="text-center text-gray-400 font-mono text-[10px]">
-                                                                                {val.order_number && !isEmpty ? (
-                                                                                    <button
-                                                                                        className="text-blue-600 font-bold underline hover:text-blue-800"
-                                                                                        onClick={() => {
-                                                                                            const orderToView = val.full_order || assignment?.orders;
-                                                                                            if (orderToView) openOrderDetail(orderToView);
-                                                                                        }}
-                                                                                    >
-                                                                                        {val.order_number}
-                                                                                    </button>
-                                                                                ) : isEditing ? (
-                                                                                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openAssignModal(acc, assignment.slot_number)}>
-                                                                                        배정
-                                                                                    </Button>
-                                                                                ) : !isEmpty ? (
-                                                                                    <span>-</span>
-                                                                                ) : (
-                                                                                    <span></span>
-                                                                                )}
                                                                             </td>
                                                                             <td>
                                                                                 <div className="flex justify-center gap-1 items-center">
