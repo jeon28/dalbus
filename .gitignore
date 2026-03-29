@@ -19,6 +19,10 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.mcp.json
+
+# duplicate/nested repository folder
+dalbus/
 
 # vercel
 .vercel/
