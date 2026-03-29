@@ -110,7 +110,7 @@ interface GridValue {
     memo?: string;
 }
 
-function TidalAccountsContent() {
+function HifiTidalAccountsContent() {
     const { isAdmin, isHydrated } = useServices();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -136,8 +136,8 @@ function TidalAccountsContent() {
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-    const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
     const [viewOrder, setViewOrder] = useState<Order | null>(null);
+    const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
     const [moveTargets, setMoveTargets] = useState<Account[]>([]);
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
@@ -349,7 +349,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const getAvailableSlots = (accountId: string) => {
         const acc = accounts.find(a => a.id === accountId);
         if (!acc) return [];
-        const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
         const taken = new Set((acc.order_accounts || [])
             .filter(oa => oa && typeof oa.slot_number === 'number')
             .map(oa => oa.slot_number));
@@ -374,7 +373,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }[] = [];
 
         accounts.forEach((acc, accIdx) => {
-            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
                 const found = acc.order_accounts?.find(oa => oa.slot_number === i);
                 const assignment: Assignment = found || {
@@ -452,7 +450,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         const query = searchQuery.toLowerCase().trim();
 
         accounts.forEach(acc => {
-            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
                 const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
                 const val = gridValues[`${acc.id}_${i}`] || {};
@@ -2272,10 +2269,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     );
 }
 
-export default function TidalAccountsPage() {
+export default function HifiTidalAccountsPage() {
     return (
         <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
-            <TidalAccountsContent />
+            <HifiTidalAccountsContent />
         </Suspense>
     );
 }

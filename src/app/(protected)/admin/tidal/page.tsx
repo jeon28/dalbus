@@ -5,7 +5,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, MoreVertical, Settings } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -349,7 +349,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const getAvailableSlots = (accountId: string) => {
         const acc = accounts.find(a => a.id === accountId);
         if (!acc) return [];
-        const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
         const taken = new Set((acc.order_accounts || [])
             .filter(oa => oa && typeof oa.slot_number === 'number')
             .map(oa => oa.slot_number));
@@ -374,7 +373,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }[] = [];
 
         accounts.forEach((acc, accIdx) => {
-            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i);
@@ -455,7 +453,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         const query = searchQuery.toLowerCase().trim();
 
         accounts.forEach(acc => {
-            const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
             for (let i = 0; i < acc.max_slots; i++) {
                 const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
                 const val = gridValues[`${acc.id}_${i}`] || {};
@@ -1532,7 +1529,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 const isExpanded = expandedRows.has(acc.id);
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 const paddedAssignments: any[] = [];
-                                const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master');
+
                                 for (let i = 0; i < acc.max_slots; i++) {
                                     const existing = acc.order_accounts?.find(oa => oa.slot_number === i);
                                     if (existing) {
@@ -2250,6 +2247,73 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <Dialog open={isOrderDetailOpen} onOpenChange={setIsOrderDetailOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>주문 상세 정보</DialogTitle></DialogHeader>
+                    {viewOrder && (
+                        <div className="py-4 space-y-2 text-sm">
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">날짜</span>
+                                <span className="col-span-2">{viewOrder.created_at ? new Date(viewOrder.created_at).toLocaleString() : '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">주문번호</span>
+                                <span className="col-span-2 font-mono">{viewOrder.order_number}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">이름</span>
+                                <span className="col-span-2">{viewOrder.profiles?.name || viewOrder.buyer_name || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">이메일</span>
+                                <span className="col-span-2">{viewOrder.profiles?.email || viewOrder.buyer_email || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">연락처</span>
+                                <span className="col-span-2">{viewOrder.profiles?.phone || viewOrder.buyer_phone || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">회원 ID</span>
+                                <span className="col-span-2 font-mono">{viewOrder.profiles?.email || viewOrder.user_id || '-'}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">서비스 (기간)</span>
+                                <span className="col-span-2">
+                                    {viewOrder.products?.name}
+                                    {viewOrder.start_date && viewOrder.end_date && (
+                                        <span className="ml-1 text-blue-600">
+                                            ({Math.round(differenceInDays(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date)) / 30)}개월)
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">금액</span>
+                                <span className="col-span-2">₩{viewOrder.amount?.toLocaleString()}</span>
+                            </div>
+                            <div className="grid grid-cols-3 border-b pb-2">
+                                <span className="font-bold text-gray-500">상태</span>
+                                <span className="col-span-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${viewOrder.assignment_status === 'completed' ? 'bg-green-100 text-green-700' :
+                                        viewOrder.assignment_status === 'assigned' ? 'bg-blue-100 text-blue-700' :
+                                            viewOrder.payment_status === 'paid' ? 'bg-blue-50 text-blue-600' :
+                                                'bg-gray-100 text-gray-600'
+                                        }`}>
+                                        {getStatusLabel(viewOrder)}
+                                    </span>
+                                    <span className="ml-2 text-xs text-gray-400">
+                                        ({viewOrder.payment_status} / {viewOrder.assignment_status})
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button onClick={() => setIsOrderDetailOpen(false)}>닫기</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Memo Modal */}
             <Dialog open={isMemoModalOpen} onOpenChange={setIsMemoModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
