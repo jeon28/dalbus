@@ -26,9 +26,10 @@ export default function LoginPage() {
         console.log('Login: Attempting login for', id);
 
         try {
+            const normalizedEmail = id.toLowerCase();
             const response = await apiFetch('/api/auth/login', {
                 method: 'POST',
-                body: JSON.stringify({ email: id, password }),
+                body: JSON.stringify({ email: normalizedEmail, password }),
                 cache: 'no-store'
             });
 
