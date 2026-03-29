@@ -136,8 +136,7 @@ function HifiTidalAccountsContent() {
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-    const [viewOrder, setViewOrder] = useState<Order | null>(null);
-    const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
+
     const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
     const [moveTargets, setMoveTargets] = useState<Account[]>([]);
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
@@ -848,8 +847,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 setIsImportResultModalOpen(true);
                 fetchAccounts();
             } catch (error: unknown) {
-                const e = error as Error;
-                alert(`엑셀 업로드 실패: ${e.message}`);
+                const err = error as Error;
+                alert(`엑셀 업로드 실패: ${err.message}`);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -929,18 +928,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     };
 
 
-    const openOrderDetail = (order?: Order) => {
-        if (!order) return;
-        setViewOrder(order);
-        setIsOrderDetailOpen(true);
-    };
 
-    const getStatusLabel = (order: Order) => {
-        if (order.assignment_status === 'completed') return '작업완료';
-        if (order.assignment_status === 'assigned') return '배정완료';
-        if (order.payment_status === 'paid') return '입금확인';
-        return '주문신청';
-    };
 
     const toggleSelectAll = (filteredFlat: { id: string }[]) => {
         if (selectedAssignmentIds.size === filteredFlat.length) {
@@ -1459,7 +1447,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </div>
                 ) : (
                     <div className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="grid grid-cols-14 gap-4 p-4 bg-gray-50 font-bold border-b text-base">
+                        <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-base">
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>
                                 GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
@@ -1471,7 +1459,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 종료예정일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
                             <div className="col-span-1 text-left">지속개월</div>
-                            <div className="col-span-1 text-right pr-2">계약금액</div>
+
                             <div className="col-span-1 text-center cursor-pointer hover:bg-gray-100 flex items-center justify-center gap-1" onClick={() => handleSort('used_slots')}>
                                 슬롯 {sortConfig?.key === 'used_slots' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
@@ -1564,7 +1552,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                 return (
                                     <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                                        <div className="grid grid-cols-14 gap-4 p-4 items-center text-base">
+                                        <div className="grid grid-cols-13 gap-4 p-4 items-center text-base">
                                             <div className="col-span-1 text-gray-700 font-medium cursor-pointer truncate" title={acc.login_id} onClick={() => toggleRow(acc.id)}>
                                                 {acc.login_id}
                                             </div>
@@ -1586,9 +1574,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             <div className="col-span-1 text-gray-500 font-mono text-sm cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 {duration}
                                             </div>
-                                            <div className="col-span-1 text-right text-gray-500 font-mono text-sm pr-2 cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                                -
-                                            </div>
+
                                             <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                                 <span className={`px-2 py-1 rounded-full text-sm font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                                                     {acc.order_accounts?.length || 0}/6
@@ -1738,9 +1724,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                     </td>
                                                                                     <td className="px-1">
                                                                                         <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
-                                                                                    </td>
-                                                                                    <td className="px-1 w-12">
-                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
                                                                                     </td>
                                                                                     <td className="px-1 w-16">
                                                                                         <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} />
@@ -1998,72 +1981,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isOrderDetailOpen} onOpenChange={setIsOrderDetailOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>주문 상세 정보</DialogTitle></DialogHeader>
-                    {viewOrder && (
-                        <div className="py-4 space-y-2 text-sm">
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">날짜</span>
-                                <span className="col-span-2">{viewOrder.created_at ? new Date(viewOrder.created_at).toLocaleString() : '-'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">주문번호</span>
-                                <span className="col-span-2 font-mono">{viewOrder.order_number}</span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">이름</span>
-                                <span className="col-span-2">{viewOrder.profiles?.name || viewOrder.buyer_name || '-'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">이메일</span>
-                                <span className="col-span-2">{viewOrder.profiles?.email || viewOrder.buyer_email || '-'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">연락처</span>
-                                <span className="col-span-2">{viewOrder.profiles?.phone || viewOrder.buyer_phone || '-'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">회원 ID</span>
-                                <span className="col-span-2 font-mono">{viewOrder.profiles?.email || viewOrder.user_id || '-'}</span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">서비스 (기간)</span>
-                                <span className="col-span-2">
-                                    {viewOrder.products?.name}
-                                    {viewOrder.start_date && viewOrder.end_date && (
-                                        <span className="ml-1 text-blue-600">
-                                            ({Math.round(differenceInDays(parseISO(viewOrder.end_date), parseISO(viewOrder.start_date)) / 30)}개월)
-                                        </span>
-                                    )}
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">금액</span>
-                                <span className="col-span-2">₩{viewOrder.amount?.toLocaleString()}</span>
-                            </div>
-                            <div className="grid grid-cols-3 border-b pb-2">
-                                <span className="font-bold text-gray-500">상태</span>
-                                <span className="col-span-2">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${viewOrder.assignment_status === 'completed' ? 'bg-green-100 text-green-700' :
-                                        viewOrder.assignment_status === 'assigned' ? 'bg-blue-100 text-blue-700' :
-                                            viewOrder.payment_status === 'paid' ? 'bg-blue-50 text-blue-600' :
-                                                'bg-gray-100 text-gray-600'
-                                        }`}>
-                                        {getStatusLabel(viewOrder)}
-                                    </span>
-                                    <span className="ml-2 text-xs text-gray-400">
-                                        ({viewOrder.payment_status} / {viewOrder.assignment_status})
-                                    </span>
-                                </span>
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button onClick={() => setIsOrderDetailOpen(false)}>닫기</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+
 
             {/* Import Result Modal */}
             <Dialog open={isImportResultModalOpen} onOpenChange={setIsImportResultModalOpen}>

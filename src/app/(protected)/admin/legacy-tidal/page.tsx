@@ -124,8 +124,7 @@ function LegacyTidalContent() {
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-    const [isOrderDetailOpen, setIsOrderDetailOpen] = useState(false);
-    const [viewOrder, setViewOrder] = useState<Order | null>(null);
+
     const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
     const [moveTargets, setMoveTargets] = useState<Account[]>([]);
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
@@ -572,7 +571,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         } catch { alert('이동 실패: 네트워크 오류'); }
     };
 
-    const openOrderDetail = (order?: Order) => { if (!order) return; setViewOrder(order); setIsOrderDetailOpen(true); };
+
 
     const toggleSelectAll = (filteredFlat: { id: string }[]) => {
         if (selectedAssignmentIds.size === filteredFlat.length) setSelectedAssignmentIds(new Set());
@@ -1016,14 +1015,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             </Select>
                                                                         </td>
                                                                         <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} /></td>
-                                                                        <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="PW" value={val.tidal_password || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_password', e.target.value)} /></td>
                                                                         <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} /></td>
                                                                         <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="Email" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} /></td>
                                                                         <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="전화번호" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} /></td>
-                                                                        <td className="px-1"><Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} /></td>
-                                                                        <td className="px-1 w-12"><Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} /></td>
                                                                         <td className="px-1"><Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} /></td>
-                                                                        <td className="px-1 w-12"><Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} /></td>
                                                                         <td className="px-1 w-16"><Input type="number" className="h-8 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} /></td>
                                                                     </>
                                                                 ) : isEmpty ? (
@@ -1163,19 +1158,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isOrderDetailOpen} onOpenChange={setIsOrderDetailOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>주문 상세 정보</DialogTitle></DialogHeader>
-                    {viewOrder && (
-                        <div className="py-4 space-y-2 text-sm">
-                            {[['날짜', viewOrder.created_at ? new Date(viewOrder.created_at).toLocaleString() : '-'], ['주문번호', viewOrder.order_number], ['이름', viewOrder.profiles?.name || viewOrder.buyer_name || '-'], ['이메일', viewOrder.profiles?.email || viewOrder.buyer_email || '-'], ['연락처', viewOrder.profiles?.phone || viewOrder.buyer_phone || '-'], ['금액', `₩${viewOrder.amount?.toLocaleString()}`]].map(([k, v]) => (
-                                <div key={k} className="grid grid-cols-3 border-b pb-2"><span className="font-bold text-gray-500">{k}</span><span className="col-span-2">{v}</span></div>
-                            ))}
-                        </div>
-                    )}
-                    <DialogFooter><Button onClick={() => setIsOrderDetailOpen(false)}>닫기</Button></DialogFooter>
-                </DialogContent>
-            </Dialog>
+
 
             <Dialog open={isImportResultModalOpen} onOpenChange={setIsImportResultModalOpen}>
                 <DialogContent className="max-w-md">
@@ -1236,9 +1219,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     {editAssignData && (
                         <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
                             <div className="flex gap-4">
-                                <div className="w-[20%] space-y-1"><Label className="text-xs text-gray-500">이름</Label><Input value={editAssignData.buyer_name || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })} className="h-9" /></div>
+                                <div className="w-[30%] space-y-1"><Label className="text-xs text-gray-500">이름</Label><Input value={editAssignData.buyer_name || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })} className="h-9" /></div>
                                 <div className="flex-1 space-y-1"><Label className="text-xs text-gray-500">Tidal ID</Label><Input value={editAssignData.tidal_id || ''} onChange={e => setEditAssignData({ ...editAssignData, tidal_id: e.target.value })} className="h-9" /></div>
-                                <div className="w-[20%] space-y-1"><Label className="text-xs text-gray-500">PW</Label><Input value={editAssignData.tidal_password || ''} onChange={e => setEditAssignData({ ...editAssignData, tidal_password: e.target.value })} className="h-9" /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1"><Label className="text-xs text-gray-500">전화번호</Label><Input value={editAssignData.buyer_phone || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_phone: e.target.value })} className="h-9" /></div>
