@@ -119,14 +119,20 @@ export async function GET(req: NextRequest) {
         // Filter out inactive assignments, re-sort by slot_number, and recalculate used_slots locally for accuracy
         const filteredData = processedData?.map(account => {
             const { searchParams } = new URL(req.url);
-            const showAll = searchParams.get('showInactive') === 'true';
+            const showInactive = searchParams.get('showInactive') === 'true';
+            const showDeleted = searchParams.get('showDeleted') === 'true';
+
             const assignments = (account.order_accounts || [])
-                .filter((oa: { is_active?: boolean }) => showAll || oa.is_active !== false)
+                .filter((oa: { is_active?: boolean; is_deleted?: boolean }) => {
+                    if (showDeleted) return oa.is_deleted === true;
+                    if (showInactive) return oa.is_deleted !== true; // Show all non-deleted (both active and inactive)
+                    return oa.is_active !== false && oa.is_deleted !== true; // Show only active, non-deleted
+                })
                 .sort((a: { slot_number: number }, b: { slot_number: number }) => a.slot_number - b.slot_number);
             return {
                 ...account,
                 order_accounts: assignments,
-                used_slots: assignments.filter((oa: { is_active?: boolean }) => oa.is_active !== false).length
+                used_slots: assignments.filter((oa: { is_active?: boolean; is_deleted?: boolean }) => oa.is_active !== false && oa.is_deleted !== true).length
             };
         });
 

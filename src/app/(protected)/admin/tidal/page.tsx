@@ -55,6 +55,8 @@ interface Assignment {
     period_months?: number;
     amount?: number;
     memo?: string;
+    is_active?: boolean;
+    is_deleted?: boolean;
 }
 
 interface Account {
@@ -142,6 +144,7 @@ function TidalAccountsContent() {
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
+    const [showDeletedOnly, setShowDeletedOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [newAccount, setNewAccount] = useState({
@@ -160,6 +163,13 @@ function TidalAccountsContent() {
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
     const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
+    
+    // Quick Edit Feature State
+    const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
+    const [quickEditValues, setQuickEditValues] = useState<GridValue | null>(null);
+    const [quickEditAccountId, setQuickEditAccountId] = useState('');
+    const [quickEditSlotIdx, setQuickEditSlotIdx] = useState<number | null>(null);
+    const [quickEditAssignmentId, setQuickEditAssignmentId] = useState('');
     
     // Memo Feature State
     const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
@@ -250,6 +260,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     }, [searchParams, accounts]);
 
     useEffect(() => {
+        if (isHydrated && isAdmin) {
+            fetchAccounts();
+        }
+    }, [showDeletedOnly]);
+
+    useEffect(() => {
         if (showExpiredOnly) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -272,7 +288,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     // --- Fetching Functions ---
     const fetchAccounts = async () => {
         try {
-            const res = await apiFetch('/api/admin/accounts?product=Tidal', { cache: 'no-store' });
+            const params = new URLSearchParams({ product: 'Tidal' });
+            if (showDeletedOnly) {
+                params.append('showDeleted', 'true');
+            } else {
+                params.append('showInactive', 'true');
+            }
+            const res = await apiFetch(`/api/admin/accounts?${params.toString()}`, { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
@@ -691,7 +713,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return;
         }
 
-        if (!confirm('정말 삭제하시겠습니까?')) return;
+        if (!confirm('정말 삭제하시겠습니까? (삭제된 데이터 보기에 저장됩니다)')) return;
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
@@ -984,6 +1006,50 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
+    const openQuickEditModal = (accountId: string, slotIdx: number, values: GridValue, assignmentId: string) => {
+        setQuickEditAccountId(accountId);
+        setQuickEditSlotIdx(slotIdx);
+        setQuickEditAssignmentId(assignmentId);
+        setQuickEditValues({ ...values });
+        setIsQuickEditModalOpen(true);
+    };
+
+    const handleSaveQuickEdit = async () => {
+        if (!quickEditAssignmentId || !quickEditValues) return;
+        try {
+            const res = await apiFetch(`/api/admin/assignments/${quickEditAssignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(quickEditValues)
+            });
+            if (!res.ok) throw new Error('Update failed');
+            
+            updateGridValue(quickEditAccountId, quickEditSlotIdx as number, 'buyer_name', quickEditValues.buyer_name);
+            updateGridValue(quickEditAccountId, quickEditSlotIdx as number, 'order_number', quickEditValues.order_number);
+            setIsQuickEditModalOpen(false);
+            fetchAccounts();
+            alert('정보가 수정되었습니다.');
+        } catch (e) {
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
+        }
+    };
+
+    const handleRestore = async (assignmentId: string) => {
+        if (!confirm('배정을 복구하시겠습니까?')) return;
+        try {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_deleted: false, is_active: true })
+            });
+            if (!res.ok) throw new Error('Restore failed');
+            alert('복구되었습니다. (배정 번호 유지)');
+            fetchAccounts();
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
     const generateTidalPassword = () => {
         const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$";
         let pass = "";
@@ -1093,6 +1159,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             >
                                 <Filter className="w-4 h-4" />
                                 잔여일 조회
+                            </Button>
+                            <Button
+                                variant={showDeletedOnly ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setShowDeletedOnly(!showDeletedOnly)}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                삭제 데이터
                             </Button>
                             <Button
                                 variant="outline"
@@ -1329,10 +1404,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 </PopoverTrigger>
                                                                 <PopoverContent className="w-32 p-1" align="start">
                                                                     <div className="flex flex-col gap-1">
-                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => startEdit(acc.id, sIdx)}>
-                                                                            <Pencil size={12} /> 수정
-                                                                        </Button>
                                                                         {!isEmpty && (
+                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-blue-600 font-bold" onClick={() => openQuickEditModal(acc.id, sIdx, val, assignment.id)}>
+                                                                                <Pencil size={12} /> 정보수정
+                                                                            </Button>
+                                                                        )}
+                                                                        {!isEmpty && !assignment.is_deleted && (
                                                                             <>
                                                                                 <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => openMoveModal(assignment)}>
                                                                                     <ArrowRightLeft size={12} /> 이동
@@ -1340,10 +1417,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                 <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-orange-600 hover:text-orange-700" onClick={() => handleDeactivate(assignment.id)}>
                                                                                     <PowerOff size={12} /> 종료
                                                                                 </Button>
-                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(assignment.id)}>
-                                                                                    <Trash2 size={12} /> 삭제
-                                                                                </Button>
                                                                             </>
+                                                                        )}
+                                                                        {!isEmpty && assignment.is_deleted && (
+                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-green-600 hover:text-green-700" onClick={() => handleRestore(assignment.id)}>
+                                                                                <ArrowRightLeft size={12} /> 복구
+                                                                            </Button>
+                                                                        )}
+                                                                        {!isEmpty && !assignment.is_deleted && (isExpired || assignment.is_active === false) && (
+                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(assignment.id)}>
+                                                                                <Trash2 size={12} /> 삭제
+                                                                            </Button>
                                                                         )}
                                                                     </div>
                                                                 </PopoverContent>
@@ -1797,10 +1881,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                         </>
                                                                                     ) : (
                                                                                         <>
-                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, assignment.slot_number)}>
-                                                                                                <Pencil size={14} />
-                                                                                            </Button>
-
                                                                                             {isEmpty && (
                                                                                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="배정" onClick={() => openAssignModal(acc, assignment.slot_number)}>
                                                                                                     <Plus size={14} />
@@ -1809,14 +1889,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                                                                             {!isEmpty && (
                                                                                                 <>
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
-                                                                                                        <ArrowRightLeft size={14} />
-                                                                                                    </Button>
-
-                                                                                                    {/* Deactivate Button for Expired/Active Accounts */}
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                                                        <PowerOff size={14} />
-                                                                                                    </Button>
 
                                                                                                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
                                                                                                         <Trash2 size={14} />
@@ -2116,6 +2188,57 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsMemoModalOpen(false)}>취소</Button>
                         <Button onClick={handleSaveMemo}>저장</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Quick Edit Modal */}
+            <Dialog open={isQuickEditModalOpen} onOpenChange={setIsQuickEditModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>최단 정보수정</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label>그룹 번호 (로그인 ID)</Label>
+                            <Input 
+                                value={accounts.find(a => a.id === quickEditAccountId)?.login_id || ''} 
+                                disabled 
+                                className="bg-gray-50 cursor-not-allowed"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="flex justify-between">
+                                <span>주문 번호</span>
+                                {quickEditValues?.order_number && (
+                                    <a 
+                                        href={`/search?orderNumber=${quickEditValues.order_number}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-600 hover:underline"
+                                    >
+                                        주문 확인하기 ↗
+                                    </a>
+                                )}
+                            </Label>
+                            <Input 
+                                value={quickEditValues?.order_number || ''} 
+                                onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, order_number: e.target.value } : null)}
+                                placeholder="주문 번호를 입력하세요"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>고객명</Label>
+                            <Input 
+                                value={quickEditValues?.buyer_name || ''} 
+                                onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_name: e.target.value } : null)}
+                                placeholder="고객명을 입력하세요"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)}>취소</Button>
+                        <Button onClick={handleSaveQuickEdit} className="bg-blue-600 hover:bg-blue-700">정보 수정</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
