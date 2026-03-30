@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -226,67 +226,8 @@ function TidalAccountsContent() {
 연장을 원하시면 아래 링크로 접속하여서 신청바랍니다.
 ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL}/public`, []);
 
-    // --- Hooks & Effects ---
-    useEffect(() => {
-        setNotificationMessage(defaultTemplate);
-    }, [defaultTemplate]);
-
-    useEffect(() => {
-        if (isHydrated && !isAdmin) router.push('/admin');
-        else if (isHydrated && isAdmin) {
-            fetchAccounts();
-            fetchPendingOrders();
-        }
-    }, [isAdmin, isHydrated, router]);
-
-    useEffect(() => {
-        const accountId = searchParams.get('accountId');
-        if (accountId && accounts.length > 0) {
-            // Switch to List View (grouped view) and expand only the assigned account
-            setIsGridView(false);
-            setExpandedRows(new Set([accountId]));
-
-            const scrollToAndHighlight = () => {
-                const element = document.getElementById(`account-${accountId}`);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    element.style.transition = 'background-color 0.5s ease-in-out';
-                    element.style.backgroundColor = '#e0f2fe';
-                    setTimeout(() => { if (element) element.style.backgroundColor = ''; }, 3000);
-                } else setTimeout(scrollToAndHighlight, 500);
-            };
-            setTimeout(scrollToAndHighlight, 500);
-        }
-    }, [searchParams, accounts]);
-
-    useEffect(() => {
-        if (isHydrated && isAdmin) {
-            fetchAccounts();
-        }
-    }, [showDeletedOnly]);
-
-    useEffect(() => {
-        if (showExpiredOnly) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const newExpanded = new Set<string>();
-            accounts.forEach(acc => {
-                const hasExpired = acc.order_accounts?.some(oa => {
-                    if (!oa.end_date) return false;
-                    const endDate = parseISO(oa.end_date);
-                    const diffTime = endDate.getTime() - today.getTime();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return diffDays <= expiredDays;
-                });
-                if (hasExpired) newExpanded.add(acc.id);
-            });
-            setExpandedRows(newExpanded);
-        }
-    }, [showExpiredOnly, accounts, expiredDays]);
-
-
     // --- Fetching Functions ---
-    const fetchAccounts = async () => {
+    const fetchAccounts = useCallback(async () => {
         try {
             const params = new URLSearchParams({ product: 'Tidal' });
             if (showDeletedOnly) {
@@ -327,9 +268,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         } catch (error) {
             console.error(error);
         }
-    };
+    }, [showDeletedOnly]);
 
-    const fetchPendingOrders = async () => {
+    const fetchPendingOrders = useCallback(async () => {
         try {
             const res = await apiFetch('/api/admin/orders', { cache: 'no-store' });
             if (res.ok) {
@@ -350,7 +291,66 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         } catch (error) {
             console.error(error);
         }
-    };
+    }, []);
+
+    // --- Hooks & Effects ---
+    useEffect(() => {
+        setNotificationMessage(defaultTemplate);
+    }, [defaultTemplate]);
+
+    useEffect(() => {
+        if (isHydrated && !isAdmin) {
+            router.replace('/');
+        }
+    }, [isAdmin, isHydrated, router]);
+
+    useEffect(() => {
+        if (isHydrated && isAdmin) {
+            fetchAccounts();
+            fetchPendingOrders();
+        }
+    }, [isAdmin, isHydrated, fetchAccounts, fetchPendingOrders]);
+
+    useEffect(() => {
+        const accountId = searchParams.get('accountId');
+        if (accountId && accounts.length > 0) {
+            // Switch to List View (grouped view) and expand only the assigned account
+            setIsGridView(false);
+            setExpandedRows(new Set([accountId]));
+
+            const scrollToAndHighlight = () => {
+                const element = document.getElementById(`account-${accountId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.style.transition = 'background-color 0.5s ease-in-out';
+                    element.style.backgroundColor = '#e0f2fe';
+                    setTimeout(() => { if (element) element.style.backgroundColor = ''; }, 3000);
+                } else setTimeout(scrollToAndHighlight, 500);
+            };
+            setTimeout(scrollToAndHighlight, 500);
+        }
+    }, [searchParams, accounts]);
+
+    useEffect(() => {
+        if (showExpiredOnly) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const newExpanded = new Set<string>();
+            accounts.forEach(acc => {
+                const hasExpired = acc.order_accounts?.some(oa => {
+                    if (!oa.end_date) return false;
+                    const endDate = parseISO(oa.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays <= expiredDays;
+                });
+                if (hasExpired) newExpanded.add(acc.id);
+            });
+            setExpandedRows(newExpanded);
+        }
+    }, [showExpiredOnly, accounts, expiredDays]);
+
+
 
     // --- Computed Helpers ---
     const getPeriodMonths = (start?: string, end?: string) => {
@@ -1057,17 +1057,41 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         return pass;
     };
 
-    const startEdit = (accountId: string, slotIdx: number) => {
-        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
-    };
 
     const cancelEdit = (accountId: string, slotIdx: number) => {
+        const key = `${accountId}_${slotIdx}`;
         setEditingSlots(prev => {
             const next = { ...prev };
-            delete next[`${accountId}_${slotIdx}`];
+            delete next[key];
             return next;
         });
-        fetchAccounts();
+
+        // Restore gridValue from accounts state locally
+        const acc = accounts.find(a => a.id === accountId);
+        if (acc) {
+            const assignment = acc.order_accounts?.find(oa => oa.slot_number === slotIdx);
+            let defaultPw = assignment?.tidal_password || '';
+            if (slotIdx === 0 && !defaultPw) defaultPw = acc.login_pw;
+
+            setGridValues(prev => ({
+                ...prev,
+                [key]: {
+                    assignment_id: assignment?.id,
+                    tidal_id: assignment?.tidal_id ?? null,
+                    tidal_password: defaultPw,
+                    buyer_name: assignment?.buyer_name || assignment?.orders?.buyer_name || assignment?.orders?.profiles?.name || '',
+                    buyer_phone: assignment?.buyer_phone || assignment?.orders?.buyer_phone || assignment?.orders?.profiles?.phone || '',
+                    buyer_email: assignment?.buyer_email || assignment?.orders?.buyer_email || '',
+                    start_date: assignment?.start_date || '',
+                    end_date: assignment?.end_date || '',
+                    order_number: assignment?.order_number || assignment?.orders?.order_number || '',
+                    type: assignment?.type || (slotIdx === 0 ? 'master' : 'user'),
+                    period_months: assignment?.period_months || 0,
+                    amount: assignment?.orders?.amount || 0,
+                    memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
+                }
+            }));
+        }
     };
 
     const openMemoModal = (accountId: string, slotIdx: number, currentMemo: string, assignmentId: string) => {
@@ -1405,9 +1429,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 <PopoverContent className="w-32 p-1" align="start">
                                                                     <div className="flex flex-col gap-1">
                                                                         {!isEmpty && (
-                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-blue-600 font-bold" onClick={() => openQuickEditModal(acc.id, sIdx, val, assignment.id)}>
-                                                                                <Pencil size={12} /> 정보수정
-                                                                            </Button>
+                                                                            <>
+                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-blue-600 font-bold" onClick={() => openQuickEditModal(acc.id, sIdx, val, assignment.id)}>
+                                                                                    <Pencil size={12} /> 정보수정
+                                                                                </Button>
+
+                                                                            </>
                                                                         )}
                                                                         {!isEmpty && !assignment.is_deleted && (
                                                                             <>
