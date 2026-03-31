@@ -237,6 +237,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             fetchAccounts();
             fetchPendingOrders();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, isHydrated, router]);
 
     useEffect(() => {
@@ -263,6 +264,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if (isHydrated && isAdmin) {
             fetchAccounts();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showDeletedOnly]);
 
     useEffect(() => {
@@ -1057,9 +1059,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         return pass;
     };
 
-    const startEdit = (accountId: string, slotIdx: number) => {
-        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
-    };
+
 
     const cancelEdit = (accountId: string, slotIdx: number) => {
         setEditingSlots(prev => {
