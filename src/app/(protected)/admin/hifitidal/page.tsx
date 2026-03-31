@@ -930,13 +930,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
 
 
-    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
-        if (selectedAssignmentIds.size === filteredFlat.length) {
-            setSelectedAssignmentIds(new Set());
-        } else {
-            setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
-        }
-    };
+
 
     const handleToggleSelection = (id: string) => {
         setSelectedAssignmentIds(prev => {
