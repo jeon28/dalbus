@@ -29,7 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 
 interface Assignment {
@@ -181,7 +181,7 @@ function HifiTidalAccountsContent() {
 
     const [isOrderDetailModalOpen, setIsOrderDetailModalOpen] = useState(false);
     const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
-    const [isLoadingOrder, setIsLoadingOrder] = useState(false);
+    const [, setIsLoadingOrder] = useState(false);
 
     // --- DAL-20: Column Resizing and Filter States ---
     const [expiredDays, setExpiredDays] = useState(7);
