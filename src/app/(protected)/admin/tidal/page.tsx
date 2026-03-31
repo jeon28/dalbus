@@ -1041,6 +1041,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
+    const startEdit = (accountId: string, slotIdx: number) => {
+        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
+    };
+
     const generateTidalPassword = () => {
         const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$";
         let pass = "";
