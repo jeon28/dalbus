@@ -182,7 +182,7 @@ function TidalAccountsContent() {
     const [expiredDays, setExpiredDays] = useState(7);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         'checkbox': 40,
-        'slot': 60,
+        'slot_col': 80,
         'manage': 60,
         'type': 40,
         'tidal_id': 250,
@@ -1235,13 +1235,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
                         <table className="w-full text-sm min-w-[1400px]">
                             <thead>
-                                <tr className="bg-gray-100 border-b">
-                                    <th className="text-center py-2 border-r border-gray-200" style={{ width: columnWidths['checkbox'] }}>
+                                <tr className="bg-gray-100/80 sticky top-0 z-10 border-b border-gray-200 shadow-sm text-sm">
+                                    <th className="relative p-2 text-center border-r border-gray-100" style={{ width: columnWidths['checkbox'] }}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length}
-                                            onChange={() => toggleSelectAll(getFlattenedAssignments())}
+                                            checked={selectedAssignmentIds.size > 0 && getFlattenedAssignments().every(item => selectedAssignmentIds.has(item.assignment.id))}
+                                            onChange={(e) => {
+                                                const flattened = getFlattenedAssignments();
+                                                if (e.target.checked) setSelectedAssignmentIds(new Set(flattened.map(item => item.assignment.id)));
+                                                else setSelectedAssignmentIds(new Set());
+                                            }}
                                         />
+                                    </th>
+                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['slot_col'] }}>
+                                        <div className="flex items-center justify-center gap-1 cursor-pointer hover:bg-gray-200 h-full" onClick={() => handleSort('login_id')}>
+                                            배정번호 {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('slot_col', e)} />
                                     </th>
                                     <th className="relative p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                         관리
@@ -1384,6 +1394,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         onChange={() => handleToggleSelection(assignment.id)}
                                                     />
                                                 </td>
+                                                <td className="p-2 text-center border-r bg-gray-50/5" style={{ width: columnWidths['slot_col'] }}>
+                                                    <span className="text-blue-600 font-bold text-xs">
+                                                        {acc.login_id}-{sIdx + 1}
+                                                    </span>
+                                                </td>
                                                 <td className="p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
                                                         {isEditing ? (
@@ -1519,7 +1534,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                         <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                         <td className="p-2 text-left border-r truncate max-w-[400px] text-xs" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
-                                                            <span className="text-blue-600 font-bold mr-2 text-[10px] whitespace-nowrap">[{acc.login_id}-{sIdx + 1}]</span>
                                                             <span className="text-gray-500">{val.memo?.split('\n')[0] || '-'}</span>
                                                         </td>
                                                     </>
