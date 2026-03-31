@@ -105,13 +105,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             finalEndDate = finalEndDate || format(addDays(parseISO(finalStartDate), durationMonths * 30), 'yyyy-MM-dd');
         }
 
+        // Determine table based on product param
+        const product = req.nextUrl.searchParams.get('product');
+        const isHifiTidal = product?.toLowerCase().includes('hifi');
+        const assignmentTable = isHifiTidal ? 'legacy_tidal_account' : 'order_accounts';
+
         // 2. Determine Slot Number and Type
         let finalSlotNumber = slot_number;
         let finalType = type;
 
         // Fetch current assignments to determine next slot or validate existing
         const { data: currentAssignments, error: fetchError } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .select('id, slot_number, type')
             .eq('account_id', account_id)
             .order('slot_number', { ascending: true });
@@ -163,56 +168,69 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 }, { status: 409 });
             }
 
+            const updatePayload: Record<string, string | number | boolean | null | undefined> = {
+                order_number: finalOrderNumber,
+                tidal_password: tidal_password || existingAssignment?.tidal_password,
+                tidal_id: tidal_id || existingAssignment?.tidal_id,
+                type: finalType || existingAssignment?.type,
+                buyer_name: finalBuyerName || existingAssignment?.buyer_name,
+                buyer_phone: finalBuyerPhone || existingAssignment?.buyer_phone,
+                buyer_email: finalBuyerEmail || existingAssignment?.buyer_email,
+                start_date: finalStartDate,
+                end_date: end_date || finalEndDate,
+                amount: amount !== undefined ? amount : (existingAssignment as { amount?: number })?.amount,
+                period_months: period_months !== undefined ? period_months : (existingAssignment as { period_months?: number })?.period_months,
+                memo: memo !== undefined ? memo : (existingAssignment as { memo?: string })?.memo
+            };
+
+            // legacy_tidal_account does NOT have order_id column
+            if (!isHifiTidal) {
+                updatePayload.order_id = targetOrderId;
+            }
+
             const { error: updateError } = await supabaseAdmin
-                .from('order_accounts')
-                .update({
-                    order_id: targetOrderId,
-                    order_number: finalOrderNumber,
-                    tidal_password: tidal_password || existingAssignment?.tidal_password,
-                    tidal_id: tidal_id || existingAssignment?.tidal_id,
-                    type: finalType || existingAssignment?.type,
-                    buyer_name: finalBuyerName || existingAssignment?.buyer_name,
-                    buyer_phone: finalBuyerPhone || existingAssignment?.buyer_phone,
-                    buyer_email: finalBuyerEmail || existingAssignment?.buyer_email,
-                    start_date: finalStartDate,
-                    end_date: end_date || finalEndDate,
-                    amount: amount !== undefined ? amount : (existingAssignment as { amount?: number })?.amount,
-                    period_months: period_months !== undefined ? period_months : (existingAssignment as { period_months?: number })?.period_months,
-                    memo: memo !== undefined ? memo : (existingAssignment as { memo?: string })?.memo
-                })
+                .from(assignmentTable)
+                .update(updatePayload)
                 .eq('id', existingAssignment?.id);
 
             if (updateError) throw updateError;
         } else {
+            const insertPayload: Record<string, string | number | boolean | null | undefined> = {
+                order_number: finalOrderNumber,
+                account_id: account_id,
+                slot_number: finalSlotNumber,
+                tidal_password: tidal_password,
+                tidal_id: tidal_id || null,
+                type: finalType,
+                buyer_name: finalBuyerName || null,
+                buyer_phone: finalBuyerPhone || null,
+                buyer_email: finalBuyerEmail || null,
+                start_date: finalStartDate,
+                end_date: finalEndDate,
+                amount: amount || 0,
+                period_months: period_months || 0,
+                memo: memo || null
+            };
+
+            // legacy_tidal_account does NOT have order_id column
+            if (!isHifiTidal) {
+                insertPayload.order_id = targetOrderId;
+            }
+
             const { error: insertError } = await supabaseAdmin
-                .from('order_accounts')
-                .insert([{
-                    order_id: targetOrderId,
-                    order_number: finalOrderNumber,
-                    account_id: account_id,
-                    slot_number: finalSlotNumber,
-                    tidal_password: tidal_password,
-                    tidal_id: tidal_id || null,
-                    type: finalType,
-                    buyer_name: finalBuyerName || null,
-                    buyer_phone: finalBuyerPhone || null,
-                    buyer_email: finalBuyerEmail || null,
-                    start_date: finalStartDate,
-                    end_date: finalEndDate,
-                    amount: amount || 0,
-                    period_months: period_months || 0,
-                    memo: memo || null
-                }]);
+                .from(assignmentTable)
+                .insert([insertPayload]);
 
             if (insertError) throw insertError;
         }
 
         // Sync Used Slots
         const { count: actualCount } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .select('*', { count: 'exact', head: true })
             .eq('account_id', account_id)
             .eq('is_active', true);
+
 
         await supabaseAdmin.from('accounts').update({ used_slots: actualCount || 0 }).eq('id', account_id);
 
