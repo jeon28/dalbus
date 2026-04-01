@@ -230,8 +230,6 @@ function TidalAccountsContent() {
 연장을 원하시면 아래 링크로 접속하여서 신청바랍니다.
 ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL}/public`, []);
 
-<<<<<<< HEAD
-=======
     // --- Hooks & Effects ---
     useEffect(() => {
         setNotificationMessage(defaultTemplate);
@@ -293,7 +291,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     }, [showExpiredOnly, accounts, expiredDays]);
 
 
->>>>>>> 6e53d3ed0d547ea26eeb83e849b206d1c1a535a7
     // --- Fetching Functions ---
     const fetchAccounts = useCallback(async () => {
         try {
@@ -1114,10 +1111,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         return pass;
     };
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 6e53d3ed0d547ea26eeb83e849b206d1c1a535a7
 
     const cancelEdit = (accountId: string, slotIdx: number) => {
         const key = `${accountId}_${slotIdx}`;
