@@ -49,7 +49,7 @@ function InactiveAccountsContent() {
     const fetchInactiveAssignments = async () => {
         try {
             setIsLoading(true);
-            const res = await apiFetch('/api/admin/assignments/inactive', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/assignments/inactive?product=Tidal', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
             setAssignments(data);

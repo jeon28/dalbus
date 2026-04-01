@@ -440,6 +440,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     if (diffDays > expiredDays) continue;
                 }
 
+                // Deleted Filter
+                if (showDeletedOnly && assignment.id.startsWith('empty_')) continue;
+
                 let periodNum = assignment.period_months || 0;
                 if (!periodNum && assignment.start_date && assignment.end_date) {
                     try {
@@ -510,6 +513,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         continue;
                     }
                 }
+
+                // Deleted Filter
+                if (showDeletedOnly && (!assignment || assignment.id.startsWith('empty_'))) continue;
 
                 flat.push({
                     accountId: acc.id,

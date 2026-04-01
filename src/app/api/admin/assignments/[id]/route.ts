@@ -80,14 +80,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
             if (oaError) throw oaError;
 
-            // 2. Re-index slots if type or is_active changed
-            const shouldReindex = type !== undefined || is_active !== undefined;
+            // 2. Re-index slots if type, is_active, or is_deleted changed
+            const shouldReindex = type !== undefined || is_active !== undefined || body.is_deleted !== undefined;
             if (shouldReindex && updatedData) {
                 // Fetch all assignments for this account
                 const { data: allSlots, error: fetchAllError } = await supabaseAdmin
                     .from(assignmentTable)
                     .select('id, slot_number, type')
                     .eq('account_id', updatedData.account_id)
+                    .eq('is_deleted', false) // Only re-index non-deleted ones
                     .order('slot_number', { ascending: true });
 
                 if (fetchAllError) throw fetchAllError;
@@ -125,7 +126,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     }
                 }
 
-                // Sync used_slots
+                // Sync used_slots (Include both active and inactive but non-deleted)
                 const { count: actualCount } = await supabaseAdmin
                     .from(assignmentTable)
                     .select('*', { count: 'exact', head: true })
@@ -219,7 +220,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             .from(assignmentTable)
             .select('*', { count: 'exact', head: true })
             .eq('account_id', assignment.account_id)
-            .eq('is_active', true);
+            .eq('is_deleted', false);
 
         await supabaseAdmin
             .from('accounts')

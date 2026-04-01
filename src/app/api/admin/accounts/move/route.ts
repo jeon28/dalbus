@@ -71,11 +71,13 @@ export async function POST(req: NextRequest) {
 
 
         // 3. Perform Move (Update order_accounts)
-        const updatePayload: Record<string, string | number | undefined> = {
+        const updatePayload: any = {
             account_id: target_account_id,
             slot_number: target_slot_number,
             tidal_password: target_tidal_password,
-            assigned_at: new Date().toISOString()
+            assigned_at: new Date().toISOString(),
+            is_deleted: false,
+            is_active: true
         };
 
         if (target_slot_number === 0) {

@@ -3,13 +3,19 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const { data, error } = await supabaseAdmin
+        const { searchParams } = new URL(req.url);
+        const product = searchParams.get('product');
+
+        let query = supabaseAdmin
             .from('order_accounts')
             .select(`
                 *,
-                accounts ( login_id ),
+                accounts!inner ( 
+                    login_id,
+                    products!inner ( name, slug )
+                ),
                 orders ( 
                     order_number, 
                     buyer_name,
@@ -19,7 +25,16 @@ export async function GET() {
                 )
             `)
             .eq('is_active', false)
-            .order('assigned_at', { ascending: false });
+            .eq('is_deleted', false);
+
+        if (product) {
+            query = query.ilike('accounts.products.slug', `%${product}%`);
+        } else {
+            // Default to Tidal if not specified, to avoid showing unrelated products
+            query = query.ilike('accounts.products.slug', '%tidal%');
+        }
+
+        const { data, error } = await query.order('assigned_at', { ascending: false });
 
         if (error) throw error;
 

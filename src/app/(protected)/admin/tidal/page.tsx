@@ -458,9 +458,36 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }[] = [];
 
         accounts.forEach((acc, accIdx) => {
+            if (showDeletedOnly) {
+                // When showing deleted data, show ALL historical deleted assignments
+                const deletedAssignments = (acc.order_accounts || []).filter(oa => oa.is_deleted);
+                deletedAssignments.forEach(assignment => {
+                    const periodNum = getPeriodMonths(assignment.start_date, assignment.end_date);
+                    
+                    // Search Filter
+                    const query = searchQuery.toLowerCase().trim();
+                    if (query) {
+                        const buyerName = (assignment.buyer_name || assignment.orders?.buyer_name || '').toLowerCase();
+                        const buyerEmail = (assignment.buyer_email || assignment.orders?.buyer_email || '').toLowerCase();
+                        const tidalId = (assignment.tidal_id || '').toLowerCase();
+                        const buyerPhone = (assignment.buyer_phone || assignment.orders?.buyer_phone || '').toLowerCase();
+                        if (!buyerName.includes(query) && !buyerEmail.includes(query) && !tidalId.includes(query) && !buyerPhone.includes(query)) return;
+                    }
+
+                    flattened.push({
+                        id: assignment.id,
+                        assignment,
+                        account: acc,
+                        period: periodNum,
+                        originalAccIndex: accIdx
+                    });
+                });
+                return;
+            }
+
             for (let i = 0; i < acc.max_slots; i++) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i);
+                let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i && !oa.is_deleted);
                 if (!assignment) {
                     assignment = {
                         id: `empty_${acc.id}_${i}`,
@@ -504,10 +531,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 let periodNum = assignment.period_months || 0;
                 if (!periodNum && assignment.start_date && assignment.end_date) {
                     try {
-                        const start = parseISO(assignment.start_date);
-                        const end = parseISO(assignment.end_date);
-                        const days = differenceInDays(end, start);
-                        periodNum = Math.floor(days / 30);
+                        periodNum = getPeriodMonths(assignment.start_date, assignment.end_date);
                     } catch { }
                 }
 
@@ -571,6 +595,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         continue;
                     }
                 }
+
+                // Deleted Filter
+                if (showDeletedOnly && (!assignment || assignment.id.startsWith('empty_'))) continue;
 
                 flat.push({
                     accountId: acc.id,
@@ -1694,38 +1721,50 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         {sortedAccounts
                             .map((acc) => {
                                 const isExpanded = expandedRows.has(acc.id);
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                const paddedAssignments: any[] = [];
-
-                                for (let i = 0; i < acc.max_slots; i++) {
-                                    const existing = acc.order_accounts?.find(oa => oa.slot_number === i);
-                                    if (existing) {
-                                        paddedAssignments.push(existing);
-                                    } else {
-                                        paddedAssignments.push({
-                                            id: `empty_${acc.id}_${i}`,
-                                            slot_number: i,
-                                            type: i === 0 ? 'master' : 'user',
-                                            account_id: acc.id,
-                                            is_active: true,
-                                            // Empty placeholders
-                                            tidal_id: null,
-                                            tidal_password: null,
-                                            buyer_name: null,
-                                            buyer_email: null,
-                                            buyer_phone: null,
-                                            order_number: null,
-                                            start_date: null,
-                                            end_date: null
-                                        });
+                                let sortedAssignments: any[] = [];
+                                
+                                if (showDeletedOnly) {
+                                    // List ALL deleted assignments for this account
+                                    sortedAssignments = (acc.order_accounts || []).filter(oa => oa.is_deleted);
+                                    if (sortedAssignments.length === 0) return null;
+                                } else {
+                                    const paddedAssignments: any[] = [];
+                                    for (let i = 0; i < acc.max_slots; i++) {
+                                        const existing = acc.order_accounts?.find(oa => oa.slot_number === i && !oa.is_deleted);
+                                        if (existing) {
+                                            paddedAssignments.push(existing);
+                                        } else {
+                                            paddedAssignments.push({
+                                                id: `empty_${acc.id}_${i}`,
+                                                slot_number: i,
+                                                type: i === 0 ? 'master' : 'user',
+                                                account_id: acc.id,
+                                                is_active: true,
+                                                tidal_id: null,
+                                                tidal_password: null,
+                                                buyer_name: null,
+                                                buyer_email: null,
+                                                buyer_phone: null,
+                                                order_number: null,
+                                                start_date: null,
+                                                end_date: null
+                                            });
+                                        }
                                     }
+
+                                    sortedAssignments = paddedAssignments.sort((a, b) => {
+                                        if (a.type === 'master' && b.type !== 'master') return -1;
+                                        if (b.type === 'master' && a.type !== 'master') return 1;
+                                        return (a.slot_number || 0) - (b.slot_number || 0);
+                                    });
                                 }
 
-                                let sortedAssignments = paddedAssignments.sort((a, b) => {
-                                    if (a.type === 'master' && b.type !== 'master') return -1;
-                                    if (b.type === 'master' && a.type !== 'master') return 1;
-                                    return (a.slot_number || 0) - (b.slot_number || 0);
-                                });
+                                // --- Deleted Filter Functionality ---
+                                if (showDeletedOnly) {
+                                    sortedAssignments = sortedAssignments.filter(assignment => !assignment.id.startsWith('empty_'));
+                                    // If no deleted assignments in this account, hide the account row
+                                    if (sortedAssignments.length === 0) return null;
+                                }
 
                                 // --- Expired Filter Functionality ---
                                 if (showExpiredOnly) {
@@ -2107,7 +2146,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
             <Dialog open={isMoveModalOpen} onOpenChange={setIsMoveModalOpen}>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>배정 이동</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{selectedAssignment?.is_deleted ? '삭제 데이터 배정 복구' : '배정 이동'}</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-4">
                         <div className="border p-2 rounded bg-gray-50 text-sm mb-4">
                             <div className="font-bold mb-1">이동 대상:</div>

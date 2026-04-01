@@ -12,6 +12,7 @@ export async function GET() {
                 accounts ( login_id )
             `)
             .eq('is_active', false)
+            .eq('is_deleted', false)
             .order('assigned_at', { ascending: false });
 
         if (error) throw error;
