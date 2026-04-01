@@ -29,6 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 
 interface Assignment {
@@ -55,6 +56,8 @@ interface Assignment {
     period_months?: number;
     amount?: number;
     memo?: string;
+    is_active?: boolean;
+    is_deleted?: boolean;
 }
 
 interface Account {
@@ -142,6 +145,7 @@ function HifiTidalAccountsContent() {
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
+    const [showDeletedOnly, setShowDeletedOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [newAccount, setNewAccount] = useState({
@@ -161,6 +165,13 @@ function HifiTidalAccountsContent() {
     const [isSendingNotify, setIsSendingNotify] = useState(false);
     const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
     
+    // Quick Edit Feature State
+    const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
+    const [quickEditValues, setQuickEditValues] = useState<GridValue | null>(null);
+    const [quickEditAccountId, setQuickEditAccountId] = useState('');
+    const [quickEditSlotIdx, setQuickEditSlotIdx] = useState<number | null>(null);
+    const [quickEditAssignmentId, setQuickEditAssignmentId] = useState('');
+    
     // Memo Feature State
     const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
     const [currentMemoInput, setCurrentMemoInput] = useState('');
@@ -168,11 +179,15 @@ function HifiTidalAccountsContent() {
     const [memoTargetSlotIdx, setMemoTargetSlotIdx] = useState<number | null>(null);
     const [memoTargetAssignmentId, setMemoTargetAssignmentId] = useState('');
 
+    const [isOrderDetailModalOpen, setIsOrderDetailModalOpen] = useState(false);
+    const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+    const [, setIsLoadingOrder] = useState(false);
+
     // --- DAL-20: Column Resizing and Filter States ---
     const [expiredDays, setExpiredDays] = useState(7);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         'checkbox': 40,
-        'slot': 60,
+        'slot_col': 80,
         'manage': 60,
         'type': 40,
         'tidal_id': 250,
@@ -227,7 +242,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             fetchAccounts();
             fetchPendingOrders();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, isHydrated, router]);
+
+    useEffect(() => {
+        if (isHydrated && isAdmin) {
+            fetchAccounts();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showDeletedOnly]);
 
     useEffect(() => {
         const accountId = searchParams.get('accountId');
@@ -272,7 +295,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     // --- Fetching Functions ---
     const fetchAccounts = async () => {
         try {
-            const res = await apiFetch('/api/admin/accounts?product=HifiTidal', { cache: 'no-store' });
+            const params = new URLSearchParams({ product: 'HifiTidal' });
+            if (showDeletedOnly) {
+                params.append('showDeleted', 'true');
+            } else {
+                params.append('showInactive', 'true');
+            }
+            const res = await apiFetch(`/api/admin/accounts?${params.toString()}`, { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setAccounts(data);
@@ -294,10 +323,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         start_date: assignment?.start_date || '',
                         end_date: assignment?.end_date || '',
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
+                        order_id: assignment?.order_id || assignment?.orders?.id || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'),
                         period_months: assignment?.period_months || 0,
                         amount: assignment?.amount || 0,
-                        memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
+                        memo: assignment?.memo || assignment?.orders?.profiles?.memo || '',
                     };
                 }
             });
@@ -640,7 +670,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
         try {
             if (data.assignment_id) {
-                const res = await apiFetch(`/api/admin/assignments/${data.assignment_id}`, {
+                const res = await apiFetch(`/api/admin/assignments/${data.assignment_id}?product=HifiTidal`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -651,7 +681,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     alert('이름 또는 ID(이메일)를 입력해주세요.');
                     return;
                 }
-                const res = await apiFetch(`/api/admin/accounts/${accountId}/assign`, {
+                const res = await apiFetch(`/api/admin/accounts/${accountId}/assign?product=HifiTidal`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ...data, slot_number: slotIdx })
@@ -690,7 +720,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
         if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
-            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}?product=HifiTidal`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts();
             fetchPendingOrders();
@@ -699,16 +729,38 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
-    const handleDeactivate = async (assignmentId: string) => {
-        if (!confirm('배정을 종료하시겠습니까?')) return;
+    const handleToggleActive = async (assignmentId: string, currentStatus: boolean | undefined) => {
+        const nextStatus = !currentStatus;
+        if (!nextStatus) {
+            if (!confirm('배정을 종료하시겠습니까?\n종료 시 해당 행이 붉은색으로 표시됩니다.')) return;
+        } else {
+            if (!confirm('배정을 다시 원상 복구하시겠습니까?')) return;
+        }
+
         try {
-            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}?product=HifiTidal`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: false })
+                body: JSON.stringify({ is_active: nextStatus })
             });
-            if (!res.ok) throw new Error('Deactivation failed');
-            alert('비활성화 되었습니다.');
+            if (!res.ok) throw new Error('Toggle failed');
+            alert(nextStatus ? '복구되었습니다.' : '종료되었습니다.');
+            fetchAccounts();
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleRestore = async (assignmentId: string) => {
+        if (!confirm('배정을 복구하시겠습니까?')) return;
+        try {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}?product=HifiTidal`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_deleted: false, is_active: true })
+            });
+            if (!res.ok) throw new Error('Restore failed');
+            alert('복구되었습니다. (배정 번호 유지)');
             fetchAccounts();
         } catch (error) {
             alert('실패: ' + (error instanceof Error ? error.message : String(error)));
@@ -909,7 +961,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     order_id: selectedAssignment.orders?.id,
                     target_account_id: selectedTargetAccount,
                     target_slot_number: selectedTargetSlot,
-                    target_tidal_password: selectedAssignment.tidal_password
+                    target_tidal_password: selectedAssignment.tidal_password,
+                    source_table: 'legacy_tidal_account'
                 })
             });
 
@@ -930,13 +983,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
 
 
-    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
-        if (selectedAssignmentIds.size === filteredFlat.length) {
-            setSelectedAssignmentIds(new Set());
-        } else {
-            setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
-        }
-    };
+
 
     const handleToggleSelection = (id: string) => {
         setSelectedAssignmentIds(prev => {
@@ -1002,6 +1049,38 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         fetchAccounts();
     };
 
+    const openQuickEditModal = (accountId: string, slotIdx: number, values: GridValue, assignmentId: string) => {
+        setQuickEditAccountId(accountId);
+        setQuickEditSlotIdx(slotIdx);
+        setQuickEditAssignmentId(assignmentId);
+        setQuickEditValues({ ...values });
+        setIsQuickEditModalOpen(true);
+    };
+
+    const handleSaveQuickEdit = async () => {
+        if (!quickEditAssignmentId || !quickEditValues) return;
+        try {
+            const res = await apiFetch(`/api/admin/assignments/${quickEditAssignmentId}?product=HifiTidal`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(quickEditValues)
+            });
+            if (!res.ok) throw new Error('Update failed');
+            
+            // UI 상태 반영 (Grid View 데이터 캐시 업데이트)
+            setGridValues(prev => ({
+                ...prev,
+                [`${quickEditAccountId}_${quickEditSlotIdx}`]: { ...quickEditValues }
+            }));
+            
+            setIsQuickEditModalOpen(false);
+            fetchAccounts();
+            alert('정보가 수정되었습니다.');
+        } catch (e) {
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
+        }
+    };
+
     const openMemoModal = (accountId: string, slotIdx: number, currentMemo: string, assignmentId: string) => {
         setMemoTargetAccountId(accountId);
         setMemoTargetSlotIdx(slotIdx);
@@ -1026,10 +1105,29 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         setIsMemoModalOpen(true);
     };
 
+    const fetchOrderDetails = async (orderId: string) => {
+        setIsLoadingOrder(true);
+        try {
+            const res = await apiFetch(`/api/admin/orders/${orderId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setSelectedOrderDetails(data);
+                setIsOrderDetailModalOpen(true);
+            } else {
+                alert('주문 정보를 불러오지 못했습니다.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('오류가 발생했습니다.');
+        } finally {
+            setIsLoadingOrder(false);
+        }
+    };
+
     const handleSaveMemo = async () => {
         if (!memoTargetAssignmentId) return;
         try {
-            const res = await apiFetch(`/api/admin/assignments/${memoTargetAssignmentId}`, {
+            const res = await apiFetch(`/api/admin/assignments/${memoTargetAssignmentId}?product=HifiTidal`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ memo: currentMemoInput })
@@ -1093,9 +1191,18 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 잔여일 조회
                             </Button>
                             <Button
+                                variant={showDeletedOnly ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setShowDeletedOnly(!showDeletedOnly)}
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                삭제 데이터
+                            </Button>
+                            <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => router.push('/admin/tidal/inactive')}
+                                onClick={() => router.push('/admin/hifitidal/inactive')}
                                 className="flex items-center gap-2 h-8"
                             >
                                 <History className="w-4 h-4" />
@@ -1158,13 +1265,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
                         <table className="w-full text-sm min-w-[1400px]">
                             <thead>
-                                <tr className="bg-gray-100 border-b">
-                                    <th className="text-center py-2 border-r border-gray-200" style={{ width: columnWidths['checkbox'] }}>
+                                <tr className="bg-gray-100/80 sticky top-0 z-10 border-b border-gray-200 shadow-sm text-sm">
+                                    <th className="relative p-2 text-center border-r border-gray-100" style={{ width: columnWidths['checkbox'] }}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length}
-                                            onChange={() => toggleSelectAll(getFlattenedAssignments())}
+                                            checked={selectedAssignmentIds.size > 0 && getFlattenedAssignments().every(item => selectedAssignmentIds.has(item.assignment.id))}
+                                            onChange={(e) => {
+                                                const flattened = getFlattenedAssignments();
+                                                if (e.target.checked) setSelectedAssignmentIds(new Set(flattened.map(item => item.assignment.id)));
+                                                else setSelectedAssignmentIds(new Set());
+                                            }}
                                         />
+                                    </th>
+                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['slot_col'] }}>
+                                        <div className="flex items-center justify-center gap-1 cursor-pointer hover:bg-gray-200 h-full" onClick={() => handleSort('login_id')}>
+                                            배정번호 {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('slot_col', e)} />
                                     </th>
                                     <th className="relative p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                         관리
@@ -1268,7 +1385,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     break;
                                                 case 'buyer_email':
                                                     aVal = a.assignment.buyer_email || a.assignment.orders?.buyer_email || '';
-                                                    bVal = b.assignment.buyer_email || b.assignment.orders?.buyer_email || '';
+                                                    bVal = b.assignment.buyer_email || a.assignment.orders?.buyer_email || '';
                                                     break;
                                                 default:
                                                     return 0;
@@ -1297,15 +1414,21 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const isExpired = assignment.end_date ? parseISO(assignment.end_date) < today : false;
 
                                         const isEmpty = assignment.id.startsWith('empty_');
+                                        const isActive = assignment.is_active !== false;
 
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                 <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedAssignmentIds.has(assignment.id)}
                                                         onChange={() => handleToggleSelection(assignment.id)}
                                                     />
+                                                </td>
+                                                <td className="p-2 text-center border-r bg-gray-50/5" style={{ width: columnWidths['slot_col'] }}>
+                                                    <span className={`font-bold text-xs ${!isActive ? 'text-red-700' : 'text-blue-600'}`}>
+                                                        {acc.login_id}-{sIdx + 1}
+                                                    </span>
                                                 </td>
                                                 <td className="p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
@@ -1327,21 +1450,28 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                 </PopoverTrigger>
                                                                 <PopoverContent className="w-32 p-1" align="start">
                                                                     <div className="flex flex-col gap-1">
-                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => startEdit(acc.id, sIdx)}>
-                                                                            <Pencil size={12} /> 수정
+                                                                                 <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-blue-600 font-bold" onClick={() => openQuickEditModal(acc.id, sIdx, val, assignment.id)}>
+                                                                            <Pencil size={12} /> 정보수정
                                                                         </Button>
-                                                                        {!isEmpty && (
+                                                                        {!isEmpty && !assignment.is_deleted && (
                                                                             <>
                                                                                 <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => openMoveModal(assignment)}>
                                                                                     <ArrowRightLeft size={12} /> 이동
                                                                                 </Button>
-                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-orange-600 hover:text-orange-700" onClick={() => handleDeactivate(assignment.id)}>
-                                                                                    <PowerOff size={12} /> 종료
-                                                                                </Button>
-                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(assignment.id)}>
-                                                                                    <Trash2 size={12} /> 삭제
+                                                                                <Button size="sm" variant="ghost" className={`h-8 justify-start gap-2 text-xs ${!isActive ? 'text-blue-600' : 'text-orange-600 hover:text-orange-700'}`} onClick={() => handleToggleActive(assignment.id, assignment.is_active)}>
+                                                                                    <PowerOff size={12} /> {!isActive ? '복구' : '종료'}
                                                                                 </Button>
                                                                             </>
+                                                                        )}
+                                                                        {!isEmpty && assignment.is_deleted && (
+                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-green-600 hover:text-green-700" onClick={() => handleRestore(assignment.id)}>
+                                                                                <ArrowRightLeft size={12} /> 복구
+                                                                            </Button>
+                                                                        )}
+                                                                        {!isEmpty && !assignment.is_deleted && (isExpired || assignment.is_active === false) && (
+                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(assignment.id)}>
+                                                                                <Trash2 size={12} /> 삭제
+                                                                            </Button>
                                                                         )}
                                                                     </div>
                                                                 </PopoverContent>
@@ -1410,17 +1540,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
+                                                        <td className={`p-2 border-r truncate max-w-[120px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
                                                             <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.tidal_id || '-'}</span>
                                                         </td>
 
-                                                        <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
+                                                        <td className={`p-2 border-r truncate max-w-[80px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
                                                             <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</span>
                                                         </td>
-                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.buyer_email || assignment.orders?.buyer_email || undefined} style={{ width: columnWidths['buyer_email'] }}>
+                                                        <td className={`p-2 border-r truncate max-w-[120px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.buyer_email || assignment.orders?.buyer_email || undefined} style={{ width: columnWidths['buyer_email'] }}>
                                                             {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
                                                         </td>
-                                                        <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
+                                                        <td className={`p-2 border-r truncate max-w-[100px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
                                                             {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
                                                         </td>
 
@@ -1433,7 +1563,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                         <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                         <td className="p-2 text-left border-r truncate max-w-[400px] text-xs" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
-                                                            <span className="text-blue-600 font-bold mr-2 text-[10px] whitespace-nowrap">[{acc.login_id}-{sIdx + 1}]</span>
                                                             <span className="text-gray-500">{val.memo?.split('\n')[0] || '-'}</span>
                                                         </td>
                                                     </>
@@ -1619,6 +1748,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const key = `${acc.id}_${sIdx}`;
                                                                     const val = gridValues[key] || {}; // Current Input Values
                                                                     const isEditing = editingSlots[key];
+                                                                    const isActive = assignment.is_active !== false;
 
                                                                     // Period Calc for display
                                                                     let period = '-';
@@ -1641,9 +1771,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const isEmpty = assignment.id.startsWith('empty_');
 
                                                                     return (
-                                                                        <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
+                                                                        <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : ''}`}>
                                                                             <td className="text-center text-[10px] font-bold">
-                                                                                <span className={isEmpty ? "text-green-600" : "text-gray-900"}>
+                                                                                <span className={!isActive ? 'text-red-700 font-bold' : isEmpty ? "text-green-600" : "text-gray-900"}>
                                                                                     {acc.login_id}-{assignment.slot_number + 1}
                                                                                 </span>
                                                                             </td>
@@ -1651,57 +1781,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             {isEditing ? (
                                                                                 <>
                                                                                     <td className="px-1">
-                                                                                        <Select value={val.type || 'user'} onValueChange={async (value) => {
-                                                                                            if (value === 'master') {
-                                                                                                const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master' && oa.slot_number !== sIdx);
-                                                                                                if (hasMaster) {
-                                                                                                    alert('이미 Master가 설정되어 있습니다.');
-                                                                                                    return;
-                                                                                                }
-                                                                                                if (sIdx !== 0) {
-                                                                                                    const assignment = acc.order_accounts?.find(oa => oa.slot_number === sIdx);
-                                                                                                    const slot0InUse = acc.order_accounts?.some(oa => oa.slot_number === 0 && !oa.id.startsWith('empty_'));
-                                                                                                    
-                                                                                                    if (slot0InUse) {
-                                                                                                        alert('1번 슬롯이 이미 사용 중입니다. 기존 마스터 또는 1번 슬롯 사용자를 먼저 비워주세요.');
-                                                                                                        return;
-                                                                                                    }
-                                                                                                    
-                                                                                                    if (assignment && !assignment.id.startsWith('empty_')) {
-                                                                                                        if (confirm('마스터로 변경 시 즉시 1번 슬롯으로 이동합니다. 계속하시겠습니까?')) {
-                                                                                                            try {
-                                                                                                                const res = await apiFetch(`/api/admin/assignments/${assignment.id}`, {
-                                                                                                                    method: 'PUT',
-                                                                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                                                                    body: JSON.stringify({ type: 'master' })
-                                                                                                                });
-                                                                                                                if (!res.ok) {
-                                                                                                                    const errorData = await res.json().catch(() => null);
-                                                                                                                    throw new Error(errorData?.error || '변경에 실패했습니다.');
-                                                                                                                }
-                                                                                                                cancelEdit(acc.id, sIdx);
-                                                                                                                fetchAccounts();
-                                                                                                                alert('마스터로 변경되었습니다.');
-                                                                                                            } catch (error) {
-                                                                                                                alert('변경 실패: ' + (error instanceof Error ? error.message : String(error)));
-                                                                                                            }
-                                                                                                        }
-                                                                                                        return;
-                                                                                                    } else {
-                                                                                                        alert('신규 마스터 배정은 1번 슬롯의 "수정" 또는 "배정" 버튼을 통해 진행해주세요.');
-                                                                                                        return;
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                            updateGridValue(acc.id, sIdx, 'type', value);
-                                                                                        }}>
+                                                                                        <Select value={val.type || 'user'} onValueChange={(value) => updateGridValue(acc.id, sIdx, 'type', value)}>
                                                                                             <SelectTrigger className="h-8 text-xs bg-white">
                                                                                                 <SelectValue />
                                                                                             </SelectTrigger>
                                                                                             <SelectContent>
                                                                                                 <SelectItem value="master">Master</SelectItem>
                                                                                                 <SelectItem value="user">User</SelectItem>
-                                                                                             </SelectContent>
+                                                                                            </SelectContent>
                                                                                         </Select>
                                                                                     </td>
                                                                                     <td className="px-1">
@@ -1719,26 +1806,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                     <td className="px-1">
                                                                                         <Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
                                                                                     </td>
-                                                                                    <td className="px-1 w-12">
-                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
-                                                                                    </td>
                                                                                     <td className="px-1">
                                                                                         <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
                                                                                     </td>
-                                                                                    <td className="px-1 w-16">
+                                                                                    <td className="px-1 w-12">
+                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
+                                                                                    </td>
+                                                                                    <td className="px-1 w-20">
                                                                                         <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} />
                                                                                     </td>
                                                                                 </>
                                                                             ) : isEmpty ? (
                                                                                 <>
-                                                                                    <td className="px-2 text-center"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
+                                                                                    <td colSpan={9}></td>
                                                                                 </>
                                                                             ) : (
                                                                                 <>
@@ -1747,43 +1827,32 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                                                                                 {val.type === 'master' ? 'Master' : 'User'}
                                                                                             </span>
-                                                                                            {assignment.id && !assignment.id.startsWith('empty') && (
-                                                                                                <MessageSquareText
-                                                                                                    size={14}
-                                                                                                    className={`cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        openMemoModal(acc.id, sIdx, val.memo || '', assignment.id);
-                                                                                                    }}
-                                                                                                />
-                                                                                            )}
+                                                                                            <MessageSquareText
+                                                                                                size={14}
+                                                                                                className={`cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
+                                                                                                onClick={() => openMemoModal(acc.id, sIdx, val.memo || '', assignment.id)}
+                                                                                            />
                                                                                         </div>
                                                                                     </td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>
-                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.tidal_id || '-'}</span>
-                                                                                    </td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>
-                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.buyer_name || '-'}</span>
-                                                                                    </td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
-                                                                                    <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
+                                                                                    <td className={`px-2 truncate max-w-[120px] ${!isActive ? 'text-red-600 font-bold' : 'text-gray-700'}`} title={val.tidal_id || undefined}>{val.tidal_id || '-'}</td>
+                                                                                    <td className={`px-2 truncate max-w-[80px] ${!isActive ? 'text-red-600' : 'text-gray-700'}`} title={val.buyer_name || undefined}>{val.buyer_name || '-'}</td>
+                                                                                    <td className={`px-2 truncate max-w-[120px] ${!isActive ? 'text-red-600' : 'text-gray-700'}`} title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
+                                                                                    <td className={`px-2 truncate max-w-[100px] ${!isActive ? 'text-red-600' : 'text-gray-700'}`} title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
+                                                                                    <td className={`px-2 font-mono ${!isActive ? 'text-red-500' : 'text-gray-500'}`}>{val.start_date || '-'}</td>
                                                                                     <td className="px-2 font-mono">
-                                                                                        <span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>
+                                                                                        <span className={isExpired ? "text-red-500 font-bold" : !isActive ? "text-red-600" : "text-gray-500"}>
                                                                                             {val.end_date || '-'}
                                                                                             {isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}
                                                                                         </span>
                                                                                     </td>
+                                                                                    <td className={`text-center font-mono ${!isActive ? 'text-red-500' : 'text-gray-500'}`}>{period}</td>
+                                                                                    <td className={`text-right font-mono px-2 ${!isActive ? 'text-red-600 font-bold' : 'text-gray-700'}`}>
+                                                                                        {val.amount ? val.amount.toLocaleString() : '-'}
+                                                                                    </td>
                                                                                 </>
                                                                             )}
 
-                                                                            <td className="text-center text-gray-500 font-mono">
-                                                                                {!isEmpty ? period : ''}
-                                                                            </td>
-                                                                            <td className="text-right text-gray-700 font-mono px-2">
-                                                                                {!isEmpty ? (val.amount ? val.amount.toLocaleString() : '-') : ''}
-                                                                            </td>
-                                                                            <td>
+                                                                            <td className="px-1 text-center">
                                                                                 <div className="flex justify-center gap-1 items-center">
                                                                                     {isEditing ? (
                                                                                         <>
@@ -1794,33 +1863,35 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                                 X
                                                                                             </Button>
                                                                                         </>
+                                                                                    ) : assignment.is_deleted ? (
+                                                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-700" title="삭제 데이터 복구" onClick={() => handleRestore(assignment.id)}>
+                                                                                            <ArrowRightLeft size={14} />
+                                                                                        </Button>
+                                                                                    ) : isEmpty ? (
+                                                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="배정" onClick={() => openAssignModal(acc, assignment.slot_number)}>
+                                                                                            <Plus size={14} />
+                                                                                        </Button>
                                                                                     ) : (
                                                                                         <>
                                                                                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, assignment.slot_number)}>
                                                                                                 <Pencil size={14} />
                                                                                             </Button>
-
-                                                                                            {isEmpty && (
-                                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="배정" onClick={() => openAssignModal(acc, assignment.slot_number)}>
-                                                                                                    <Plus size={14} />
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
+                                                                                                <ArrowRightLeft size={14} />
+                                                                                            </Button>
+                                                                                            <Button 
+                                                                                                size="sm" 
+                                                                                                variant="ghost" 
+                                                                                                className={`h-7 w-7 p-0 ${!isActive ? 'text-blue-600 hover:text-blue-700' : 'text-gray-400 hover:text-orange-600'}`} 
+                                                                                                title={!isActive ? "복구" : "종료"} 
+                                                                                                onClick={() => handleToggleActive(assignment.id, assignment.is_active)}
+                                                                                            >
+                                                                                                <PowerOff size={14} />
+                                                                                            </Button>
+                                                                                            {(isExpired || !isActive) && (
+                                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
+                                                                                                    <Trash2 size={14} />
                                                                                                 </Button>
-                                                                                            )}
-
-                                                                                            {!isEmpty && (
-                                                                                                <>
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
-                                                                                                        <ArrowRightLeft size={14} />
-                                                                                                    </Button>
-
-                                                                                                    {/* Deactivate Button for Expired/Active Accounts */}
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-orange-600" title="비활성화 (종료)" onClick={() => handleDeactivate(assignment.id)}>
-                                                                                                        <PowerOff size={14} />
-                                                                                                    </Button>
-
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                                                        <Trash2 size={14} />
-                                                                                                    </Button>
-                                                                                                </>
                                                                                             )}
                                                                                         </>
                                                                                     )}
@@ -1887,23 +1958,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 <Label htmlFor="edit_login_id" className="text-right">
                                     그룹 ID <span className="text-red-500">*</span>
                                 </Label>
-                                <Input id="edit_login_id" value={editingAccount.login_id || ''} onChange={(e) => setEditingAccount({ ...editingAccount, login_id: e.target.value })} className="col-span-3" required />
+                                <Input id="edit_login_id" value={editingAccount?.login_id || ''} onChange={(e) => setEditingAccount(prev => prev ? { ...prev, login_id: e.target.value } : null)} className="col-span-3" required />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit_payment_email" className="text-right">
                                     결제 계정 <span className="text-red-500">*</span>
                                 </Label>
-                                <Input id="edit_payment_email" value={editingAccount.payment_email || ''} onChange={(e) => setEditingAccount({ ...editingAccount, payment_email: e.target.value })} className="col-span-3" required />
+                                <Input id="edit_payment_email" value={editingAccount?.payment_email || ''} onChange={(e) => setEditingAccount(prev => prev ? { ...prev, payment_email: e.target.value } : null)} className="col-span-3" required />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit_payment_day" className="text-right">
                                     결제일 <span className="text-red-500">*</span>
                                 </Label>
-                                <Input id="edit_payment_day" type="number" min="1" max="31" value={editingAccount.payment_day || 1} onChange={(e) => setEditingAccount({ ...editingAccount, payment_day: parseInt(e.target.value) || 1 })} className="col-span-3" required />
+                                <Input id="edit_payment_day" type="number" min="1" max="31" value={editingAccount?.payment_day || 1} onChange={(e) => setEditingAccount(prev => prev ? { ...prev, payment_day: parseInt(e.target.value) || 1 } : null)} className="col-span-3" required />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit_memo" className="text-right">메모</Label>
-                                <Input id="edit_memo" value={editingAccount.memo || ''} onChange={(e) => setEditingAccount({ ...editingAccount, memo: e.target.value })} className="col-span-3" />
+                                <Input id="edit_memo" value={editingAccount?.memo || ''} onChange={(e) => setEditingAccount(prev => prev ? { ...prev, memo: e.target.value } : null)} className="col-span-3" />
                             </div>
                         </div>
                     )}
@@ -1997,12 +2068,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     <div className="flex justify-around items-end">
                                         <div>
                                             <div className="text-[10px] text-green-500">신규</div>
-                                            <div className="text-xl font-bold text-green-700">{importResults.success.masters.created}</div>
+                                            <div className="text-xl font-bold text-green-700">{importResults?.success.masters.created}</div>
                                         </div>
                                         <div className="text-gray-300 mb-1">/</div>
                                         <div>
                                             <div className="text-[10px] text-green-500">업데이트</div>
-                                            <div className="text-xl font-bold text-green-700">{importResults.success.masters.updated}</div>
+                                            <div className="text-xl font-bold text-green-700">{importResults?.success.masters.updated}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -2011,22 +2082,22 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     <div className="flex justify-around items-end">
                                         <div>
                                             <div className="text-[10px] text-blue-500">신규</div>
-                                            <div className="text-xl font-bold text-blue-700">{importResults.success.slots.created}</div>
+                                            <div className="text-xl font-bold text-blue-700">{importResults?.success.slots.created}</div>
                                         </div>
                                         <div className="text-gray-300 mb-1">/</div>
                                         <div>
                                             <div className="text-[10px] text-blue-500">업데이트</div>
-                                            <div className="text-xl font-bold text-blue-700">{importResults.success.slots.updated}</div>
+                                            <div className="text-xl font-bold text-blue-700">{importResults?.success.slots.updated}</div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {importResults.failed.length > 0 && (
+                            {importResults?.failed && importResults.failed.length > 0 && (
                                 <div className="space-y-2">
-                                    <h4 className="text-sm font-bold text-red-600">실패 목록 ({importResults.failed.length})</h4>
+                                    <h4 className="text-sm font-bold text-red-600">실패 목록 ({importResults?.failed.length})</h4>
                                     <div className="max-h-40 overflow-y-auto border rounded divide-y text-xs">
-                                        {importResults.failed.map((f, i) => (
+                                        {importResults?.failed.map((f, i) => (
                                             <div key={i} className="p-2 flex justify-between">
                                                 <span className="font-medium">{f.id}</span>
                                                 <span className="text-red-500">{f.reason}</span>
@@ -2114,6 +2185,204 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <Button variant="outline" onClick={() => setIsMemoModalOpen(false)}>취소</Button>
                         <Button onClick={handleSaveMemo}>저장</Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* Quick Edit Modal */}
+            <Dialog open={isQuickEditModalOpen} onOpenChange={setIsQuickEditModalOpen}>
+                <DialogContent 
+                    className="max-w-[480px] w-[95vw] max-h-[90vh] overflow-y-auto rounded-[2.5rem] p-5 md:p-7"
+                    onPointerDownOutside={(e) => e.preventDefault()}
+                >
+                    <DialogHeader className="pt-2">
+                        <DialogTitle className="flex justify-between items-center text-xl font-bold py-1 border-b-0">
+                            <div className="flex items-center gap-1.5 text-xl font-black">
+                                <span>정보수정 / {accounts.find(a => a.id === quickEditAccountId)?.login_id}-{((quickEditSlotIdx as number) || 0) + 1}</span>
+                                {quickEditValues?.order_number && (
+                                    <button 
+                                        type="button"
+                                        className="text-xl text-blue-600 hover:text-blue-800 hover:underline flex items-center font-black bg-transparent border-0 p-0 ml-1"
+                                        onClick={() => {
+                                            if (quickEditValues?.order_id) fetchOrderDetails(quickEditValues.order_id);
+                                        }}
+                                    >
+                                        / {quickEditValues?.order_number}
+                                    </button>
+                                )}
+                            </div>
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2 space-y-4">
+                        {/* Row 1: 이름, Tidal ID, PW */}
+                        <div className="grid grid-cols-12 gap-3">
+                            <div className="col-span-3 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">이름</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.buyer_name || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_name: e.target.value } : null)}
+                                    placeholder="전성현"
+                                />
+                            </div>
+                            <div className="col-span-6 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">Tidal ID</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.tidal_id || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, tidal_id: e.target.value } : null)}
+                                    placeholder="sjeon2801@gmail.com"
+                                />
+                            </div>
+                            <div className="col-span-3 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">PW</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.tidal_password || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: e.target.value } : null)}
+                                    placeholder="135792"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Row 2: 전화번호, 이메일 */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">전화번호</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.buyer_phone || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_phone: e.target.value } : null)}
+                                    placeholder="010-2255-2288"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">이메일</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.buyer_email || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_email: e.target.value } : null)}
+                                    placeholder="jeon28@gmail.com"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Row 3: 시작일, 종료일, 개월, 계약금액 */}
+                        <div className="grid grid-cols-12 gap-3">
+                            <div className="col-span-4 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">시작일</Label>
+                                <Input 
+                                    type="date"
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.start_date || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, start_date: e.target.value } : null)}
+                                />
+                            </div>
+                            <div className="col-span-4 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">종료일</Label>
+                                <Input 
+                                    type="date"
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.end_date || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, end_date: e.target.value } : null)}
+                                />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1 text-center truncate">개월</Label>
+                                <Input 
+                                    type="number"
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white text-center px-1"
+                                    value={quickEditValues?.period_months || 0} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, period_months: parseInt(e.target.value) || 0 } : null)}
+                                />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1 text-center truncate">금액</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white text-right px-2"
+                                    value={quickEditValues?.amount?.toLocaleString() || '0'} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, amount: parseInt(e.target.value.replace(/,/g, '')) || 0 } : null)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Row 4: 메모 */}
+                        <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-gray-500 ml-1">메모</Label>
+                            <textarea 
+                                className="w-full min-h-[90px] p-3 border border-gray-200 rounded-2xl focus:ring-1 focus:ring-blue-500 outline-none text-sm bg-white shadow-sm"
+                                value={quickEditValues?.memo || ''} 
+                                onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, memo: e.target.value } : null)}
+                                placeholder="메모할 내용을 입력하세요"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-2 pt-3 border-t-0 flex-row justify-end">
+                        <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)} className="h-11 px-8 rounded-xl font-semibold border-gray-200 hover:bg-gray-50">취소</Button>
+                        <Button onClick={handleSaveQuickEdit} className="bg-blue-600 hover:bg-blue-700 h-11 px-10 rounded-xl font-bold shadow-lg shadow-blue-200">저장</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Order Detail Modal */}
+            <Dialog open={isOrderDetailModalOpen} onOpenChange={setIsOrderDetailModalOpen}>
+                <DialogContent className="sm:max-w-md rounded-3xl p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold border-b pb-4">주문 상세 내역</DialogTitle>
+                    </DialogHeader>
+                    {selectedOrderDetails ? (
+                        <div className="py-4 space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-1">
+                                    <p className="text-gray-500 font-medium">주문번호</p>
+                                    <p className="text-blue-600 font-bold">{selectedOrderDetails.order_number}</p>
+                                </div>
+                                <div className="space-y-1 text-right">
+                                    <p className="text-gray-500 font-medium">주문일시</p>
+                                    <p>{format(parseISO(selectedOrderDetails.created_at), 'yyyy-MM-dd HH:mm')}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500">신청인(입금자)</span>
+                                    <span className="font-bold">{selectedOrderDetails.buyer_name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500">연락처</span>
+                                    <span>{selectedOrderDetails.buyer_phone}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500">이메일</span>
+                                    <span>{selectedOrderDetails.buyer_email}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 pt-2">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 font-medium">상세 상품명</span>
+                                    <span className="font-bold">{selectedOrderDetails?.products?.name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 font-medium">결제 금액</span>
+                                    <span className="text-lg font-black text-blue-600">
+                                        {selectedOrderDetails?.amount?.toLocaleString()}원
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex justify-center">
+                                <Button 
+                                    onClick={() => setIsOrderDetailModalOpen(false)}
+                                    className="w-full h-12 rounded-xl bg-gray-900 hover:bg-black font-bold"
+                                >
+                                    닫기
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="py-10 text-center">
+                            <p className="text-gray-500">주문 내역을 불러오고 있습니다...</p>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </main >

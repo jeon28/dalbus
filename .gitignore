@@ -38,5 +38,9 @@ output.log
 # migrations
 order_accounts_migration.sql
 
+# local storage
 supabase/.temp/
 supabase-migration/
+
+# sensitive sensitive
+mcp_config.json

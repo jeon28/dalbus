@@ -178,11 +178,15 @@ function TidalAccountsContent() {
     const [memoTargetSlotIdx, setMemoTargetSlotIdx] = useState<number | null>(null);
     const [memoTargetAssignmentId, setMemoTargetAssignmentId] = useState('');
 
+    const [isOrderDetailModalOpen, setIsOrderDetailModalOpen] = useState(false);
+    const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+    const [, setIsLoadingOrder] = useState(false);
+
     // --- DAL-20: Column Resizing and Filter States ---
     const [expiredDays, setExpiredDays] = useState(7);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         'checkbox': 40,
-        'slot': 60,
+        'slot_col': 80,
         'manage': 60,
         'type': 40,
         'tidal_id': 250,
@@ -226,6 +230,70 @@ function TidalAccountsContent() {
 연장을 원하시면 아래 링크로 접속하여서 신청바랍니다.
 ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL}/public`, []);
 
+<<<<<<< HEAD
+=======
+    // --- Hooks & Effects ---
+    useEffect(() => {
+        setNotificationMessage(defaultTemplate);
+    }, [defaultTemplate]);
+
+    useEffect(() => {
+        if (isHydrated && !isAdmin) router.push('/admin');
+        else if (isHydrated && isAdmin) {
+            fetchAccounts();
+            fetchPendingOrders();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdmin, isHydrated, router]);
+
+    useEffect(() => {
+        const accountId = searchParams.get('accountId');
+        if (accountId && accounts.length > 0) {
+            // Switch to List View (grouped view) and expand only the assigned account
+            setIsGridView(false);
+            setExpandedRows(new Set([accountId]));
+
+            const scrollToAndHighlight = () => {
+                const element = document.getElementById(`account-${accountId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.style.transition = 'background-color 0.5s ease-in-out';
+                    element.style.backgroundColor = '#e0f2fe';
+                    setTimeout(() => { if (element) element.style.backgroundColor = ''; }, 3000);
+                } else setTimeout(scrollToAndHighlight, 500);
+            };
+            setTimeout(scrollToAndHighlight, 500);
+        }
+    }, [searchParams, accounts]);
+
+    useEffect(() => {
+        if (isHydrated && isAdmin) {
+            fetchAccounts();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showDeletedOnly]);
+
+    useEffect(() => {
+        if (showExpiredOnly) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const newExpanded = new Set<string>();
+            accounts.forEach(acc => {
+                const hasExpired = acc.order_accounts?.some(oa => {
+                    if (!oa.end_date) return false;
+                    const endDate = parseISO(oa.end_date);
+                    const diffTime = endDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays <= expiredDays;
+                });
+                if (hasExpired) newExpanded.add(acc.id);
+            });
+            setExpandedRows(newExpanded);
+        }
+    }, [showExpiredOnly, accounts, expiredDays]);
+
+
+>>>>>>> 6e53d3ed0d547ea26eeb83e849b206d1c1a535a7
     // --- Fetching Functions ---
     const fetchAccounts = useCallback(async () => {
         try {
@@ -257,10 +325,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         start_date: assignment?.start_date || '',
                         end_date: assignment?.end_date || '',
                         order_number: assignment?.order_number || assignment?.orders?.order_number || '',
+                        order_id: assignment?.order_id || assignment?.orders?.id || '',
                         type: assignment?.type || (i === 0 ? 'master' : 'user'),
                         period_months: assignment?.period_months || 0,
                         amount: assignment?.orders?.amount || 0,
-                        memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
+                        memo: assignment?.memo || assignment?.orders?.profiles?.memo || '',
                     };
                 }
             });
@@ -724,21 +793,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
-    const handleDeactivate = async (assignmentId: string) => {
-        if (!confirm('배정을 종료하시겠습니까?')) return;
-        try {
-            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: false })
-            });
-            if (!res.ok) throw new Error('Deactivation failed');
-            alert('비활성화 되었습니다.');
-            fetchAccounts();
-        } catch (error) {
-            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
-        }
-    };
+
 
     const handleCreateAccount = async () => {
         if (!newAccount.login_id.trim() || !newAccount.payment_email.trim()) {
@@ -954,13 +1009,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
 
 
-    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
-        if (selectedAssignmentIds.size === filteredFlat.length) {
-            setSelectedAssignmentIds(new Set());
-        } else {
-            setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
-        }
-    };
+
 
     const handleToggleSelection = (id: string) => {
         setSelectedAssignmentIds(prev => {
@@ -1024,8 +1073,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             });
             if (!res.ok) throw new Error('Update failed');
             
-            updateGridValue(quickEditAccountId, quickEditSlotIdx as number, 'buyer_name', quickEditValues.buyer_name);
-            updateGridValue(quickEditAccountId, quickEditSlotIdx as number, 'order_number', quickEditValues.order_number);
+            // UI 상태 반영 (Grid View 데이터 캐시 업데이트)
+            setGridValues(prev => ({
+                ...prev,
+                [`${quickEditAccountId}_${quickEditSlotIdx}`]: { ...quickEditValues }
+            }));
+            
             setIsQuickEditModalOpen(false);
             fetchAccounts();
             alert('정보가 수정되었습니다.');
@@ -1050,6 +1103,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
+    const startEdit = (accountId: string, slotIdx: number) => {
+        setEditingSlots(prev => ({ ...prev, [`${accountId}_${slotIdx}`]: true }));
+    };
+
     const generateTidalPassword = () => {
         const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$";
         let pass = "";
@@ -1057,6 +1114,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         return pass;
     };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 6e53d3ed0d547ea26eeb83e849b206d1c1a535a7
 
     const cancelEdit = (accountId: string, slotIdx: number) => {
         const key = `${accountId}_${slotIdx}`;
@@ -1116,6 +1177,45 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         
         setCurrentMemoInput(newMemo);
         setIsMemoModalOpen(true);
+    };
+
+    const fetchOrderDetails = async (orderId: string) => {
+        setIsLoadingOrder(true);
+        try {
+            const res = await apiFetch(`/api/admin/orders/${orderId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setSelectedOrderDetails(data);
+                setIsOrderDetailModalOpen(true);
+            } else {
+                alert('주문 정보를 불러오지 못했습니다.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('오류가 발생했습니다.');
+        } finally {
+            setIsLoadingOrder(false);
+        }
+    };
+
+    const handleToggleActive = async (assignmentId: string, currentStatus: boolean | undefined) => {
+        const nextStatus = !currentStatus;
+        const msg = nextStatus ? '해당 배정을 활성화하시겠습니까?' : '해당 배정을 종료하시겠습니까?\n종료 시 해당 줄이 붉은색으로 표시됩니다.';
+        
+        if (!confirm(msg)) return;
+
+        try {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: nextStatus })
+            });
+            if (!res.ok) throw new Error('Update failed');
+            
+            fetchAccounts();
+        } catch (e) {
+            alert('변경 실패: ' + (e instanceof Error ? e.message : String(e)));
+        }
     };
 
     const handleSaveMemo = async () => {
@@ -1259,13 +1359,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
                         <table className="w-full text-sm min-w-[1400px]">
                             <thead>
-                                <tr className="bg-gray-100 border-b">
-                                    <th className="text-center py-2 border-r border-gray-200" style={{ width: columnWidths['checkbox'] }}>
+                                <tr className="bg-gray-100/80 sticky top-0 z-10 border-b border-gray-200 shadow-sm text-sm">
+                                    <th className="relative p-2 text-center border-r border-gray-100" style={{ width: columnWidths['checkbox'] }}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length}
-                                            onChange={() => toggleSelectAll(getFlattenedAssignments())}
+                                            checked={selectedAssignmentIds.size > 0 && getFlattenedAssignments().every(item => selectedAssignmentIds.has(item.assignment.id))}
+                                            onChange={(e) => {
+                                                const flattened = getFlattenedAssignments();
+                                                if (e.target.checked) setSelectedAssignmentIds(new Set(flattened.map(item => item.assignment.id)));
+                                                else setSelectedAssignmentIds(new Set());
+                                            }}
                                         />
+                                    </th>
+                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['slot_col'] }}>
+                                        <div className="flex items-center justify-center gap-1 cursor-pointer hover:bg-gray-200 h-full" onClick={() => handleSort('login_id')}>
+                                            배정번호 {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                        </div>
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('slot_col', e)} />
                                     </th>
                                     <th className="relative p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                         관리
@@ -1396,17 +1506,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const today = new Date();
                                         today.setHours(0, 0, 0, 0);
                                         const isExpired = assignment.end_date ? parseISO(assignment.end_date) < today : false;
+                                        const isActive = assignment.is_active !== false;
 
                                         const isEmpty = assignment.id.startsWith('empty_');
 
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${!isActive ? 'bg-red-50 text-red-600' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                 <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedAssignmentIds.has(assignment.id)}
                                                         onChange={() => handleToggleSelection(assignment.id)}
                                                     />
+                                                </td>
+                                                <td className="p-2 text-center border-r bg-gray-50/5" style={{ width: columnWidths['slot_col'] }}>
+                                                    <span className="text-blue-600 font-bold text-xs">
+                                                        {acc.login_id}-{sIdx + 1}
+                                                    </span>
                                                 </td>
                                                 <td className="p-2 text-center border-r" style={{ width: columnWidths['manage'] }}>
                                                     <div className="flex justify-center gap-1 items-center">
@@ -1441,8 +1557,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                 <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => openMoveModal(assignment)}>
                                                                                     <ArrowRightLeft size={12} /> 이동
                                                                                 </Button>
-                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-orange-600 hover:text-orange-700" onClick={() => handleDeactivate(assignment.id)}>
-                                                                                    <PowerOff size={12} /> 종료
+                                                                                <Button size="sm" variant="ghost" className={`h-8 justify-start gap-2 text-xs ${!isActive ? 'text-blue-600' : 'text-orange-600'}`} onClick={() => handleToggleActive(assignment.id, assignment.is_active)}>
+                                                                                    <PowerOff size={12} /> {isActive ? '종료' : '복구'}
                                                                                 </Button>
                                                                             </>
                                                                         )}
@@ -1546,7 +1662,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                         <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                         <td className="p-2 text-left border-r truncate max-w-[400px] text-xs" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
-                                                            <span className="text-blue-600 font-bold mr-2 text-[10px] whitespace-nowrap">[{acc.login_id}-{sIdx + 1}]</span>
                                                             <span className="text-gray-500">{val.memo?.split('\n')[0] || '-'}</span>
                                                         </td>
                                                     </>
@@ -1731,7 +1846,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const key = `${acc.id}_${sIdx}`;
                                                                     const val = gridValues[key] || {}; // Current Input Values
                                                                     const isEditing = editingSlots[key];
-
+                                                                    const isActive = assignment.is_active !== false;
                                                                     // Period Calc for display
                                                                     let period = '-';
                                                                     let isExpired = false;
@@ -1753,9 +1868,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const isEmpty = assignment.id.startsWith('empty_');
 
                                                                     return (
-                                                                        <tr key={assignment.id} className="border-b last:border-0 h-10 hover:bg-gray-50">
+                                                                        <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : ''}`}>
                                                                             <td className="text-center text-[10px] font-bold">
-                                                                                <span className={isEmpty ? "text-green-600" : "text-gray-900"}>
+                                                                                <span className={!isActive ? 'text-red-700 font-bold' : isEmpty ? "text-green-600" : "text-gray-900"}>
                                                                                     {acc.login_id}-{assignment.slot_number + 1}
                                                                                 </span>
                                                                             </td>
@@ -1763,57 +1878,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             {isEditing ? (
                                                                                 <>
                                                                                     <td className="px-1">
-                                                                                        <Select value={val.type || 'user'} onValueChange={async (value) => {
-                                                                                            if (value === 'master') {
-                                                                                                const hasMaster = acc.order_accounts?.some(oa => oa.type === 'master' && oa.slot_number !== sIdx);
-                                                                                                if (hasMaster) {
-                                                                                                    alert('이미 Master가 설정되어 있습니다.');
-                                                                                                    return;
-                                                                                                }
-                                                                                                if (sIdx !== 0) {
-                                                                                                    const assignment = acc.order_accounts?.find(oa => oa.slot_number === sIdx);
-                                                                                                    const slot0InUse = acc.order_accounts?.some(oa => oa.slot_number === 0 && !oa.id.startsWith('empty_'));
-                                                                                                    
-                                                                                                    if (slot0InUse) {
-                                                                                                        alert('1번 슬롯이 이미 사용 중입니다. 기존 마스터 또는 1번 슬롯 사용자를 먼저 비워주세요.');
-                                                                                                        return;
-                                                                                                    }
-                                                                                                    
-                                                                                                    if (assignment && !assignment.id.startsWith('empty_')) {
-                                                                                                        if (confirm('마스터로 변경 시 즉시 1번 슬롯으로 이동합니다. 계속하시겠습니까?')) {
-                                                                                                            try {
-                                                                                                                const res = await apiFetch(`/api/admin/assignments/${assignment.id}`, {
-                                                                                                                    method: 'PUT',
-                                                                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                                                                    body: JSON.stringify({ type: 'master' })
-                                                                                                                });
-                                                                                                                if (!res.ok) {
-                                                                                                                    const errorData = await res.json().catch(() => null);
-                                                                                                                    throw new Error(errorData?.error || '변경에 실패했습니다.');
-                                                                                                                }
-                                                                                                                cancelEdit(acc.id, sIdx);
-                                                                                                                fetchAccounts();
-                                                                                                                alert('마스터로 변경되었습니다.');
-                                                                                                            } catch (error) {
-                                                                                                                alert('변경 실패: ' + (error instanceof Error ? error.message : String(error)));
-                                                                                                            }
-                                                                                                        }
-                                                                                                        return;
-                                                                                                    } else {
-                                                                                                        alert('신규 마스터 배정은 1번 슬롯의 "수정" 또는 "배정" 버튼을 통해 진행해주세요.');
-                                                                                                        return;
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                            updateGridValue(acc.id, sIdx, 'type', value);
-                                                                                        }}>
+                                                                                        <Select value={val.type || 'user'} onValueChange={(value) => updateGridValue(acc.id, sIdx, 'type', value)}>
                                                                                             <SelectTrigger className="h-8 text-xs bg-white">
                                                                                                 <SelectValue />
                                                                                             </SelectTrigger>
                                                                                             <SelectContent>
                                                                                                 <SelectItem value="master">Master</SelectItem>
                                                                                                 <SelectItem value="user">User</SelectItem>
-                                                                                             </SelectContent>
+                                                                                            </SelectContent>
                                                                                         </Select>
                                                                                     </td>
                                                                                     <td className="px-1">
@@ -1831,26 +1903,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                     <td className="px-1">
                                                                                         <Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} />
                                                                                     </td>
-                                                                                    <td className="px-1 w-12">
-                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
-                                                                                    </td>
                                                                                     <td className="px-1">
                                                                                         <Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} />
                                                                                     </td>
-                                                                                    <td className="px-1 w-16">
+                                                                                    <td className="px-1 w-12">
+                                                                                        <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} />
+                                                                                    </td>
+                                                                                    <td className="px-1 w-20">
                                                                                         <Input type="number" className="h-8 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} />
                                                                                     </td>
                                                                                 </>
                                                                             ) : isEmpty ? (
                                                                                 <>
-                                                                                    <td className="px-2 text-center"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
-                                                                                    <td className="px-2"></td>
+                                                                                    <td colSpan={9}></td>
                                                                                 </>
                                                                             ) : (
                                                                                 <>
@@ -1859,24 +1924,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${val.type === 'master' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                                                                                 {val.type === 'master' ? 'Master' : 'User'}
                                                                                             </span>
-                                                                                            {assignment.id && !assignment.id.startsWith('empty') && (
-                                                                                                <MessageSquareText
-                                                                                                    size={14}
-                                                                                                    className={`cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        openMemoModal(acc.id, sIdx, val.memo || '', assignment.id);
-                                                                                                    }}
-                                                                                                />
-                                                                                            )}
+                                                                                            <MessageSquareText
+                                                                                                size={14}
+                                                                                                className={`cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
+                                                                                                onClick={() => openMemoModal(acc.id, sIdx, val.memo || '', assignment.id)}
+                                                                                            />
                                                                                         </div>
                                                                                     </td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>
-                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.tidal_id || '-'}</span>
-                                                                                    </td>
-                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>
-                                                                                        <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{val.buyer_name || '-'}</span>
-                                                                                    </td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.tidal_id || undefined}>{val.tidal_id || '-'}</td>
+                                                                                    <td className="px-2 text-gray-700 truncate max-w-[80px]" title={val.buyer_name || undefined}>{val.buyer_name || '-'}</td>
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[120px]" title={val.buyer_email || undefined}>{val.buyer_email || '-'}</td>
                                                                                     <td className="px-2 text-gray-700 truncate max-w-[100px]" title={val.buyer_phone || undefined}>{val.buyer_phone || '-'}</td>
                                                                                     <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
@@ -1886,16 +1942,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                             {isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}
                                                                                         </span>
                                                                                     </td>
+                                                                                    <td className="text-center text-gray-500 font-mono">{period}</td>
+                                                                                    <td className="text-right text-gray-700 font-mono px-2">
+                                                                                        {val.amount ? val.amount.toLocaleString() : '-'}
+                                                                                    </td>
                                                                                 </>
                                                                             )}
 
-                                                                            <td className="text-center text-gray-500 font-mono">
-                                                                                {!isEmpty ? period : ''}
-                                                                            </td>
-                                                                            <td className="text-right text-gray-700 font-mono px-2">
-                                                                                {!isEmpty ? (val.amount ? val.amount.toLocaleString() : '-') : ''}
-                                                                            </td>
-                                                                            <td>
+                                                                            <td className="px-1 text-center">
                                                                                 <div className="flex justify-center gap-1 items-center">
                                                                                     {isEditing ? (
                                                                                         <>
@@ -1906,21 +1960,35 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                                 X
                                                                                             </Button>
                                                                                         </>
+                                                                                    ) : assignment.is_deleted ? (
+                                                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-700" title="삭제 데이터 복구" onClick={() => handleRestore(assignment.id)}>
+                                                                                            <ArrowRightLeft size={14} />
+                                                                                        </Button>
+                                                                                    ) : isEmpty ? (
+                                                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="배정" onClick={() => openAssignModal(acc, assignment.slot_number)}>
+                                                                                            <Plus size={14} />
+                                                                                        </Button>
                                                                                     ) : (
                                                                                         <>
-                                                                                            {isEmpty && (
-                                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="배정" onClick={() => openAssignModal(acc, assignment.slot_number)}>
-                                                                                                    <Plus size={14} />
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => startEdit(acc.id, assignment.slot_number)}>
+                                                                                                <Pencil size={14} />
+                                                                                            </Button>
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="이동" onClick={() => openMoveModal(assignment)}>
+                                                                                                <ArrowRightLeft size={14} />
+                                                                                            </Button>
+                                                                                            <Button 
+                                                                                                size="sm" 
+                                                                                                variant="ghost" 
+                                                                                                className={`h-7 w-7 p-0 ${!isActive ? 'text-blue-600 hover:text-blue-700' : 'text-gray-400 hover:text-orange-600'}`} 
+                                                                                                title={!isActive ? "복구" : "종료"} 
+                                                                                                onClick={() => handleToggleActive(assignment.id, assignment.is_active)}
+                                                                                            >
+                                                                                                <PowerOff size={14} />
+                                                                                            </Button>
+                                                                                            {(isExpired || !isActive) && (
+                                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
+                                                                                                    <Trash2 size={14} />
                                                                                                 </Button>
-                                                                                            )}
-
-                                                                                            {!isEmpty && (
-                                                                                                <>
-
-                                                                                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="삭제 (배정해제)" onClick={() => handleDelete(assignment.id)}>
-                                                                                                        <Trash2 size={14} />
-                                                                                                    </Button>
-                                                                                                </>
                                                                                             )}
                                                                                         </>
                                                                                     )}
@@ -2221,52 +2289,200 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
             {/* Quick Edit Modal */}
             <Dialog open={isQuickEditModalOpen} onOpenChange={setIsQuickEditModalOpen}>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>최단 정보수정</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="space-y-2">
-                            <Label>그룹 번호 (로그인 ID)</Label>
-                            <Input 
-                                value={accounts.find(a => a.id === quickEditAccountId)?.login_id || ''} 
-                                disabled 
-                                className="bg-gray-50 cursor-not-allowed"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex justify-between">
-                                <span>주문 번호</span>
+                <DialogContent 
+                    className="max-w-[480px] w-[95vw] max-h-[90vh] overflow-y-auto rounded-[2.5rem] p-5 md:p-7"
+                    onPointerDownOutside={(e) => e.preventDefault()}
+                >
+                    <DialogHeader className="pt-2">
+                        <DialogTitle className="flex justify-between items-center text-xl font-bold py-1 border-b-0">
+                            <div className="flex items-center gap-1.5 text-xl font-black">
+                                <span>정보수정 / {accounts.find(a => a.id === quickEditAccountId)?.login_id}-{((quickEditSlotIdx as number) || 0) + 1}</span>
                                 {quickEditValues?.order_number && (
-                                    <a 
-                                        href={`/search?orderNumber=${quickEditValues.order_number}`} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-blue-600 hover:underline"
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            if (quickEditValues.order_id) fetchOrderDetails(quickEditValues.order_id);
+                                        }}
+                                        className="text-xl text-blue-600 hover:text-blue-800 hover:underline flex items-center font-black bg-transparent border-0 p-0 ml-1"
                                     >
-                                        주문 확인하기 ↗
-                                    </a>
+                                        / {quickEditValues.order_number}
+                                    </button>
                                 )}
-                            </Label>
-                            <Input 
-                                value={quickEditValues?.order_number || ''} 
-                                onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, order_number: e.target.value } : null)}
-                                placeholder="주문 번호를 입력하세요"
-                            />
+                            </div>
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2 space-y-4">
+                        {/* Row 1: 이름, Tidal ID, PW */}
+                        <div className="grid grid-cols-12 gap-3">
+                            <div className="col-span-3 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">이름</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.buyer_name || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_name: e.target.value } : null)}
+                                    placeholder="전성현"
+                                />
+                            </div>
+                            <div className="col-span-6 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">Tidal ID</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.tidal_id || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, tidal_id: e.target.value } : null)}
+                                    placeholder="sjeon2801@gmail.com"
+                                />
+                            </div>
+                            <div className="col-span-3 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">PW</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.tidal_password || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: e.target.value } : null)}
+                                    placeholder="135792"
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label>고객명</Label>
-                            <Input 
-                                value={quickEditValues?.buyer_name || ''} 
-                                onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_name: e.target.value } : null)}
-                                placeholder="고객명을 입력하세요"
+
+                        {/* Row 2: 전화번호, 이메일 */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">전화번호</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.buyer_phone || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_phone: e.target.value } : null)}
+                                    placeholder="010-2255-2288"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">이메일</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.buyer_email || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, buyer_email: e.target.value } : null)}
+                                    placeholder="jeon28@gmail.com"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Row 3: 시작일, 종료일, 개월, 계약금액 */}
+                        <div className="grid grid-cols-12 gap-3">
+                            <div className="col-span-4 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">시작일</Label>
+                                <Input 
+                                    type="date"
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.start_date || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, start_date: e.target.value } : null)}
+                                />
+                            </div>
+                            <div className="col-span-4 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1">종료일</Label>
+                                <Input 
+                                    type="date"
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
+                                    value={quickEditValues?.end_date || ''} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, end_date: e.target.value } : null)}
+                                />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1 text-center truncate">개월</Label>
+                                <Input 
+                                    type="number"
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white text-center px-1"
+                                    value={quickEditValues?.period_months || 0} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, period_months: parseInt(e.target.value) || 0 } : null)}
+                                />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                                <Label className="text-[11px] font-semibold text-gray-500 ml-1 text-center truncate">금액</Label>
+                                <Input 
+                                    className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white text-right px-2"
+                                    value={quickEditValues?.amount?.toLocaleString() || '0'} 
+                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, amount: parseInt(e.target.value.replace(/,/g, '')) || 0 } : null)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Row 4: 메모 */}
+                        <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-gray-500 ml-1">메모</Label>
+                            <textarea 
+                                className="w-full min-h-[90px] p-3 border border-gray-200 rounded-2xl focus:ring-1 focus:ring-blue-500 outline-none text-sm bg-white shadow-sm"
+                                value={quickEditValues?.memo || ''} 
+                                onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, memo: e.target.value } : null)}
+                                placeholder="메모할 내용을 입력하세요"
                             />
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)}>취소</Button>
-                        <Button onClick={handleSaveQuickEdit} className="bg-blue-600 hover:bg-blue-700">정보 수정</Button>
+                    <DialogFooter className="gap-2 sm:gap-2 pt-3 border-t-0 flex-row justify-end">
+                        <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)} className="h-11 px-8 rounded-xl font-semibold border-gray-200 hover:bg-gray-50">취소</Button>
+                        <Button onClick={handleSaveQuickEdit} className="bg-blue-600 hover:bg-blue-700 h-11 px-10 rounded-xl font-bold shadow-lg shadow-blue-200">저장</Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Order Detail Modal */}
+            <Dialog open={isOrderDetailModalOpen} onOpenChange={setIsOrderDetailModalOpen}>
+                <DialogContent className="sm:max-w-md rounded-3xl p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold border-b pb-4">주문 상세 내역</DialogTitle>
+                    </DialogHeader>
+                    {selectedOrderDetails ? (
+                        <div className="py-4 space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-1">
+                                    <p className="text-gray-500 font-medium">주문번호</p>
+                                    <p className="text-blue-600 font-bold">{selectedOrderDetails.order_number}</p>
+                                </div>
+                                <div className="space-y-1 text-right">
+                                    <p className="text-gray-500 font-medium">주문일시</p>
+                                    <p>{format(parseISO(selectedOrderDetails.created_at), 'yyyy-MM-dd HH:mm')}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500">신청인(입금자)</span>
+                                    <span className="font-bold">{selectedOrderDetails.buyer_name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500">연락처</span>
+                                    <span>{selectedOrderDetails.buyer_phone}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500">이메일</span>
+                                    <span>{selectedOrderDetails.buyer_email}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 pt-2">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 font-medium">상세 상품명</span>
+                                    <span className="font-bold">{selectedOrderDetails.products?.name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 font-medium">결제 금액</span>
+                                    <span className="text-lg font-black text-blue-600">
+                                        {selectedOrderDetails.amount?.toLocaleString()}원
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex justify-center">
+                                <Button 
+                                    onClick={() => setIsOrderDetailModalOpen(false)}
+                                    className="w-full h-12 rounded-xl bg-gray-900 hover:bg-black font-bold"
+                                >
+                                    닫기
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="py-10 text-center">
+                            <p className="text-gray-500">주문 내역을 불러오고 있습니다...</p>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </main >

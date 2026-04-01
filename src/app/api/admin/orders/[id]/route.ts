@@ -1,6 +1,38 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+// GET: Fetch single order details
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id: orderId } = await params;
+
+    try {
+        const { data: order, error } = await supabaseAdmin
+            .from('orders')
+            .select(`
+                *,
+                profiles(name, email, phone),
+                products(name),
+                product_plans(duration_months),
+                order_accounts(id, account_id, slot_number, tidal_id, accounts(login_id))
+            `)
+            .eq('id', orderId)
+            .single();
+
+        if (error) throw error;
+        if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+
+        return NextResponse.json(order);
+    } catch (error) {
+        console.error('Error fetching order:', error);
+        const err = error as { message: string };
+        return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+}
+
+// DELETE: Hard Delete history
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }

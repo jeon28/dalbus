@@ -7,7 +7,10 @@ export const dynamic = 'force-dynamic';
 // PUT: Update assignment and linked order details
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params; // order_accounts.id
+        const { id } = await params; // order_accounts.id or legacy_tidal_account.id
+        const product = req.nextUrl.searchParams.get('product');
+        const isHifiTidal = product?.toLowerCase().includes('hifi');
+        const assignmentTable = isHifiTidal ? 'legacy_tidal_account' : 'order_accounts';
         const body = await req.json();
 
         // body contains: tidal_password, buyer_name, buyer_phone, buyer_email, start_date, end_date, type, is_active
@@ -45,13 +48,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (body.is_deleted !== undefined) oaUpdates.is_deleted = body.is_deleted;
         if (amount !== undefined && amount !== null) oaUpdates.amount = Number(amount);
         if (period_months !== undefined && period_months !== null) oaUpdates.period_months = Number(period_months);
-        if (_memo !== undefined) {
-            // memo is updated in profiles.memo, not order_accounts
-            
-            // Sync with profiles.memo if a user_id exists for this order
-            const { data: assignmentData } = await supabaseAdmin
+        if (_memo !== undefined && !isHifiTidal) {
+            oaUpdates.memo = _memo;
 
-                .from('order_accounts')
+            // Optional sync with profiles.memo if a user_id exists for this order
+            const { data: assignmentData } = await supabaseAdmin
+                .from(assignmentTable)
                 .select('orders(user_id)')
                 .eq('id', id)
                 .single();
@@ -63,12 +65,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     .update({ memo: _memo })
                     .eq('id', userId);
             }
+        } else if (_memo !== undefined) {
+            oaUpdates.memo = _memo;
         }
 
 
         if (Object.keys(oaUpdates).length > 0) {
             const { data: updatedData, error: oaError } = await supabaseAdmin
-                .from('order_accounts')
+                .from(assignmentTable)
                 .update(oaUpdates)
                 .eq('id', id)
                 .select('account_id') // Fetch account_id to update slots
@@ -81,7 +85,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             if (shouldReindex && updatedData) {
                 // Fetch all assignments for this account
                 const { data: allSlots, error: fetchAllError } = await supabaseAdmin
-                    .from('order_accounts')
+                    .from(assignmentTable)
                     .select('id, slot_number, type')
                     .eq('account_id', updatedData.account_id)
                     .order('slot_number', { ascending: true });
@@ -102,7 +106,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     // Pass 1: Move to temporary high slots to avoid unique constraint collisions
                     for (let i = 0; i < sorted.length; i++) {
                         await supabaseAdmin
-                            .from('order_accounts')
+                            .from(assignmentTable)
                             .update({ slot_number: sorted[i].slot_number + 1000 })
                             .eq('id', sorted[i].id);
                     }
@@ -115,7 +119,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                         }
                         
                         await supabaseAdmin
-                            .from('order_accounts')
+                            .from(assignmentTable)
                             .update(updates)
                             .eq('id', sorted[i].id);
                     }
@@ -123,7 +127,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
                 // Sync used_slots
                 const { count: actualCount } = await supabaseAdmin
-                    .from('order_accounts')
+                    .from(assignmentTable)
                     .select('*', { count: 'exact', head: true })
                     .eq('account_id', updatedData.account_id)
                     .eq('is_deleted', false);
@@ -148,11 +152,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE: Unassign (Remove from order_accounts) or Hard Delete history
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params; // order_accounts.id
+        const { id } = await params; // order_accounts.id or legacy_tidal_account.id
+        const product = req.nextUrl.searchParams.get('product');
+        const assignmentTable = product?.toLowerCase().includes('hifi') ? 'legacy_tidal_account' : 'order_accounts';
 
         // 1. Get info before delete
         const { data: assignment, error: fetchError } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .select('account_id, order_id')
             .eq('id', id)
             .single();
@@ -161,7 +167,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         // 2. Soft Delete assignment
         const { error: delError } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .update({ is_deleted: true, is_active: false })
             .eq('id', id);
 
@@ -171,7 +177,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         // 3. Re-index remaining slots to maintain sequence (1, 2, 3...)
         // Fetch all remaining active assignments for this account, ordered by their current slot_number
         const { data: remainingSlots, error: fetchRemainingError } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .select('id, slot_number, type')
             .eq('account_id', assignment.account_id)
             .eq('is_deleted', false)
@@ -189,7 +195,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             // Pass 1: Move to temporary high slots
             for (let i = 0; i < sorted.length; i++) {
                 await supabaseAdmin
-                    .from('order_accounts')
+                    .from(assignmentTable)
                     .update({ slot_number: (sorted[i].slot_number ?? 0) + 1000 })
                     .eq('id', sorted[i].id);
             }
@@ -202,7 +208,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
                 }
 
                 await supabaseAdmin
-                    .from('order_accounts')
+                    .from(assignmentTable)
                     .update(updates)
                     .eq('id', sorted[i].id);
             }
@@ -210,7 +216,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         // 4. Update Account Used Slots (Robust Sync)
         const { count: actualCount } = await supabaseAdmin
-            .from('order_accounts')
+            .from(assignmentTable)
             .select('*', { count: 'exact', head: true })
             .eq('account_id', assignment.account_id)
             .eq('is_active', true);
