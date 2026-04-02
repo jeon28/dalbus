@@ -207,11 +207,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 insertPayload.order_id = targetOrderId;
             }
 
-            const { error: insertError } = await supabaseAdmin
-                .from(assignmentTable)
-                .insert([insertPayload]);
+            // Check if this tidal_id already exists (even if deleted) to avoid unique constraint 23505
+            if (tidal_id) {
+                const { data: globalExisting } = await supabaseAdmin
+                    .from(assignmentTable)
+                    .select('id, is_deleted, account_id')
+                    .eq('tidal_id', tidal_id)
+                    .limit(1)
+                    .single();
 
-            if (insertError) throw insertError;
+                if (globalExisting) {
+                    if (!globalExisting.is_deleted) {
+                        return NextResponse.json({ error: '이미 다른 곳에서 사용 중인 Tidal ID입니다.' }, { status: 409 });
+                    }
+                    
+                    // it's deleted, so we can reuse it (move to new account/slot)
+                    const { error: moveError } = await supabaseAdmin
+                        .from(assignmentTable)
+                        .update({
+                            ...insertPayload,
+                            is_deleted: false,
+                            is_active: true
+                        })
+                        .eq('id', globalExisting.id);
+
+                    if (moveError) throw moveError;
+                    // Skip the insert below
+                } else {
+                    const { error: insertError } = await supabaseAdmin
+                        .from(assignmentTable)
+                        .insert([insertPayload]);
+                    if (insertError) throw insertError;
+                }
+            } else {
+                const { error: insertError } = await supabaseAdmin
+                    .from(assignmentTable)
+                    .insert([insertPayload]);
+                if (insertError) throw insertError;
+            }
         }
 
         // Sync Used Slots
