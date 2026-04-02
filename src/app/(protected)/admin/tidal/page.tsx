@@ -57,6 +57,7 @@ interface Assignment {
     memo?: string;
     is_active?: boolean;
     is_deleted?: boolean;
+    account_id?: string;
 }
 
 interface Account {
@@ -495,16 +496,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         type: i === 0 ? 'master' : 'user',
                         account_id: acc.id,
                         is_active: true,
-                        tidal_id: null,
-                        tidal_password: null,
-                        buyer_name: null,
-                        buyer_email: null,
-                        buyer_phone: null,
-                        order_number: null,
-                        start_date: null,
-                        end_date: null
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    } as any;
+                        tidal_id: undefined,
+                        tidal_password: undefined,
+                        buyer_name: undefined,
+                        buyer_email: undefined,
+                        buyer_phone: undefined,
+                        order_number: undefined,
+                        start_date: undefined,
+                        end_date: undefined
+                    };
                 }
 
                 // Search Filter
