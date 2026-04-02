@@ -71,7 +71,15 @@ export async function POST(req: NextRequest) {
 
 
         // 3. Perform Move (Update order_accounts)
-        const updatePayload: any = {
+        const updatePayload: {
+            account_id: string;
+            slot_number?: number;
+            tidal_password?: string;
+            assigned_at: string;
+            is_deleted: boolean;
+            is_active: boolean;
+            type?: 'master' | 'user';
+        } = {
             account_id: target_account_id,
             slot_number: target_slot_number,
             tidal_password: target_tidal_password,

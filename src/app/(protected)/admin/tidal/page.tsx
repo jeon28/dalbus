@@ -1721,14 +1721,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         {sortedAccounts
                             .map((acc) => {
                                 const isExpanded = expandedRows.has(acc.id);
-                                let sortedAssignments: any[] = [];
+                                let sortedAssignments: Assignment[] = [];
                                 
                                 if (showDeletedOnly) {
                                     // List ALL deleted assignments for this account
                                     sortedAssignments = (acc.order_accounts || []).filter(oa => oa.is_deleted);
                                     if (sortedAssignments.length === 0) return null;
                                 } else {
-                                    const paddedAssignments: any[] = [];
+                                    const paddedAssignments: Assignment[] = [];
                                     for (let i = 0; i < acc.max_slots; i++) {
                                         const existing = acc.order_accounts?.find(oa => oa.slot_number === i && !oa.is_deleted);
                                         if (existing) {
@@ -1740,14 +1740,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 type: i === 0 ? 'master' : 'user',
                                                 account_id: acc.id,
                                                 is_active: true,
-                                                tidal_id: null,
-                                                tidal_password: null,
-                                                buyer_name: null,
-                                                buyer_email: null,
-                                                buyer_phone: null,
-                                                order_number: null,
-                                                start_date: null,
-                                                end_date: null
+                                                tidal_id: undefined,
+                                                tidal_password: undefined,
+                                                buyer_name: undefined,
+                                                buyer_email: undefined,
+                                                buyer_phone: undefined,
+                                                order_number: undefined,
+                                                start_date: undefined,
+                                                end_date: undefined
                                             });
                                         }
                                     }
