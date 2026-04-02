@@ -49,22 +49,32 @@ export async function GET(
         const orderIds = orders.map(o => o.id);
         const orderNumbers = orders.map(o => o.order_number).filter(Boolean);
 
-        // 3. Find order_accounts linked to these orders
-        // Use .or to match either by order_id or order_number (fallback for imports)
-        const query = supabaseAdmin
-            .from('order_accounts')
-            .select('*, accounts ( login_id )')
-            .or(`order_id.in.(${orderIds.join(',')}),order_number.in.(${orderNumbers.join(',')})`);
+        // 3. Find assignments from BOTH tables
+        const tables = ['order_accounts', 'legacy_tidal_account'];
+        let allAccounts: any[] = [];
 
-        const { data: accountsData, error: accountsError } = await query.order('assigned_at', { ascending: false });
+        for (const table of tables) {
+            let query = supabaseAdmin
+                .from(table)
+                .select('*, accounts ( login_id )')
+                .eq('is_deleted', false);
 
-        if (accountsError) {
-            console.error('Error fetching order accounts:', accountsError);
-            return NextResponse.json({ error: accountsError.message }, { status: 500 });
+            const filterStrings: string[] = [];
+            if (orderIds.length > 0) filterStrings.push(`order_id.in.(${orderIds.join(',')})`);
+            if (orderNumbers.length > 0) filterStrings.push(`order_number.in.(${orderNumbers.join(',')})`);
+            if (profile.email) filterStrings.push(`buyer_email.eq.${profile.email}`);
+
+            if (filterStrings.length > 0) {
+                query = query.or(filterStrings.join(','));
+                const { data, error } = await query.order('assigned_at', { ascending: false });
+                if (!error && data) {
+                    allAccounts = [...allAccounts, ...data];
+                }
+            }
         }
 
-        // 4. Transform data to include product/plan info from the orders list
-        const enrichedAccounts = accountsData.map(account => {
+        // 4. Transform data to include product/plan info
+        const enrichedAccounts = allAccounts.map(account => {
             const relatedOrder = orders.find(o => o.id === account.order_id || (account.order_number && o.order_number === account.order_number));
             return {
                 ...account,
