@@ -170,7 +170,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 end_date: end_date || finalEndDate,
                 amount: amount !== undefined ? amount : (existingAssignment as { amount?: number })?.amount,
                 period_months: period_months !== undefined ? period_months : (existingAssignment as { period_months?: number })?.period_months,
-                memo: memo !== undefined ? memo : (existingAssignment as { memo?: string })?.memo
+                memo: memo !== undefined ? memo : (existingAssignment as { memo?: string })?.memo,
+                is_deleted: false,
+                is_active: true
             };
 
             // legacy_tidal_account does NOT have order_id column
