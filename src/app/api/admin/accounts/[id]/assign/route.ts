@@ -136,8 +136,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             }
         }
 
-        // 3. Check for existing at this slot
-        const existingAssignment = currentAssignments?.find(a => a.slot_number === finalSlotNumber && !a.is_deleted);
+        // 3. Check for existing at this slot (Include deleted ones to prevent account_slot_key unique violation pada INSERT)
+        const existingAssignment = currentAssignments?.find(a => a.slot_number === finalSlotNumber);
 
         if (existingAssignment) {
             const { data: targetOrder } = await supabaseAdmin
