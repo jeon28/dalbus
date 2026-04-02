@@ -94,15 +94,12 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 if (prodRes.ok) {
                     const prodData = await prodRes.json();
                     setProduct(prodData);
-                }
-
-                // Fetch plans
-                const plansRes = await apiFetch(`/api/public/plans?product_id=${id}`);
-                if (plansRes.ok) {
-                    const plansData = await plansRes.json();
-                    setPlans(plansData);
-                    if (plansData.length > 0) {
-                        setSelectedPeriod(plansData[0].duration_months);
+                    
+                    // Unified plans from product_plans relation
+                    if (prodData.product_plans && prodData.product_plans.length > 0) {
+                        const sortedPlans = [...prodData.product_plans].sort((a, b) => a.duration_months - b.duration_months);
+                        setPlans(sortedPlans);
+                        setSelectedPeriod(sortedPlans[0].duration_months);
                     }
                 }
 
