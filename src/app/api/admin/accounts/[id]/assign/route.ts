@@ -209,18 +209,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             // Check if this tidal_id already exists (even if deleted) to avoid unique constraint 23505
             if (tidal_id) {
-                const { data: globalExisting } = await supabaseAdmin
+                console.log(`[DEBUG] Checking duplication for tidal_id: ${tidal_id} in table: ${assignmentTable}`);
+                const { data: globalExistingList, error: globalFetchError } = await supabaseAdmin
                     .from(assignmentTable)
-                    .select('id, is_deleted, account_id')
-                    .eq('tidal_id', tidal_id)
-                    .limit(1)
-                    .single();
+                    .select('id, is_deleted, account_id, slot_number')
+                    .eq('tidal_id', tidal_id);
 
-                if (globalExisting) {
-                    if (!globalExisting.is_deleted) {
-                        return NextResponse.json({ error: '이미 다른 곳에서 사용 중인 Tidal ID입니다.' }, { status: 409 });
-                    }
-                    
+                if (globalFetchError) {
+                    console.error('[DEBUG] Global Fetch Error:', globalFetchError);
+                }
+
+                const activeExisting = globalExistingList?.find(item => !item.is_deleted);
+                const deletedExisting = globalExistingList?.find(item => item.is_deleted);
+
+                if (activeExisting) {
+                    console.warn(`[DEBUG] Active tidal_id found in account: ${activeExisting.account_id}, slot: ${activeExisting.slot_number}`);
+                    return NextResponse.json({ 
+                        error: `이미 다른 곳에서 사용 중인 Tidal ID입니다. (위치: 계정 ${activeExisting.account_id}, 슬롯 ${activeExisting.slot_number + 1})` 
+                    }, { status: 409 });
+                }
+                
+                if (deletedExisting) {
+                    console.log(`[DEBUG] Deleted tidal_id found, reusing record ID: ${deletedExisting.id}`);
                     // it's deleted, so we can reuse it (move to new account/slot)
                     const { error: moveError } = await supabaseAdmin
                         .from(assignmentTable)
@@ -229,7 +239,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             is_deleted: false,
                             is_active: true
                         })
-                        .eq('id', globalExisting.id);
+                        .eq('id', deletedExisting.id);
 
                     if (moveError) throw moveError;
                     // Skip the insert below
