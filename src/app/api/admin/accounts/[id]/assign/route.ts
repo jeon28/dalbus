@@ -117,7 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // Fetch current assignments to determine next slot or validate existing
         const { data: currentAssignments, error: fetchError } = await supabaseAdmin
             .from(assignmentTable)
-            .select('id, slot_number, type')
+            .select('id, slot_number, type, is_active, is_deleted, order_id, buyer_email, buyer_name, tidal_password, tidal_id, buyer_phone, memo')
             .eq('account_id', account_id)
             .order('slot_number', { ascending: true });
 
@@ -137,17 +137,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         // 3. Check for existing at this slot
-        const existingAssignment = currentAssignments?.find(a => a.slot_number === finalSlotNumber) as {
-            id?: string;
-            order_id?: string;
-            buyer_email?: string;
-            buyer_name?: string;
-            tidal_password?: string;
-            tidal_id?: string;
-            type?: string;
-            buyer_phone?: string;
-            memo?: string;
-        } | undefined;
+        const existingAssignment = currentAssignments?.find(a => a.slot_number === finalSlotNumber && !a.is_deleted);
 
         if (existingAssignment) {
             const { data: targetOrder } = await supabaseAdmin
