@@ -207,31 +207,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 insertPayload.order_id = targetOrderId;
             }
 
-            // Check if this tidal_id already exists (even if deleted) to avoid unique constraint 23505
+            // Check if this tidal_id already exists (even if deleted) across ALL tables to avoid unique constraint 23505
             if (tidal_id) {
-                console.log(`[DEBUG] Checking duplication for tidal_id: ${tidal_id} in table: ${assignmentTable}`);
-                const { data: globalExistingList, error: globalFetchError } = await supabaseAdmin
-                    .from(assignmentTable)
-                    .select('id, is_deleted, account_id, slot_number')
-                    .eq('tidal_id', tidal_id);
+                const cleanedId = tidal_id.trim();
+                console.log(`[DEBUG] Checking duplication for cleanedId: ${cleanedId}`);
 
-                if (globalFetchError) {
-                    console.error('[DEBUG] Global Fetch Error:', globalFetchError);
+                // Check BOTH tables to be absolutely sure
+                const tables = ['order_accounts', 'legacy_tidal_account'];
+                let activeExisting = null;
+                let deletedExisting = null;
+                let foundTable = '';
+
+                for (const table of tables) {
+                    const { data: list } = await supabaseAdmin
+                        .from(table)
+                        .select('id, is_deleted, account_id, slot_number')
+                        .ilike('tidal_id', cleanedId); // Case-insensitive search
+
+                    const active = list?.find(item => !item.is_deleted);
+                    if (active) {
+                        activeExisting = active;
+                        foundTable = table;
+                        break;
+                    }
+                    if (!deletedExisting) {
+                        deletedExisting = list?.find(item => item.is_deleted);
+                        if (deletedExisting) foundTable = table;
+                    }
                 }
 
-                const activeExisting = globalExistingList?.find(item => !item.is_deleted);
-                const deletedExisting = globalExistingList?.find(item => item.is_deleted);
-
                 if (activeExisting) {
-                    console.warn(`[DEBUG] Active tidal_id found in account: ${activeExisting.account_id}, slot: ${activeExisting.slot_number}`);
+                    console.warn(`[DEBUG] Active tidal_id found in table: ${foundTable}, account: ${activeExisting.account_id}, slot: ${activeExisting.slot_number}`);
                     return NextResponse.json({ 
-                        error: `이미 다른 곳에서 사용 중인 Tidal ID입니다. (위치: 계정 ${activeExisting.account_id}, 슬롯 ${activeExisting.slot_number + 1})` 
+                        error: `이미 다른 곳에서 사용 중인 Tidal ID입니다. (위치: ${foundTable === 'order_accounts' ? 'Tidal' : 'HifiTidal'} 계정 ${activeExisting.account_id}, 슬롯 ${activeExisting.slot_number + 1})` 
                     }, { status: 409 });
                 }
                 
-                if (deletedExisting) {
-                    console.log(`[DEBUG] Deleted tidal_id found, reusing record ID: ${deletedExisting.id}`);
-                    // it's deleted, so we can reuse it (move to new account/slot)
+                if (deletedExisting && foundTable === assignmentTable) {
+                    console.log(`[DEBUG] Deleted tidal_id found in SAME table, reusing record ID: ${deletedExisting.id}`);
                     const { error: moveError } = await supabaseAdmin
                         .from(assignmentTable)
                         .update({
@@ -242,7 +255,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         .eq('id', deletedExisting.id);
 
                     if (moveError) throw moveError;
-                    // Skip the insert below
                 } else {
                     const { error: insertError } = await supabaseAdmin
                         .from(assignmentTable)
@@ -262,7 +274,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             .from(assignmentTable)
             .select('*', { count: 'exact', head: true })
             .eq('account_id', account_id)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .eq('is_deleted', false);
 
 
         await supabaseAdmin.from('accounts').update({ used_slots: actualCount || 0 }).eq('id', account_id);
@@ -279,10 +292,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ success: true });
 
     } catch (error) {
-        console.error('Assign Error:', error);
+        console.error('Assign Error Detail:', error);
         const err = error as { code?: string; message: string };
         if (err.code === '23505') {
-            return NextResponse.json({ error: '이미 사용 중인 Tidal ID입니다.' }, { status: 409 });
+            return NextResponse.json({ 
+                error: `서버 내부 제약 조건으로 인해 배정할 수 없습니다. (중복된 데이터가 존재하는 것으로 보입니다: ${err.message})` 
+            }, { status: 409 });
         }
         return NextResponse.json({ error: err.message || '알 수 없는 오류가 발생했습니다.' }, { status: 500 });
     }
