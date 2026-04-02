@@ -108,6 +108,15 @@ function SuccessContent() {
             return;
         }
 
+        // Guest email discrepancy check - only if they changed the email from what was in the order
+        if (email !== guestEmail) {
+            const confirmed = window.confirm(
+                `⚠️ 주문 시 입력한 이메일(${guestEmail})과 가입하시려는 이메일(${email})이 다릅니다.\n\n` +
+                `가입하신 [ ${email} ] 계정으로 현재 주문 내역이 통합 관리됩니다. 진행하시겠습니까?`
+            );
+            if (!confirmed) return;
+        }
+
         setLoading(true);
         try {
             const response = await apiFetch('/api/auth/guest-signup', {

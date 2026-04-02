@@ -19,6 +19,7 @@ export default function SignupPage() {
         password: '',
         confirmPassword: ''
     });
+    const [isGuestDiscrepancyConfirmed, setIsGuestDiscrepancyConfirmed] = useState(false);
     const [errors, setErrors] = useState({
         id: '',
         name: '',
@@ -71,7 +72,7 @@ export default function SignupPage() {
         let error = '';
         if (name === 'id') {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!value) error = '아이디(이메일)를 입력해주세요.';
+            if (!value) error = '이메일(아이디)을 입력해주세요.';
             else if (!emailRegex.test(value)) error = '올바른 이메일 형식이 아닙니다 (예: name@example.com)';
             else if (!emailChecked) error = '이메일 중복 확인을 해주세요.';
         } else if (name === 'name') {
@@ -99,7 +100,7 @@ export default function SignupPage() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (!email) {
-            setErrors(prev => ({ ...prev, id: '아이디(이메일)를 입력해주세요.' }));
+            setErrors(prev => ({ ...prev, id: '이메일(아이디)을 입력해주세요.' }));
             idRef.current?.focus();
             return;
         }
@@ -135,6 +136,39 @@ export default function SignupPage() {
             setErrors(prev => ({ ...prev, id: '중복 확인 중 오류가 발생했습니다.' }));
         } finally {
             setCheckingEmail(false);
+        }
+    };
+
+    const checkGuestDiscrepancy = async () => {
+        if (!formData.phone) return false;
+        
+        try {
+            const response = await apiFetch('/api/auth/check-guest-email', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    phone: formData.phone, 
+                    currentEmail: formData.id 
+                })
+            });
+            const data = await response.json();
+            
+            if (data.different && !isGuestDiscrepancyConfirmed) {
+                const confirmed = window.confirm(
+                    `⚠️ 이전에 입력한 주문 이메일(${data.prevEmail})과 현재 가입 이메일(${formData.id})이 다릅니다.\n\n` +
+                    `회원가입을 진행하시면 현재 입력하신 [ ${formData.id} ]으로 모든 주문 내역이 통합 관리됩니다.\n\n` +
+                    `진행하시겠습니까?`
+                );
+                
+                if (confirmed) {
+                    setIsGuestDiscrepancyConfirmed(true);
+                    return true;
+                }
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('Guest email check error:', error);
+            return true; // Proceed if check fails
         }
     };
 
@@ -195,6 +229,10 @@ export default function SignupPage() {
         if (passErr) { passwordRef.current?.focus(); return; }
         if (confErr) { confirmPasswordRef.current?.focus(); return; }
 
+        // Guest email discrepancy check
+        const canProceed = await checkGuestDiscrepancy();
+        if (!canProceed) return;
+
         setLoading(true);
 
         const normalizedEmail = formData.id.toLowerCase();
@@ -250,9 +288,9 @@ export default function SignupPage() {
                 <h1 className={styles.title}>Join <span>Dalbus</span></h1>
 
                 <form className={styles.form} onSubmit={handleSubmit} noValidate>
-                    {/* 1. 이메일 (중복 체크) */}
+                    {/* 1. 이메일 (계정 아이디) */}
                     <div className={styles.inputGroup}>
-                        <label>아이디 (이메일)</label>
+                        <label>이메일 (아이디)</label>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <div style={{ position: 'relative', flex: 1 }}>
                                 <div style={{

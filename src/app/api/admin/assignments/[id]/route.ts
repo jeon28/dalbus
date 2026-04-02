@@ -51,7 +51,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (_memo !== undefined && !isHifiTidal) {
             oaUpdates.memo = _memo;
 
-            // Optional sync with profiles.memo if a user_id exists for this order
+            // DAL-20: Stop syncing with profiles.memo to keep memos per Tidal ID/Assignment
+            /*
             const { data: assignmentData } = await supabaseAdmin
                 .from(assignmentTable)
                 .select('orders(user_id)')
@@ -65,6 +66,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     .update({ memo: _memo })
                     .eq('id', userId);
             }
+            */
         } else if (_memo !== undefined) {
             oaUpdates.memo = _memo;
         }
@@ -166,11 +168,23 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         if (fetchError || !assignment) throw new Error('Assignment not found');
 
-        // 2. Soft Delete assignment
-        const { error: delError } = await supabaseAdmin
-            .from(assignmentTable)
-            .update({ is_deleted: true, is_active: false })
-            .eq('id', id);
+        // 2. Delete or Soft Delete assignment
+        const hardDelete = req.nextUrl.searchParams.get('hardDelete') === 'true';
+        let delError;
+        
+        if (hardDelete) {
+            const { error } = await supabaseAdmin
+                .from(assignmentTable)
+                .delete()
+                .eq('id', id);
+            delError = error;
+        } else {
+            const { error } = await supabaseAdmin
+                .from(assignmentTable)
+                .update({ is_deleted: true, is_active: false })
+                .eq('id', id);
+            delError = error;
+        }
 
 
         if (delError) throw delError;

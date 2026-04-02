@@ -327,7 +327,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         type: assignment?.type || (i === 0 ? 'master' : 'user'),
                         period_months: assignment?.period_months || 0,
                         amount: assignment?.orders?.amount || 0,
-                        memo: assignment?.memo || assignment?.orders?.profiles?.memo || '',
+                        memo: assignment?.memo || '',
                     };
                 }
             });
@@ -817,6 +817,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
+    const handlePermanentDelete = async (assignmentId: string) => {
+        if (!confirm('복구가 불가능하도록 "완전히 삭제" 하시겠습니까?')) return;
+        try {
+            const res = await apiFetch(`/api/admin/assignments/${assignmentId}?hardDelete=true`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Permanent delete failed');
+            alert('완전히 삭제되었습니다.');
+            fetchAccounts();
+            fetchPendingOrders();
+        } catch (error) {
+            alert('삭제 실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
 
 
     const handleCreateAccount = async () => {
@@ -1170,7 +1183,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     type: assignment?.type || (slotIdx === 0 ? 'master' : 'user'),
                     period_months: assignment?.period_months || 0,
                     amount: assignment?.orders?.amount || 0,
-                    memo: assignment?.orders?.profiles?.memo || assignment?.memo || '',
+                    memo: assignment?.memo || '',
                 }
             }));
         }
@@ -1584,9 +1597,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                             </>
                                                                         )}
                                                                         {!isEmpty && assignment.is_deleted && (
-                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-green-600 hover:text-green-700" onClick={() => handleRestore(assignment.id)}>
-                                                                                <ArrowRightLeft size={12} /> 복구
-                                                                            </Button>
+                                                                            <>
+                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-green-600 hover:text-green-700" onClick={() => handleRestore(assignment.id)}>
+                                                                                    <ArrowRightLeft size={12} /> 복구
+                                                                                </Button>
+                                                                                <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600 hover:text-red-700" onClick={() => handlePermanentDelete(assignment.id)}>
+                                                                                    <Trash2 size={12} /> 완전히 삭제
+                                                                                </Button>
+                                                                            </>
                                                                         )}
                                                                         {!isEmpty && !assignment.is_deleted && (isExpired || assignment.is_active === false) && (
                                                                             <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600 hover:text-red-700" onClick={() => handleDelete(assignment.id)}>
@@ -1994,9 +2012,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                             </Button>
                                                                                         </>
                                                                                     ) : assignment.is_deleted ? (
-                                                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-700" title="삭제 데이터 복구" onClick={() => handleRestore(assignment.id)}>
-                                                                                            <ArrowRightLeft size={14} />
-                                                                                        </Button>
+                                                                                        <div className="flex gap-1">
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-700" title="삭제 데이터 복구" onClick={() => handleRestore(assignment.id)}>
+                                                                                                <ArrowRightLeft size={14} />
+                                                                                            </Button>
+                                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-600 hover:text-red-700" title="완전히 삭제" onClick={() => handlePermanentDelete(assignment.id)}>
+                                                                                                <Trash2 size={14} />
+                                                                                            </Button>
+                                                                                        </div>
                                                                                     ) : isEmpty ? (
                                                                                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="배정" onClick={() => openAssignModal(acc, assignment.slot_number)}>
                                                                                             <Plus size={14} />

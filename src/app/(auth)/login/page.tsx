@@ -95,7 +95,7 @@ export default function LoginPage() {
 
                 <form className={styles.form} onSubmit={handleSubmit}>
                     <div className={styles.inputGroup}>
-                        <label>아이디 (이메일)</label>
+                        <label>이메일 (아이디)</label>
                         <div style={{ position: 'relative' }}>
                             <div style={{
                                 position: 'absolute',

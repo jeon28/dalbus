@@ -9,6 +9,7 @@ import styles from './service.module.css';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { supabase } from '@/lib/supabase';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -63,6 +64,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupResults, setLookupResults] = useState<ExtensionOrder[]>([]);
     const [lookupMessage, setLookupMessage] = useState('');
+    const [userEmails, setUserEmails] = useState<string[]>([]);
 
     const [guestInfo, setGuestInfo] = useState({
         name: '',
@@ -144,6 +146,35 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 email: user.email || '',
                 depositor: prev.depositor || user.name || ''
             }));
+
+            // Fetch all unique buyer_emails from previous orders
+            const fetchUniqueEmails = async () => {
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select('buyer_email')
+                    .eq('user_id', user.id);
+                
+                if (!error && data) {
+                    const emails = new Set<string>();
+                    if (user.email) emails.add(user.email);
+                    data.forEach(o => {
+                        if (o.buyer_email) emails.add(o.buyer_email);
+                    });
+                    
+                    const uniqueEmails = Array.from(emails);
+                    setUserEmails(uniqueEmails);
+                    
+                    // If multiple emails but current email is empty, pre-fill with first one
+                    if (uniqueEmails.length > 0 && !guestInfo.email) {
+                        setGuestInfo(prev => ({ ...prev, email: uniqueEmails[0] }));
+                    }
+                } else {
+                    setUserEmails(user.email ? [user.email] : []);
+                }
+            };
+            fetchUniqueEmails();
+        } else {
+            setUserEmails([]);
         }
     }, [user]);
 
@@ -196,8 +227,13 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const handleSubscribe = async () => {
         if (!product) return;
 
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!guestInfo.name || !guestInfo.phone || !guestInfo.email || !guestInfo.depositor) {
             alert('주문 정보를 모두 입력해주세요.');
+            return;
+        }
+        if (!emailRegex.test(guestInfo.email)) {
+            alert('올바른 이메일 형식이 아닙니다. (예: name@example.com)');
             return;
         }
         if (!user && (!agreements.privacy || !agreements.terms)) {
@@ -466,13 +502,27 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                 readOnly={!!user}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
                             />
-                            <Input
-                                type="email"
-                                placeholder="이메일을 입력해 주세요."
-                                value={guestInfo.email}
-                                readOnly={!!user}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
-                            />
+                            {user && userEmails.length > 1 ? (
+                                <select
+                                    className="w-full p-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none"
+                                    value={guestInfo.email}
+                                    onChange={(e) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                                >
+                                    {userEmails.map((email) => (
+                                        <option key={email} value={email}>
+                                            {email}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <Input
+                                    type="email"
+                                    placeholder="이메일을 입력해 주세요."
+                                    value={guestInfo.email}
+                                    readOnly={!!user}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                                />
+                            )}
                             <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
                         </div>
                     )}
