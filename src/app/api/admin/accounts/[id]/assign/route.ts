@@ -152,7 +152,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 ((targetOrder.buyer_email && targetOrder.buyer_email === existingAssignment?.buyer_email) ||
                     (targetOrder.buyer_name && targetOrder.buyer_name === existingAssignment?.buyer_name));
 
-            if (!isSameOrder && !isExtensionOfExisting && !isBuyerMatch) {
+            if (!existingAssignment.is_deleted && !isSameOrder && !isExtensionOfExisting && !isBuyerMatch) {
                 return NextResponse.json({
                     error: `선택하신 슬롯(${finalSlotNumber + 1}번)은 이미 다른 주문이 점유하고 있습니다.`
                 }, { status: 409 });
