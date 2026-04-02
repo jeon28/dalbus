@@ -6,11 +6,8 @@ import { normalizePhone } from '@/lib/utils';
 
 export async function POST(req: NextRequest) {
     try {
-        // 1. 세션 확인
+        // getServerSession for logging or optional user info, but allow guests
         const session = await getServerSession(req);
-        if (!session) {
-            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
-        }
 
         const body = await req.json();
         const { orderData, product_name, plan_name } = body;
