@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
         }
 
         const user = session;
+        const userEmail = user.email;
 
         // 3. Fetch Data for the User
-        // 3.1 Fetch Orders
+        // 3.1 Fetch Orders (by user_id OR buyer_email)
         const { data: orders, error: orderError } = await supabaseAdmin
             .from('orders')
             .select(`
@@ -25,19 +26,36 @@ export async function GET(req: NextRequest) {
                 created_at,
                 assignment_status,
                 product_id,
+                buyer_email,
                 products(name),
                 product_plans(duration_months)
             `)
-            .eq('user_id', user.id)
+            .or(`user_id.eq.${user.id}${userEmail ? `,buyer_email.eq.${userEmail}` : ''}`)
             .order('created_at', { ascending: false });
 
         if (orderError) throw orderError;
 
         // 3.2 Fetch Account Assignments
-        const { data: assignments, error: assignmentError } = await supabaseAdmin
+        // Fetch assignments linked to these orders OR matching the buyer email directly
+        const orderIds = orders?.map(o => o.id) || [];
+        
+        let assignmentsQuery = supabaseAdmin
             .from('order_accounts')
             .select('*, order_id, orders(product_id, products(name), product_plans(duration_months))')
-            .in('order_id', orders?.map(o => o.id) || []);
+            .eq('is_deleted', false);
+
+        if (orderIds.length > 0 && userEmail) {
+            assignmentsQuery = assignmentsQuery.or(`order_id.in.(${orderIds.join(',')}),buyer_email.eq.${userEmail}`);
+        } else if (orderIds.length > 0) {
+            assignmentsQuery = assignmentsQuery.in('order_id', orderIds);
+        } else if (userEmail) {
+            assignmentsQuery = assignmentsQuery.eq('buyer_email', userEmail);
+        } else {
+            // No orders and no email, return empty
+            return NextResponse.json({ orders: [], assignments: [] });
+        }
+
+        const { data: assignments, error: assignmentError } = await assignmentsQuery;
 
         if (assignmentError) throw assignmentError;
 
