@@ -49,10 +49,55 @@ function InactiveAccountsContent() {
     const fetchInactiveAssignments = async () => {
         try {
             setIsLoading(true);
+            // 1. Fetch inactive history
             const res = await apiFetch('/api/admin/assignments/inactive?product=Tidal', { cache: 'no-store' });
-            if (!res.ok) throw new Error('Failed to fetch');
-            const data = await res.json();
-            setAssignments(data);
+            if (!res.ok) throw new Error('Failed to fetch inactive history');
+            const inactiveData = await res.json();
+
+            // 2. Fetch all Tidal accounts to find current empty slots
+            const accRes = await apiFetch('/api/admin/accounts?product=Tidal', { cache: 'no-store' });
+            if (!accRes.ok) throw new Error('Failed to fetch accounts');
+            const accountsData = await accRes.json();
+
+            // 3. Identify empty slots
+            const emptySlots: any[] = [];
+            accountsData.forEach((acc: any) => {
+                const maxSlots = acc.max_slots || 5; // Default to 5 for Tidal if not specified
+                for (let i = 0; i < maxSlots; i++) {
+                    // Check if there is an ACTIVE assignment for this slot
+                    const isOccupied = acc.order_accounts?.some((oa: any) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
+                    if (!isOccupied) {
+                        emptySlots.push({
+                            id: `empty-${acc.id}-${i}`,
+                            slot_number: i,
+                            tidal_id: '-',
+                            buyer_name: '빈 슬롯',
+                            is_active: false,
+                            isEmpty: true,
+                            accounts: { login_id: acc.login_id }
+                        });
+                    }
+                }
+            });
+
+            // 4. Combine and Sort
+            const combined = [...emptySlots, ...inactiveData];
+            combined.sort((a, b) => {
+                const idA = a.accounts?.login_id || '';
+                const idB = b.accounts?.login_id || '';
+                if (idA !== idB) return idA.localeCompare(idB);
+                
+                if (a.slot_number !== b.slot_number) return a.slot_number - b.slot_number;
+                
+                if (a.isEmpty && !b.isEmpty) return -1;
+                if (!a.isEmpty && b.isEmpty) return 1;
+
+                const dateA = a.assigned_at ? new Date(a.assigned_at).getTime() : 0;
+                const dateB = b.assigned_at ? new Date(b.assigned_at).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            setAssignments(combined);
         } catch (error) {
             console.error(error);
             alert('데이터 로딩 실패');
@@ -76,17 +121,20 @@ function InactiveAccountsContent() {
     };
 
     const exportToExcel = () => {
-        const excelData = assignments.map((a, idx) => ({
-            'No.': idx + 1,
-            '그룹 ID': a.accounts?.login_id || '-',
-            'Slot': a.slot_number + 1,
-            'Tidal ID': a.tidal_id,
-            '구매자명': a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-',
-            '연락처': a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-',
-            '시작일': a.start_date || '-',
-            '종료일': a.end_date || '-',
-            '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-'
-        }));
+        const excelData = assignments.map((a: any, idx) => {
+            const isEmpty = a.isEmpty === true;
+            return {
+                'No.': idx + 1,
+                '배정번호': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
+                '상태': isEmpty ? '빈 슬롯' : '지난 내역',
+                'Tidal ID': a.tidal_id,
+                '구매자명': isEmpty ? '-' : (a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-'),
+                '연락처': isEmpty ? '-' : (a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'),
+                '시작일': a.start_date || '-',
+                '종료일': a.end_date || '-',
+                '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-'
+            };
+        });
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
@@ -120,8 +168,7 @@ function InactiveAccountsContent() {
                         <thead>
                             <tr className="bg-gray-100 border-b">
                                 <th className="p-3 text-center w-12">No</th>
-                                <th className="p-3 text-left">그룹 ID</th>
-                                <th className="p-3 text-center">Slot</th>
+                                <th className="p-3 text-center">배정번호</th>
                                 <th className="p-3 text-left">Tidal ID</th>
                                 <th className="p-3 text-left">구매자</th>
                                 <th className="p-3 text-left">연락처</th>
@@ -138,27 +185,35 @@ function InactiveAccountsContent() {
                                     </td>
                                 </tr>
                             ) : (
-                                assignments.map((a, idx) => (
-                                    <tr key={a.id} className="border-b hover:bg-gray-50">
-                                        <td className="p-2 text-center text-gray-500">{idx + 1}</td>
-                                        <td className="p-2">{a.accounts?.login_id || '-'}</td>
-                                        <td className="p-2 text-center">{a.slot_number + 1}</td>
-                                        <td className="p-2">{a.tidal_id}</td>
-                                        <td className="p-2">{a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-'}</td>
-                                        <td className="p-2">{a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'}</td>
-                                        <td className="p-2 text-center">
-                                            {a.start_date} ~ {a.end_date}
-                                        </td>
-                                        <td className="p-2 text-center text-gray-500">
-                                            {a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-'}
-                                        </td>
-                                        <td className="p-2 text-center">
-                                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-red-600" onClick={() => handleDelete(a.id)} title="영구 삭제">
-                                                <Trash2 size={16} />
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))
+                                assignments.map((a: any, idx) => {
+                                    const isEmpty = (a as any).isEmpty === true;
+                                    return (
+                                        <tr key={a.id} className={`border-b hover:bg-gray-50 h-10 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                            <td className="p-2 text-center opacity-70">{idx + 1}</td>
+                                            <td className="p-2 text-center font-bold">
+                                                {a.accounts?.login_id || '-'}-{a.slot_number + 1}
+                                            </td>
+                                            <td className="p-2">{a.tidal_id}</td>
+                                            <td className="p-2 font-bold">
+                                                {isEmpty ? '빈 슬롯' : (a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-')}
+                                            </td>
+                                            <td className="p-2">{a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'}</td>
+                                            <td className="p-2 text-center text-[10px] opacity-80">
+                                                {isEmpty ? '-' : `${a.start_date} ~ ${a.end_date}`}
+                                            </td>
+                                            <td className="p-2 text-center text-[10px] opacity-70">
+                                                {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
+                                            </td>
+                                            <td className="p-2 text-center">
+                                                {!isEmpty && (
+                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-700" onClick={() => handleDelete(a.id)} title="영구 삭제">
+                                                        <Trash2 size={16} />
+                                                    </Button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>

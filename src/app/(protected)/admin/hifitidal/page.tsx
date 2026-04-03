@@ -1445,7 +1445,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     />
                                                 </td>
                                                 <td className="p-2 text-center border-r bg-gray-50/5" style={{ width: columnWidths['slot_col'] }}>
-                                                    <span className={`font-bold text-xs ${!isActive ? 'text-red-700' : 'text-blue-600'}`}>
+                                                    <span className={`font-bold text-xs ${!isActive ? 'text-red-700' : isEmpty ? 'text-green-700' : 'text-blue-600'}`}>
                                                         {acc.login_id}-{sIdx + 1}
                                                     </span>
                                                 </td>
@@ -1551,16 +1551,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     </>
                                                 ) : isEmpty ? (
                                                     <>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['tidal_id'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['tidal_id'] }}></td>
 
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['buyer_name'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['buyer_email'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['buyer_phone'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['buyer_name'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['buyer_email'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['buyer_phone'] }}></td>
 
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['start_date'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['end_date'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['period'] }}></td>
-                                                        <td className="p-2 border-r" style={{ width: columnWidths['amount'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['start_date'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['end_date'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['period'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['amount'] }}></td>
                                                     </>
                                                 ) : (
                                                     <>
@@ -1797,7 +1797,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     return (
                                                                         <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : ''}`}>
                                                                             <td className="text-center text-[10px] font-bold">
-                                                                                <span className={!isActive ? 'text-red-700 font-bold' : isEmpty ? "text-green-600" : "text-gray-900"}>
+                                                                                <span className={!isActive ? 'text-red-700 font-bold' : isEmpty ? "text-green-700" : "text-gray-900"}>
                                                                                     {acc.login_id}-{assignment.slot_number + 1}
                                                                                 </span>
                                                                             </td>
@@ -1842,7 +1842,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                 </>
                                                                             ) : isEmpty ? (
                                                                                 <>
-                                                                                    <td colSpan={9}></td>
+                                                                                    <td colSpan={9} className="bg-green-100/50"></td>
                                                                                 </>
                                                                             ) : (
                                                                                 <>
