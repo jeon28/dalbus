@@ -189,23 +189,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         else if (isHydrated && isAdmin) { fetchAccounts(); fetchPendingOrders(); }
     }, [isAdmin, isHydrated, router]);
 
-    useEffect(() => {
-        const accountId = searchParams.get('accountId');
-        if (accountId && accounts.length > 0) {
-            setIsGridView(false);
-            setExpandedRows(new Set([accountId]));
-            const scrollToAndHighlight = () => {
-                const el = document.getElementById(`account-${accountId}`);
-                if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.style.transition = 'background-color 0.5s ease-in-out';
-                    el.style.backgroundColor = '#e0f2fe';
-                    setTimeout(() => { if (el) el.style.backgroundColor = ''; }, 3000);
-                } else setTimeout(scrollToAndHighlight, 500);
-            };
-            setTimeout(scrollToAndHighlight, 500);
-        }
-    }, [searchParams, accounts]);
 
     useEffect(() => {
         if (showExpiredOnly) {

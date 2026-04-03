@@ -245,25 +245,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, isHydrated, router]);
 
-    useEffect(() => {
-        const accountId = searchParams.get('accountId');
-        if (accountId && accounts.length > 0) {
-            // Switch to List View (grouped view) and expand only the assigned account
-            setIsGridView(false);
-            setExpandedRows(new Set([accountId]));
-
-            const scrollToAndHighlight = () => {
-                const element = document.getElementById(`account-${accountId}`);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    element.style.transition = 'background-color 0.5s ease-in-out';
-                    element.style.backgroundColor = '#e0f2fe';
-                    setTimeout(() => { if (element) element.style.backgroundColor = ''; }, 3000);
-                } else setTimeout(scrollToAndHighlight, 500);
-            };
-            setTimeout(scrollToAndHighlight, 500);
-        }
-    }, [searchParams, accounts]);
 
     useEffect(() => {
         if (isHydrated && isAdmin) {
@@ -378,25 +359,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     }, [isAdmin, isHydrated, fetchAccounts, fetchPendingOrders]);
 
-    useEffect(() => {
-        const accountId = searchParams.get('accountId');
-        if (accountId && accounts.length > 0) {
-            // Switch to List View (grouped view) and expand only the assigned account
-            setIsGridView(false);
-            setExpandedRows(new Set([accountId]));
-
-            const scrollToAndHighlight = () => {
-                const element = document.getElementById(`account-${accountId}`);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    element.style.transition = 'background-color 0.5s ease-in-out';
-                    element.style.backgroundColor = '#e0f2fe';
-                    setTimeout(() => { if (element) element.style.backgroundColor = ''; }, 3000);
-                } else setTimeout(scrollToAndHighlight, 500);
-            };
-            setTimeout(scrollToAndHighlight, 500);
-        }
-    }, [searchParams, accounts]);
 
     useEffect(() => {
         if (showExpiredOnly) {
@@ -978,6 +940,39 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         setSlotPasswordModal(generateTidalPassword());
         setIsAssignModalOpen(true);
     };
+
+    useEffect(() => {
+        const accountId = searchParams.get('accountId');
+        const slotIdx = searchParams.get('slotIdx');
+        const action = searchParams.get('action');
+
+        if (accountId && accounts.length > 0) {
+            // Switch to List View (grouped view) and expand only the assigned account
+            setIsGridView(false);
+            setExpandedRows(new Set([accountId]));
+
+            const scrollToAndHighlight = () => {
+                const element = document.getElementById(`account-${accountId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.style.transition = 'background-color 0.5s ease-in-out';
+                    element.style.backgroundColor = '#e0f2fe';
+
+                    // If action is assign, open the modal
+                    if (action === 'assign' && slotIdx !== null) {
+                        const acc = accounts.find(a => a.id === accountId);
+                        if (acc) {
+                            openAssignModal(acc, parseInt(slotIdx));
+                        }
+                    }
+
+                    setTimeout(() => { if (element) element.style.backgroundColor = ''; }, 3000);
+                } else setTimeout(scrollToAndHighlight, 500);
+            };
+            setTimeout(scrollToAndHighlight, 500);
+        }
+    }, [searchParams, accounts, openAssignModal]);
+
 
     const handleAssign = (orderId: string) => {
         if (!selectedAccount || selectedSlot === null) return;

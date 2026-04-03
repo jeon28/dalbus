@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Download } from 'lucide-react';
+import { ArrowLeft, Trash2, Download, Pencil } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import styles from '../../admin.module.css';
@@ -74,7 +74,7 @@ function InactiveAccountsContent() {
                             buyer_name: '빈 슬롯',
                             is_active: false,
                             isEmpty: true,
-                            accounts: { login_id: acc.login_id }
+                            accounts: { id: acc.id, login_id: acc.login_id }
                         });
                     }
                 }
@@ -205,7 +205,17 @@ function InactiveAccountsContent() {
                                                 {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
                                             </td>
                                             <td className="p-2 text-center">
-                                                {!isEmpty && (
+                                                {isEmpty ? (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
+                                                        onClick={() => router.push(`/admin/tidal?accountId=${a.accounts.id}&slotIdx=${a.slot_number}&action=assign`)} 
+                                                        title="배정하기"
+                                                    >
+                                                        <Pencil size={16} />
+                                                    </Button>
+                                                ) : (
                                                     <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-700" onClick={() => handleDelete(a.id)} title="영구 삭제">
                                                         <Trash2 size={16} />
                                                     </Button>
