@@ -112,3 +112,76 @@
     font-weight: 700;
     margin-left: 5px;
 }
+
+.socialGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.socialBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.socialBtn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.kakaoBtn {
+    background-color: #FEE500;
+    color: #000000;
+}
+
+.kakaoBtn:hover:not(:disabled) {
+    background-color: #f4dc00;
+}
+
+.googleBtn {
+    background-color: #ffffff;
+    color: #3c4043;
+    border-color: #e5e7eb;
+}
+
+.googleBtn:hover:not(:disabled) {
+    background-color: #f8f9fa;
+    border-color: #d1d5db;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 15px 0 5px 0;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.divider:not(:empty)::before {
+    margin-right: .8em;
+}
+
+.divider:not(:empty)::after {
+    margin-left: .8em;
+}
+
+.dividerText {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}

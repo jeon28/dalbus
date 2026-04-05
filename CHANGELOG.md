@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [Unreleased]
+
+### 🔐 소셜 로그인(SNS) 통합 (DAL-36)
+- **로그인/가입 UI 개선**: `/signup` 및 `/login` 페이지에 Google 및 Kakao 소셜 가입/로그인 버튼 추가.
+- **디자인 패턴 적용**: 버튼 Hover 애니메이션, 모던 SVG 아이콘, 기존 이메일 폼과 직관적으로 나뉘는 구분선(Divider) 레이아웃 적용 (`auth.module.css`).
+- **Supabase OAuth 연동**: `signInWithOAuth` 메서드를 통해 Google/Kakao 프로바이더 연동을 완료하고, `window.location.origin` 기반 로컬 및 운영 환경 동시 호환 리다이렉트 구현.
+
 ## v1.7.0 - 2026-03-29
 
 ### 🗂️ 기존 Tidal 계정 관리 (legacy_tidal_account) 분리 및 신규 구축
