@@ -22,7 +22,10 @@ interface LegacyTidalHistory {
     end_date?: string;
     assigned_at?: string;
     is_active: boolean;
+    is_deleted?: boolean;
+    isEmpty?: boolean;
     accounts?: {
+        id: string;
         login_id: string;
     };
 }
@@ -94,12 +97,13 @@ function LegacyTidalInactiveContent() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('정말 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+        if (!confirm('해당 기록을 삭제하시겠습니까?\n삭제된 데이터는 메인 페이지 \'삭제 데이터\' 보기에서 관리할 수 있습니다.')) return;
         try {
             const res = await apiFetch(`/api/admin/legacy-tidal-account/${id}`, {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');
+            alert('삭제 완료. 기존 Tidal 메인 페이지 → 삭제 데이터 보기에서 확인하세요.');
             fetchInactiveRecords();
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '삭제 실패';

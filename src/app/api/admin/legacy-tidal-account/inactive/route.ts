@@ -9,7 +9,7 @@ export async function GET() {
             .from('legacy_tidal_account')
             .select(`
                 *,
-                accounts ( login_id )
+                accounts ( id, login_id )
             `)
             .eq('is_active', false)
             .eq('is_deleted', false)

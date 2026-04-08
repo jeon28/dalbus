@@ -209,6 +209,27 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     }, [showExpiredOnly, accounts, expiredDays]);
 
+    // Handle deep linking from Inactive page (history)
+    useEffect(() => {
+        if (accounts.length > 0 && isHydrated) {
+            const action = searchParams.get('action');
+            const accountId = searchParams.get('accountId');
+            const slotIdxStr = searchParams.get('slotIdx');
+
+            if (action === 'assign' && accountId && slotIdxStr !== null) {
+                const acc = accounts.find(a => a.id === accountId);
+                const sIdx = parseInt(slotIdxStr);
+                if (acc && !isNaN(sIdx)) {
+                    // Force refresh grid values for this slot if needed, then open modal
+                    openAssignModal(acc, sIdx);
+                    // Clear search params to avoid re-opening on refresh
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, '', newUrl);
+                }
+            }
+        }
+    }, [accounts, isHydrated, searchParams]);
+
     const fetchAccounts = React.useCallback(async () => {
         try {
             const params = new URLSearchParams({ product: 'HifiTidal' });
