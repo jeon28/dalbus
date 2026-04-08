@@ -7,9 +7,11 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const product = searchParams.get('product');
+    const isHifi = product?.toLowerCase().includes('hifi');
+    const assignmentTable = isHifi ? 'legacy_tidal_account' : 'order_accounts';
 
     let query = supabaseAdmin
-      .from('order_accounts')
+      .from(assignmentTable)
       .select(`
         *,
         accounts!inner (
@@ -24,7 +26,6 @@ export async function GET(req: Request) {
           profiles ( name, phone )
         )
       `)
-      .eq('is_active', false)
       .eq('is_deleted', true); // only deleted records
 
     if (product) {

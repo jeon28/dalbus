@@ -768,7 +768,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return;
         }
 
-        if (!confirm('정말 삭제하시겠습니까? (삭제된 데이터 보기에 저장됩니다)')) return;
+        if (!confirm('해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)')) return;
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');

@@ -109,7 +109,7 @@ function InactiveAccountsContent() {
     const handleDelete = async (id: string) => {
         if (!confirm('해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)')) return;
         try {
-            const res = await apiFetch(`/api/admin/assignments/${id}`, {
+            const res = await apiFetch(`/api/admin/assignments/${id}?product=Tidal`, {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');

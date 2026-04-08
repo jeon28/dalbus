@@ -185,9 +185,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     useEffect(() => { setNotificationMessage(defaultTemplate); }, [defaultTemplate]);
 
     useEffect(() => {
-        if (isHydrated && !isAdmin) router.push('/admin');
-        else if (isHydrated && isAdmin) { fetchAccounts(); fetchPendingOrders(); }
-    }, [isAdmin, isHydrated, router]);
+        if (isHydrated && isAdmin) {
+            fetchAccounts();
+            fetchPendingOrders();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdmin, isHydrated, showInactive, router]);
 
 
     useEffect(() => {
@@ -206,9 +209,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     }, [showExpiredOnly, accounts, expiredDays]);
 
-    const fetchAccounts = async () => {
+    const fetchAccounts = React.useCallback(async () => {
         try {
-            const res = await apiFetch('/api/admin/accounts?product=HifiTidal&showInactive=true', { cache: 'no-store' });
+            const params = new URLSearchParams({ product: 'HifiTidal' });
+            if (showInactive) {
+                params.append('showDeleted', 'true');
+            } else {
+                params.append('showInactive', 'true');
+            }
+            const res = await apiFetch(`/api/admin/accounts?${params.toString()}`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`Failed to fetch (${res.status})`);
             const data = await res.json();
             setAccounts(data);
@@ -239,7 +248,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             });
             setGridValues(initialGrid);
         } catch (error) { console.error(error); }
-    };
+    }, [showInactive]);
 
     const fetchPendingOrders = async () => {
         try {
@@ -406,7 +415,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         let currentAssignment: Assignment | undefined;
         for (const acc of accounts) { currentAssignment = acc.order_accounts?.find(oa => oa.id === assignmentId); if (currentAssignment) break; }
         if (currentAssignment && currentAssignment.is_active !== false) { alert('비활성화(빨간 행) 상태인 계정만 삭제 가능합니다.'); return; }
-        if (!confirm('삭제 하시겠습니까?')) return;
+        if (!confirm('해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)')) return;
         try {
             const res = await apiFetch(`/api/admin/legacy-tidal-account/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
