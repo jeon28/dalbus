@@ -107,12 +107,13 @@ function InactiveAccountsContent() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('정말 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+        if (!confirm('해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)')) return;
         try {
             const res = await apiFetch(`/api/admin/assignments/${id}`, {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');
+            alert('삭제된 데이터 보기(휴지통)로 이동되었습니다.');
             fetchInactiveAssignments();
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '삭제 실패';
