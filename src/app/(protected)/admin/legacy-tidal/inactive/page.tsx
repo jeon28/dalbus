@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Download, Pencil } from 'lucide-react';
+import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
 import styles from '../../admin.module.css';
@@ -34,26 +34,34 @@ function LegacyTidalInactiveContent() {
     const router = useRouter();
     const [records, setRecords] = useState<LegacyTidalHistory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showDeleted, setShowDeleted] = useState(false);
 
     useEffect(() => {
         fetchInactiveRecords();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showDeleted]);
 
     const fetchInactiveRecords = async () => {
         try {
             setIsLoading(true);
             // 1. Fetch inactive history
-            const res = await apiFetch('/api/admin/legacy-tidal/inactive', { cache: 'no-store' });
+            const res = await apiFetch(`/api/admin/legacy-tidal/inactive?showDeleted=${showDeleted}`, { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch inactive history');
             const inactiveData = await res.json();
 
-            // 2. Fetch all HifiTidal accounts to find current empty slots
+            // 2. Clear empty slots if showing deleted
+            if (showDeleted) {
+                setRecords(inactiveData);
+                return;
+            }
+
+            // 3. Fetch all HifiTidal accounts to find current empty slots
             // (Legacy Tidal also uses HifiTidal product prefix in this app)
             const accRes = await apiFetch('/api/admin/accounts?product=HifiTidal', { cache: 'no-store' });
             if (!accRes.ok) throw new Error('Failed to fetch accounts');
             const accountsData = await accRes.json();
 
-            // 3. Identify empty slots
+            // 4. Identify empty slots
             const emptySlots: LegacyTidalHistory[] = [];
             accountsData.forEach((acc: { id: string; login_id: string; max_slots: number; order_accounts: { slot_number: number; is_active: boolean; is_deleted?: boolean }[] }) => {
                 const maxSlots = acc.max_slots || 6;
@@ -97,17 +105,42 @@ function LegacyTidalInactiveContent() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('해당 기록을 영구적으로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 계정 슬롯 관리에서 제외됩니다.')) return;
+        const confirmMsg = showDeleted 
+            ? '해당 기록을 영구적으로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 완전히 삭제됩니다.'
+            : '해당 기록을 삭제 데이터(휴지통)로 이동하시겠습니까?';
+        
+        if (!confirm(confirmMsg)) return;
+
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${id}?hardDelete=true`, {
+            const url = showDeleted 
+                ? `/api/admin/legacy-tidal/assignment/${id}?hardDelete=true`
+                : `/api/admin/legacy-tidal/assignment/${id}`;
+            
+            const res = await apiFetch(url, {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');
-            alert('영구 삭제되었습니다.');
+            alert(showDeleted ? '영구 삭제되었습니다.' : '삭제 데이터로 이동되었습니다.');
             fetchInactiveRecords();
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '삭제 실패';
             alert('삭제 실패: ' + message);
+        }
+    };
+
+    const handleRestore = async (id: string) => {
+        if (!confirm('해당 기록을 비활성 내역으로 복구하시겠습니까?')) return;
+        try {
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ is_deleted: false, is_active: false })
+            });
+            if (!res.ok) throw new Error('Restore failed');
+            alert('복구되었습니다.');
+            fetchInactiveRecords();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '복구 실패';
+            alert('복구 실패: ' + message);
         }
     };
 
@@ -144,9 +177,19 @@ function LegacyTidalInactiveContent() {
                         <Button variant="ghost" size="sm" onClick={() => router.back()}>
                             <ArrowLeft size={20} />
                         </Button>
-                        <h1 className={styles.title}>기존 Tidal 지난 배정 내역 (비활성)</h1>
+                        <h1 className={styles.title}>
+                            {showDeleted ? '삭제된 데이터 (휴지통)' : '기존 Tidal 지난 배정 내역 (비활성)'}
+                        </h1>
                     </div>
-                    <div>
+                    <div className="flex gap-2">
+                        <Button 
+                            onClick={() => setShowDeleted(!showDeleted)} 
+                            variant={showDeleted ? "default" : "outline"} 
+                            className="gap-2"
+                        >
+                            {showDeleted ? <History size={16} /> : <Trash2 size={16} />}
+                            {showDeleted ? '내역 보기' : '삭제 내역'}
+                        </Button>
                         <Button onClick={exportToExcel} variant="outline" className="gap-2">
                             <Download size={16} /> 엑셀 다운로드
                         </Button>
@@ -210,9 +253,16 @@ function LegacyTidalInactiveContent() {
                                                         <Pencil size={16} />
                                                     </Button>
                                                 ) : (
-                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-700" onClick={() => handleDelete(a.id)} title="영구 삭제">
-                                                        <Trash2 size={16} />
-                                                    </Button>
+                                                    <div className="flex justify-center gap-1">
+                                                        {showDeleted && (
+                                                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700" onClick={() => handleRestore(a.id)} title="복구">
+                                                                <RotateCcw size={16} />
+                                                            </Button>
+                                                        )}
+                                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(a.id)} title={showDeleted ? "영구 삭제" : "삭제 내역으로 이동"}>
+                                                            <Trash2 size={16} />
+                                                        </Button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
