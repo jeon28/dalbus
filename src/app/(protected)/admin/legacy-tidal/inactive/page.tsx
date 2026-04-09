@@ -57,7 +57,7 @@ function LegacyTidalInactiveContent() {
 
             // 3. Fetch all HifiTidal accounts to find current empty slots
             // (Legacy Tidal also uses HifiTidal product prefix in this app)
-            const accRes = await apiFetch('/api/admin/accounts?product=HifiTidal', { cache: 'no-store' });
+            const accRes = await apiFetch('/api/admin/legacy-tidal?showInactive=true', { cache: 'no-store' });
             if (!accRes.ok) throw new Error('Failed to fetch accounts');
             const accountsData = await accRes.json();
 

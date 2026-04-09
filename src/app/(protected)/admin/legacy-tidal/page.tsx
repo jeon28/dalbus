@@ -896,7 +896,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     </th>
                                     {[
                                         { id: 'login_id', label: '번호', sortable: true },
-                                        { id: 'memo', label: '메모', sortable: false },
                                         { id: 'tidal_id', label: 'Tidal ID', sortable: false },
                                         { id: 'buyer_name', label: '고객명', sortable: false },
                                         { id: 'buyer_email', label: '이메일', sortable: true },
@@ -905,6 +904,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         { id: 'end_date', label: '종료일', sortable: true },
                                         { id: 'period', label: '개월', sortable: true },
                                         { id: 'amount', label: '계약금액', sortable: true },
+                                        { id: 'memo', label: '메모', sortable: false },
                                     ].map(col => (
                                         <th key={col.id} className="relative p-2 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths[col.id] }}>
                                             <div className="flex items-center justify-center gap-1" onClick={() => col.sortable && handleSort(col.id)}>
@@ -953,7 +953,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const isEmpty = assignment.id.startsWith('empty_');
                                         const isDeactivated = val.is_active === false;
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/30' : '')} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/30' : (isEmpty ? 'bg-green-100/50 text-green-700' : ''))} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                 <td className="text-center py-1 border-r border-gray-100" style={{ width: columnWidths.checkbox }}>
                                                     <input type="checkbox" checked={selectedAssignmentIds.has(assignment.id)} onChange={() => handleToggleSelection(assignment.id)} />
                                                 </td>
@@ -966,14 +966,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                             </button>
                                                         )}
                                                     </div>
-                                                </td>
-                                                <td className="p-2 border-r" style={{ width: columnWidths.memo }}>
-                                                    {!isEmpty && (
-                                                        <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
-                                                            <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
-                                                            <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo?.split('\n')[0] || ''}</span>
-                                                        </div>
-                                                    )}
                                                 </td>
                                                 {isEditing ? (
                                                     <>
@@ -1004,7 +996,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 text-right border-r font-mono">{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                     </>
                                                 )}
-                                                {/* Manage cell removed */}
+                                                <td className="p-2 border-r" style={{ width: columnWidths.memo }}>
+                                                    {!isEmpty && (
+                                                        <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
+                                                            <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
+                                                            <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo?.split('\n')[0] || ''}</span>
+                                                        </div>
+                                                    )}
+                                                </td>
                                             </tr>
                                         );
                                     });
@@ -1019,11 +1018,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</div>
                             <div className="col-span-2">결제계좌</div>
                             <div className="col-span-1 text-center font-bold">결제일</div>
-                            <div className="col-span-1 text-left">메모</div>
                             <div className="col-span-2 text-left">마스터계정</div>
                             <div className="col-span-2 text-left cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('end_date')}>종료예정일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</div>
                             <div className="col-span-1 text-left">지속개월</div>
                             <div className="col-span-1 text-right pr-2">계약금액</div>
+                            <div className="col-span-1 text-left">메모</div>
                             <div className="col-span-1 text-center cursor-pointer hover:bg-gray-100 flex items-center justify-center gap-1" onClick={() => handleSort('used_slots')}>슬롯 {sortConfig?.key === 'used_slots' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</div>
                             <div className="col-span-1 text-center">관리</div>
                             <div className="col-span-1 text-center cursor-pointer hover:text-blue-600 whitespace-nowrap" onClick={toggleAllRows}>{filteredAccounts.length > 0 && filteredAccounts.every(acc => expandedRows.has(acc.id)) ? '전체접기' : '전체펼치기'}</div>
@@ -1072,11 +1071,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         <div className="col-span-1 text-gray-700 font-medium cursor-pointer truncate" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
                                         <div className="col-span-2 truncate cursor-pointer" title={acc.payment_email} onClick={() => toggleRow(acc.id)}><span className="text-blue-600 font-semibold text-base truncate">{acc.payment_email}</span></div>
                                         <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>{acc.payment_day}일</div>
-                                        <div className="col-span-1 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>{acc.memo}</div>
                                         <div className="col-span-2 text-gray-700 text-sm truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>{tidalId}</div>
                                         <div className={`col-span-2 font-mono text-sm cursor-pointer ${isWarning ? 'text-red-600 font-bold' : 'text-gray-900'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>
                                         <div className="col-span-1 text-gray-500 font-mono text-sm cursor-pointer" onClick={() => toggleRow(acc.id)}>{duration}</div>
                                         <div className="col-span-1 text-right text-gray-500 font-mono text-sm pr-2 cursor-pointer" onClick={() => toggleRow(acc.id)}>-</div>
+                                        <div className="col-span-1 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>{acc.memo}</div>
                                         <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
                                             <span className={`px-2 py-1 rounded-full text-sm font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{acc.order_accounts?.length || 0}/6</span>
                                         </div>
@@ -1092,7 +1091,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 <thead>
                                                     <tr className="text-gray-400 border-b">
                                                         <th className="py-2 text-center w-16">번호</th>
-                                                        <th className="py-2 text-left w-32">메모</th>
                                                         <th className="py-2 text-left w-32">Tidal ID</th>
                                                         <th className="py-2 text-left w-20">이름</th>
                                                         <th className="py-2 text-left w-28">이메일</th>
@@ -1101,6 +1099,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <th className="py-2 text-left w-24">종료일</th>
                                                         <th className="py-2 text-center w-16">개월</th>
                                                         <th className="py-2 text-right w-20 pr-2">계약금액</th>
+                                                        <th className="py-2 text-left w-32">메모</th>
                                                         <th className="py-2 text-center w-20">관리</th>
                                                     </tr>
                                                 </thead>
@@ -1123,16 +1122,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         const isEmpty = assignment.id.startsWith('empty_');
                                                         const isDeactivated = assignment.is_active === false;
                                                         return (
-                                                            <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/20' : '')}`}>
+                                                            <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/20' : (isEmpty ? 'bg-green-100/50 text-green-700' : ''))}`}>
                                                                 <td className="text-center text-[10px] font-bold"><span className={isEmpty ? "text-green-600" : "text-gray-900"}>{acc.login_id}-{assignment.slot_number + 1}</span></td>
                                                                 {isEditing ? (
                                                                     <>
-                                                                        <td className="px-1">
-                                                                            <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
-                                                                                <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
-                                                                                <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo?.split('\n')[0] || ''}</span>
-                                                                            </div>
-                                                                        </td>
                                                                         <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} /></td>
                                                                         <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} /></td>
                                                                         <td className="px-1"><Input className="h-8 text-xs bg-white" placeholder="Email" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} /></td>
@@ -1140,6 +1133,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         <td className="px-1"><Input type="date" className="h-8 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} /></td>
                                                                         <td className="px-1"><Input type="date" className="h-8 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} /></td>
                                                                         <td className="px-1 w-16"><Input type="number" className="h-8 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} /></td>
+                                                                        <td className="px-1">
+                                                                            <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
+                                                                                <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
+                                                                                <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo?.split('\n')[0] || ''}</span>
+                                                                            </div>
+                                                                        </td>
                                                                         <td className="px-1">
                                                                             <div className="flex justify-center gap-1 items-center">
                                                                                 <Button size="sm" variant="default" className="h-7 w-7 p-0 bg-blue-600" title="저장" onClick={() => handleSaveRow(acc.id, assignment.slot_number)}><Save size={14} /></Button>
@@ -1151,12 +1150,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <><td /><td /><td /><td /><td /><td /><td /><td /><td /></>
                                                                 ) : (
                                                                     <>
-                                                                        <td className="px-2">
-                                                                            <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
-                                                                                <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
-                                                                                <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo?.split('\n')[0] || ''}</span>
-                                                                            </div>
-                                                                        </td>
                                                                         <td className={`px-2 truncate ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold' : ''}`} title={val.tidal_id || undefined}>
                                                                             {val.tidal_id || '-'}
                                                                         </td>
@@ -1169,6 +1162,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         <td className="px-2 font-mono"><span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>{val.end_date || '-'}{isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}</span></td>
                                                                         <td className="text-center text-gray-500 font-mono">{period}</td>
                                                                         <td className="text-right text-gray-700 font-mono px-2">{val.amount ? val.amount.toLocaleString() : '-'}</td>
+                                                                        <td className="px-2">
+                                                                            <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
+                                                                                <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
+                                                                                <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo?.split('\n')[0] || ''}</span>
+                                                                            </div>
+                                                                        </td>
                                                                         <td className="px-2">
                                                                             <div className="flex justify-center gap-1 items-center">
                                                                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditAssignModal(acc.id, assignment.slot_number)}><Pencil size={14} /></Button>
