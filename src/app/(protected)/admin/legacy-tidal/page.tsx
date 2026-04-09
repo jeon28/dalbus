@@ -201,9 +201,21 @@ function LegacyTidalContent() {
         setResizingCol(id);
         const startX = e.pageX;
         const startWidth = columnWidths[id];
+        const startMemoWidth = columnWidths['memo'];
         const onMouseMove = (ev: MouseEvent) => {
-            const newWidth = Math.max(40, startWidth + (ev.pageX - startX));
-            setColumnWidths(prev => ({ ...prev, [id]: newWidth }));
+            const diff = ev.pageX - startX;
+            let newWidth = Math.max(40, startWidth + diff);
+
+            if (id !== 'memo') {
+                let newMemoWidth = startMemoWidth - diff;
+                if (newMemoWidth < 40) {
+                    newMemoWidth = 40;
+                    newWidth = startWidth + (startMemoWidth - 40);
+                }
+                setColumnWidths(prev => ({ ...prev, [id]: newWidth, memo: newMemoWidth }));
+            } else {
+                setColumnWidths(prev => ({ ...prev, [id]: newWidth }));
+            }
         };
         const onMouseUp = () => {
             setResizingCol(null);
@@ -772,8 +784,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 <Input type="number" value={expiredDays} onChange={e => setExpiredDays(parseInt(e.target.value) || 0)} className="w-12 h-7 px-1 text-center text-sm border-none focus-visible:ring-0" />
                                 <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
                             </div>
-                            <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-2 h-8">
-                                <Filter className="w-4 h-4" /> 잔여일 조회
+                            <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-1 h-7 px-2 text-xs">
+                                <Filter className="w-3.5 h-3.5" /> 잔여일
                             </Button>
                             <Button 
                                 variant={sortConfig?.key === 'updated_at' ? "default" : "outline"}
@@ -785,17 +797,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         setSortConfig({ key: 'updated_at', direction: 'desc' });
                                     }
                                 }} 
-                                className="flex items-center gap-2 h-8"
+                                className="flex items-center gap-1 h-7 px-2 text-xs"
                             >
-                                <Zap className="w-4 h-4" /> 변경일순 조회
+                                <Zap className="w-3.5 h-3.5" /> 변경일
                             </Button>
                             <Button 
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => router.push('/admin/legacy-tidal/inactive')} 
-                                className="flex items-center gap-2 h-8"
+                                className="flex items-center gap-1 h-7 px-2 text-xs"
                             >
-                                <History className="w-4 h-4" /> 비활성 내역
+                                <History className="w-3.5 h-3.5" /> 비활성
                             </Button>
                             <div className="relative">
                                 <input id="excel-import-lt" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportExcel} />
@@ -817,12 +829,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             >
                                                 <Upload className="w-4 h-4" /> 엑셀 가져오기
                                             </button>
-                                            <button
-                                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                                onClick={() => { exportToExcel(); setIsMoreMenuOpen(false); }}
-                                            >
-                                                <Download className="w-4 h-4" /> 엑셀 내보내기
-                                            </button>
+                                            {!isGridView && (
+                                                <button
+                                                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                                                    onClick={() => { exportToExcel(); setIsMoreMenuOpen(false); }}
+                                                >
+                                                    <Download className="w-4 h-4" /> 엑셀 내보내기
+                                                </button>
+                                            )}
                                         </div>
                                     </>
                                 )}
@@ -872,13 +886,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 </div>
                             )}
                             {isGridView && (
-                                <Button variant="default" size="sm" disabled={selectedAssignmentIds.size === 0} onClick={() => { setNotificationMessage(defaultTemplate); setIsNotifyModalOpen(true); }} className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}>
-                                    <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
+                                <Button variant="default" size="sm" disabled={selectedAssignmentIds.size === 0} onClick={() => { setNotificationMessage(defaultTemplate); setIsNotifyModalOpen(true); }} className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-7 gap-1 px-2 text-xs`}>
+                                    <Mail className="w-3.5 h-3.5" /> 알림 ({selectedAssignmentIds.size})
                                 </Button>
                             )}
-                            <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8" size="sm">
-                                <Plus size={16} /> 그룹 추가
-                            </Button>
+                            {!isGridView && (
+                                <Button onClick={() => setIsAddModalOpen(true)} className="gap-1 h-7 px-2 text-xs" size="sm">
+                                    <Plus className="w-3.5 h-3.5" /> 그룹 추가
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1014,6 +1030,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 })()}
                             </tbody>
                         </table>
+                        <div className="flex justify-end items-center gap-2 p-2 bg-gray-50 border-t">
+                            <Button variant="outline" size="sm" onClick={() => exportToExcel()} className="h-7 px-2 text-xs flex items-center gap-1">
+                                <Download className="w-3.5 h-3.5" /> 엑셀 내보내기
+                            </Button>
+                            <Button onClick={() => setIsAddModalOpen(true)} size="sm" className="h-7 px-2 text-xs flex items-center gap-1">
+                                <Plus className="w-3.5 h-3.5" /> 그룹 추가
+                            </Button>
+                        </div>
                     </div>
                 ) : (
                     /* ===== LIST VIEW ===== */

@@ -68,7 +68,10 @@ function InactiveAccountsContent() {
                 for (let i = 0; i < maxSlots; i++) {
                     // Check if there is an ACTIVE assignment for this slot
                     const isOccupied = acc.order_accounts?.some((oa: { slot_number: number; is_active: boolean; is_deleted?: boolean }) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
-                    if (!isOccupied) {
+                    // Check if there is an INACTIVE history for this slot
+                    const hasInactive = inactiveData.some((ina: AssignmentHistory) => ina.accounts?.id === acc.id && ina.slot_number === i);
+                    
+                    if (!isOccupied && !hasInactive) {
                         emptySlots.push({
                             id: `empty-${acc.id}-${i}`,
                             slot_number: i,
