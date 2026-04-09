@@ -315,7 +315,13 @@ function LegacyTidalInactiveContent() {
                                             <td className="p-2 text-center font-bold">
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
-                                            <td className="p-2 font-mono text-gray-500 opacity-80 text-[11px]">{a.master_id || '-'}</td>
+                                            <td 
+                                                className="p-2 font-mono text-gray-500 opacity-80 text-[11px] cursor-pointer select-none" 
+                                                onDoubleClick={() => { if (a.master_id && a.master_id !== '-') { setTidalLoginEmail(a.master_id); setCopied(false); } }} 
+                                                title="더블클릭: Tidal 로그인 팝업"
+                                            >
+                                                <span className="hover:underline hover:text-blue-600 transition-colors">{a.master_id || '-'}</span>
+                                            </td>
                                             <td className="p-2 cursor-pointer select-none" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title="더블클릭: Tidal 로그인 팝업">
                                                 <span className="hover:underline hover:text-blue-600 transition-colors">{a.tidal_id}</span>
                                             </td>
@@ -486,7 +492,7 @@ function LegacyTidalInactiveContent() {
                                 className="w-full py-3 rounded-full text-sm font-semibold transition-all hover:opacity-90"
                                 style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}
                                 onClick={() => {
-                                    window.open(`https://login.tidal.com/authorize?email=${encodeURIComponent(tidalLoginEmail)}`, '_blank');
+                                    window.open(`https://login.tidal.com/authorize?client_id=bakYq0nMtpuRYDtM&redirect_uri=${encodeURIComponent('https://account.tidal.com/login/tidal/return')}&response_type=code&geo=KR&campaignId=default&login_hint=${encodeURIComponent(tidalLoginEmail)}`, '_blank');
                                 }}
                             >
                                 Continue
