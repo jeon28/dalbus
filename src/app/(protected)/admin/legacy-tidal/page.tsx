@@ -686,6 +686,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-2 h-8">
                                 <Filter className="w-4 h-4" /> 잔여일 조회
                             </Button>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => router.push('/admin/legacy-tidal/inactive')} 
+                                className="flex items-center gap-2 h-8"
+                            >
+                                <History className="w-4 h-4" /> 비활성 내역
+                            </Button>
                             <div className="relative">
                                 <input id="excel-import-lt" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportExcel} />
                                 <Button
@@ -700,20 +708,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setIsMoreMenuOpen(false)} />
                                         <div className="absolute right-0 top-9 z-20 w-44 bg-white border rounded-lg shadow-lg py-1 text-sm">
-                                            <button
-                                                className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 ${showInactive ? 'text-blue-600' : 'text-gray-700'}`}
-                                                onClick={() => { setShowInactive(!showInactive); setIsMoreMenuOpen(false); }}
-                                            >
-                                                {showInactive ? <Eye className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
-                                                {showInactive ? '전체 보기' : '삭제 데이터'}
-                                            </button>
-                                            <button
-                                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                                onClick={() => { router.push('/admin/legacy-tidal/inactive'); setIsMoreMenuOpen(false); }}
-                                            >
-                                                <History className="w-4 h-4" /> 내역
-                                            </button>
-                                            <div className="border-t my-1" />
                                             <button
                                                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                                                 onClick={() => { document.getElementById('excel-import-lt')?.click(); setIsMoreMenuOpen(false); }}
