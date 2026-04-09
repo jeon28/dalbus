@@ -10,7 +10,9 @@ export const legacyTidalService = {
       .select(`
         *,
         legacy_tidal_assignments(
-          *
+          *,
+          created_at,
+          updated_at
         )
       `)
       .neq('status', 'disabled')
@@ -20,7 +22,15 @@ export const legacyTidalService = {
     if (error) throw error;
 
     return data.map(account => {
-        type AssignmentRow = { is_active?: boolean | null; is_deleted?: boolean | null; slot_number?: number | null; [key: string]: unknown };
+        type AssignmentRow = { 
+            id: string,
+            is_active?: boolean | null; 
+            is_deleted?: boolean | null; 
+            slot_number?: number | null; 
+            updated_at?: string | null;
+            assigned_at?: string | null;
+            [key: string]: unknown 
+        };
         const assignments = (account.legacy_tidal_assignments || []) as AssignmentRow[];
         const filteredAssignments = assignments
             .filter((oa) => {
