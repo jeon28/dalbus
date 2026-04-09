@@ -11,7 +11,6 @@ export const legacyTidalService = {
         *,
         legacy_tidal_assignments(
           *,
-          created_at,
           updated_at
         )
       `)
