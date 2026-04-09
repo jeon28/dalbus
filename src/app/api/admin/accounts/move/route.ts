@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { syncUsedSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { order_id, assignment_id, target_account_id, target_slot_number, target_tidal_password, source_table } = body;
-        const assignmentTable = source_table === 'legacy_tidal_account' ? 'legacy_tidal_account' : 'order_accounts';
+        const { order_id, assignment_id, target_account_id, target_slot_number, target_tidal_password } = body;
+        const assignmentTable = 'tidal_assignments';
 
         if ((!order_id && !assignment_id) || !target_account_id) {
             return NextResponse.json({ error: '필수 정보가 누락되었습니다. 이동할 대상을 확인해 주세요.' }, { status: 400 });
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
             .eq('is_active', true);
 
         const { data: targetAccount, error: targetError } = await supabaseAdmin
-            .from('accounts')
+            .from('tidal_accounts')
             .select('max_slots')
             .eq('id', target_account_id)
             .single();
@@ -102,19 +103,8 @@ export async function POST(req: NextRequest) {
         if (moveError) throw moveError;
 
         // 4. Update used_slots counts
-        // Decrement source
-        // We need to fetch source account used_slots first? Or just decrement.
-        // Supabase doesn't have atomic increment/decrement easily without RPC, 
-        // so we fetch, calc, update.
-
-        // Fetch Source
-        const { data: sourceAccount } = await supabaseAdmin.from('accounts').select('used_slots').eq('id', sourceAccountId).single();
-        if (sourceAccount) {
-            await supabaseAdmin.from('accounts').update({ used_slots: Math.max(0, sourceAccount.used_slots - 1) }).eq('id', sourceAccountId);
-        }
-
-        // Increment Target
-        await supabaseAdmin.from('accounts').update({ used_slots: (activeCount || 0) + 1 }).eq('id', target_account_id);
+        await syncUsedSlots(sourceAccountId, 'tidal_accounts', assignmentTable);
+        await syncUsedSlots(target_account_id, 'tidal_accounts', assignmentTable);
 
         return NextResponse.json({ success: true });
 

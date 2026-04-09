@@ -42,8 +42,7 @@ export async function GET(req: NextRequest) {
 
         // 3.2 Fetch Account Assignments
         const orderIds = orders?.map(o => o.id) || [];
-        
-        let assignments: any[] = [];
+        let assignments: Record<string, unknown>[] = [];
         
         // Only fetch if we have something to match against
         if (orderIds.length > 0 || userEmail) {

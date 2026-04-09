@@ -944,7 +944,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             };
             setTimeout(scrollToAndHighlight, 500);
         }
-    }, [searchParams, accounts, openAssignModal]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, accounts]);
 
     const handleAssign = (orderId: string) => {
         if (!selectedAccount || selectedSlot === null) return;
@@ -993,8 +994,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     order_id: selectedAssignment.orders?.id,
                     target_account_id: selectedTargetAccount,
                     target_slot_number: selectedTargetSlot,
-                    target_tidal_password: selectedAssignment.tidal_password,
-                    source_table: 'legacy_tidal_account'
+                    target_tidal_password: selectedAssignment.tidal_password
                 })
             });
 

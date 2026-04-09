@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession, isAdmin } from '@/lib/auth';
-import { tidalService } from '@/lib/tidalService';
+import { legacyTidalService } from '@/lib/legacyTidalService';
 
 export const dynamic = 'force-dynamic';
 
-// GET: Fetch all Tidal accounts
+// GET: Fetch all Legacy Tidal accounts (Grid View)
 export async function GET(req: NextRequest) {
     try {
         const session = await getServerSession(req);
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
         const showInactive = searchParams.get('showInactive') === 'true';
         const showDeleted = searchParams.get('showDeleted') === 'true';
 
-        const data = await tidalService.getAllAccounts({ showInactive, showDeleted });
+        const data = await legacyTidalService.getAllAccounts({ showInactive, showDeleted });
 
         return NextResponse.json(data);
     } catch (error) {
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST: Create a new shared Tidal account
+// POST: Create a new shared Legacy Tidal account
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(req);
@@ -47,10 +47,9 @@ export async function POST(req: NextRequest) {
             payment_email: body.payment_email ? body.payment_email.toLowerCase().trim() : body.payment_email
         };
 
-        // Remove product_id if it exists since it's no longer needed in tidal_accounts
         if (normalizedBody.product_id) delete normalizedBody.product_id;
 
-        const data = await tidalService.createAccount(normalizedBody);
+        const data = await legacyTidalService.createAccount(normalizedBody);
 
         return NextResponse.json(data);
     } catch (error) {

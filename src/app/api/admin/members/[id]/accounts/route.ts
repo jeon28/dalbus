@@ -49,29 +49,20 @@ export async function GET(
         const orderIds = orders.map(o => o.id);
         const orderNumbers = orders.map(o => o.order_number).filter(Boolean);
 
-        // 3. Find assignments from BOTH tables
-        const tables = ['order_accounts', 'legacy_tidal_account'];
-        let allAccounts: any[] = [];
+        // 3. Find assignments from unified table
+        const { data: assignments, error: assignmentsError } = await supabaseAdmin
+            .from('tidal_assignments')
+            .select('*, accounts:tidal_accounts ( login_id )')
+            .eq('is_deleted', false)
+            .or(`order_id.in.(${orderIds.join(',')})${orderNumbers.length > 0 ? `,order_number.in.(${orderNumbers.join(',')})` : ''}${profile.email ? `,buyer_email.eq.${profile.email}` : ''}`)
+            .order('assigned_at', { ascending: false });
 
-        for (const table of tables) {
-            let query = supabaseAdmin
-                .from(table)
-                .select('*, accounts ( login_id )')
-                .eq('is_deleted', false);
-
-            const filterStrings: string[] = [];
-            if (orderIds.length > 0) filterStrings.push(`order_id.in.(${orderIds.join(',')})`);
-            if (orderNumbers.length > 0) filterStrings.push(`order_number.in.(${orderNumbers.join(',')})`);
-            if (profile.email) filterStrings.push(`buyer_email.eq.${profile.email}`);
-
-            if (filterStrings.length > 0) {
-                query = query.or(filterStrings.join(','));
-                const { data, error } = await query.order('assigned_at', { ascending: false });
-                if (!error && data) {
-                    allAccounts = [...allAccounts, ...data];
-                }
-            }
+        if (assignmentsError) {
+            console.error('Error fetching assignments:', assignmentsError);
+            return NextResponse.json({ error: assignmentsError.message }, { status: 500 });
         }
+
+        const allAccounts = assignments || [];
 
         // 4. Transform data to include product/plan info
         const enrichedAccounts = allAccounts.map(account => {

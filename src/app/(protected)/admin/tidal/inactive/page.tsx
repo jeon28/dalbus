@@ -22,7 +22,9 @@ interface AssignmentHistory {
     end_date?: string;
     assigned_at?: string;
     is_active: boolean;
+    isEmpty?: boolean;
     accounts?: {
+        id: string;
         login_id: string;
     };
     orders?: {
@@ -60,12 +62,12 @@ function InactiveAccountsContent() {
             const accountsData = await accRes.json();
 
             // 3. Identify empty slots
-            const emptySlots: any[] = [];
-            accountsData.forEach((acc: any) => {
+            const emptySlots: AssignmentHistory[] = [];
+            accountsData.forEach((acc: { id: string; login_id: string; max_slots: number; order_accounts: { slot_number: number; is_active: boolean; is_deleted?: boolean }[] }) => {
                 const maxSlots = acc.max_slots || 5; // Default to 5 for Tidal if not specified
                 for (let i = 0; i < maxSlots; i++) {
                     // Check if there is an ACTIVE assignment for this slot
-                    const isOccupied = acc.order_accounts?.some((oa: any) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
+                    const isOccupied = acc.order_accounts?.some((oa: { slot_number: number; is_active: boolean; is_deleted?: boolean }) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
                     if (!isOccupied) {
                         emptySlots.push({
                             id: `empty-${acc.id}-${i}`,
@@ -122,7 +124,7 @@ function InactiveAccountsContent() {
     };
 
     const exportToExcel = () => {
-        const excelData = assignments.map((a: any, idx) => {
+        const excelData = assignments.map((a: AssignmentHistory & { isEmpty?: boolean }, idx) => {
             const isEmpty = a.isEmpty === true;
             return {
                 'No.': idx + 1,
@@ -186,8 +188,8 @@ function InactiveAccountsContent() {
                                     </td>
                                 </tr>
                             ) : (
-                                assignments.map((a: any, idx) => {
-                                    const isEmpty = (a as any).isEmpty === true;
+                                assignments.map((a: AssignmentHistory & { isEmpty?: boolean }, idx) => {
+                                    const isEmpty = a.isEmpty === true;
                                     return (
                                         <tr key={a.id} className={`border-b hover:bg-gray-50 h-10 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                             <td className="p-2 text-center opacity-70">{idx + 1}</td>
@@ -211,7 +213,7 @@ function InactiveAccountsContent() {
                                                         size="sm" 
                                                         variant="ghost" 
                                                         className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
-                                                        onClick={() => router.push(`/admin/tidal?accountId=${a.accounts.id}&slotIdx=${a.slot_number}&action=assign`)} 
+                                                        onClick={() => router.push(`/admin/tidal?accountId=${a.accounts?.id || ''}&slotIdx=${a.slot_number}&action=assign`)} 
                                                         title="배정하기"
                                                     >
                                                         <Pencil size={16} />

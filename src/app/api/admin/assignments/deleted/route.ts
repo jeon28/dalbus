@@ -7,14 +7,13 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const product = searchParams.get('product');
-    const isHifi = product?.toLowerCase().includes('hifi');
-    const assignmentTable = isHifi ? 'legacy_tidal_account' : 'order_accounts';
+    const assignmentTable = 'tidal_assignments';
 
     let query = supabaseAdmin
       .from(assignmentTable)
       .select(`
         *,
-        accounts!inner (
+        accounts:tidal_accounts!inner (
           login_id,
           products!inner ( name, slug )
         ),

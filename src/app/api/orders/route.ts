@@ -7,7 +7,7 @@ import { normalizePhone } from '@/lib/utils';
 export async function POST(req: NextRequest) {
     try {
         // getServerSession for logging or optional user info, but allow guests
-        const session = await getServerSession(req);
+        await getServerSession(req);
 
         const body = await req.json();
         const { orderData, product_name, plan_name } = body;

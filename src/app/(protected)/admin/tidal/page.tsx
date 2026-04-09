@@ -971,7 +971,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             };
             setTimeout(scrollToAndHighlight, 500);
         }
-    }, [searchParams, accounts, openAssignModal]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, accounts]);
 
 
     const handleAssign = (orderId: string) => {

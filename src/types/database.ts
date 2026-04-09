@@ -295,6 +295,233 @@ export interface Database {
           }
         ]
       }
+      tidal_accounts: {
+        Row: {
+          id: string
+          login_id: string
+          login_pw: string | null
+          status: 'available' | 'assigned' | 'disabled'
+          max_slots: number
+          used_slots: number
+          memo: string | null
+          payment_email: string | null
+          payment_day: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          login_id: string
+          login_pw?: string | null
+          status?: 'available' | 'assigned' | 'disabled'
+          max_slots?: number
+          used_slots?: number
+          memo?: string | null
+          payment_email?: string | null
+          payment_day?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          login_id?: string
+          login_pw?: string | null
+          status?: 'available' | 'assigned' | 'disabled'
+          max_slots?: number
+          used_slots?: number
+          memo?: string | null
+          payment_email?: string | null
+          payment_day?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      tidal_assignments: {
+        Row: {
+          id: string
+          account_id: string
+          order_id: string | null
+          assigned_at: string
+          slot_number: number | null
+          tidal_id: string | null
+          tidal_password: string | null
+          type: 'master' | 'user'
+          buyer_name: string | null
+          buyer_phone: string | null
+          buyer_email: string | null
+          order_number: string | null
+          start_date: string | null
+          end_date: string | null
+          is_active: boolean
+          is_deleted: boolean
+          amount: number | null
+          period_months: number | null
+          memo: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          order_id?: string | null
+          assigned_at?: string
+          slot_number?: number | null
+          tidal_id?: string | null
+          tidal_password?: string | null
+          type?: 'master' | 'user'
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+          amount?: number | null
+          period_months?: number | null
+          memo?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          order_id?: string | null
+          assigned_at?: string
+          slot_number?: number | null
+          tidal_id?: string | null
+          tidal_password?: string | null
+          type?: 'master' | 'user'
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+          amount?: number | null
+          period_months?: number | null
+          memo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tidal_assignments_account_id_fkey"
+            columns: ["account_id"]
+            referencedRelation: "tidal_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tidal_assignments_order_id_fkey"
+            columns: ["order_id"]
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      legacy_tidal_accounts: {
+        Row: {
+          id: string
+          login_id: string
+          login_pw: string | null
+          status: 'available' | 'assigned' | 'disabled'
+          max_slots: number
+          used_slots: number
+          memo: string | null
+          payment_email: string | null
+          payment_day: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          login_id: string
+          login_pw?: string | null
+          status?: 'available' | 'assigned' | 'disabled'
+          max_slots?: number
+          used_slots?: number
+          memo?: string | null
+          payment_email?: string | null
+          payment_day?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          login_id?: string
+          login_pw?: string | null
+          status?: 'available' | 'assigned' | 'disabled'
+          max_slots?: number
+          used_slots?: number
+          memo?: string | null
+          payment_email?: string | null
+          payment_day?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      legacy_tidal_assignments: {
+        Row: {
+          id: string
+          account_id: string
+          slot_number: number | null
+          tidal_id: string | null
+          tidal_password: string | null
+          type: string | null
+          buyer_name: string | null
+          buyer_phone: string | null
+          buyer_email: string | null
+          order_number: string | null
+          start_date: string | null
+          end_date: string | null
+          is_active: boolean
+          is_deleted: boolean
+          assigned_at: string
+          amount: number | null
+          period_months: number | null
+          memo: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          slot_number?: number | null
+          tidal_id?: string | null
+          tidal_password?: string | null
+          type?: string | null
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+          assigned_at?: string
+          amount?: number | null
+          period_months?: number | null
+          memo?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          slot_number?: number | null
+          tidal_id?: string | null
+          tidal_password?: string | null
+          type?: string | null
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+          assigned_at?: string
+          amount?: number | null
+          period_months?: number | null
+          memo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legacy_tidal_assignments_account_id_fkey"
+            columns: ["account_id"]
+            referencedRelation: "legacy_tidal_accounts"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       orders: {
         Row: {
           amount: number

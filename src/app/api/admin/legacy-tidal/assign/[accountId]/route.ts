@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { syncUsedSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +26,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ acc
 
         // Fetch current assignments to determine next slot
         const { data: currentAssignments, error: fetchError } = await supabaseAdmin
-            .from('legacy_tidal_account')
+            .from('legacy_tidal_assignments')
             .select('id, slot_number, type')
             .eq('account_id', account_id)
             .eq('is_active', true)
+            .eq('is_deleted', false)
             .order('slot_number', { ascending: true });
 
         if (fetchError) throw fetchError;
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ acc
 
         if (existingAssignment) {
             const { error: updateError } = await supabaseAdmin
-                .from('legacy_tidal_account')
+                .from('legacy_tidal_assignments')
                 .update({
                     order_number: order_number || null,
                     tidal_password: tidal_password || null,
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ acc
             if (updateError) throw updateError;
         } else {
             const { error: insertError } = await supabaseAdmin
-                .from('legacy_tidal_account')
+                .from('legacy_tidal_assignments')
                 .insert([{
                     account_id,
                     slot_number: finalSlotNumber,
@@ -95,16 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ acc
         }
 
         // Sync used_slots
-        const { count: actualCount } = await supabaseAdmin
-            .from('legacy_tidal_account')
-            .select('*', { count: 'exact', head: true })
-            .eq('account_id', account_id)
-            .eq('is_active', true);
-
-        await supabaseAdmin
-            .from('accounts')
-            .update({ used_slots: actualCount || 0 })
-            .eq('id', account_id);
+        await syncUsedSlots(account_id, 'legacy_tidal_accounts', 'legacy_tidal_assignments');
 
         return NextResponse.json({ success: true });
     } catch (error) {

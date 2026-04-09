@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { normalizePhone } from '@/lib/utils';
+import { reindexSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,9 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params; // order_accounts.id or legacy_tidal_account.id
-        const product = req.nextUrl.searchParams.get('product');
-        const isHifiTidal = product?.toLowerCase().includes('hifi');
-        const assignmentTable = isHifiTidal ? 'legacy_tidal_account' : 'order_accounts';
+        const assignmentTable = 'tidal_assignments';
         const body = await req.json();
 
         // body contains: tidal_password, buyer_name, buyer_phone, buyer_email, start_date, end_date, type, is_active
@@ -48,26 +47,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (body.is_deleted !== undefined) oaUpdates.is_deleted = body.is_deleted;
         if (amount !== undefined && amount !== null) oaUpdates.amount = Number(amount);
         if (period_months !== undefined && period_months !== null) oaUpdates.period_months = Number(period_months);
-        if (_memo !== undefined && !isHifiTidal) {
-            oaUpdates.memo = _memo;
-
-            // DAL-20: Stop syncing with profiles.memo to keep memos per Tidal ID/Assignment
-            /*
-            const { data: assignmentData } = await supabaseAdmin
-                .from(assignmentTable)
-                .select('orders(user_id)')
-                .eq('id', id)
-                .single();
-                
-            const userId = (assignmentData?.orders as { user_id?: string } | null)?.user_id;
-            if (userId) {
-                await supabaseAdmin
-                    .from('profiles')
-                    .update({ memo: _memo })
-                    .eq('id', userId);
-            }
-            */
-        } else if (_memo !== undefined) {
+        if (_memo !== undefined) {
             oaUpdates.memo = _memo;
         }
 
@@ -85,60 +65,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             // 2. Re-index slots if type, is_active, or is_deleted changed
             const shouldReindex = type !== undefined || is_active !== undefined || body.is_deleted !== undefined;
             if (shouldReindex && updatedData) {
-                // Fetch all assignments for this account
-                const { data: allSlots, error: fetchAllError } = await supabaseAdmin
-                    .from(assignmentTable)
-                    .select('id, slot_number, type')
-                    .eq('account_id', updatedData.account_id)
-                    .eq('is_deleted', false) // Only re-index non-deleted ones
-                    .order('slot_number', { ascending: true });
-
-                if (fetchAllError) throw fetchAllError;
-
-                if (allSlots && allSlots.length > 0) {
-                    const sorted = [...allSlots].sort((a, b) => {
-                        if (a.type === 'master' && b.type !== 'master') return -1;
-                        if (b.type === 'master' && a.type !== 'master') return 1;
-                        if (a.type === 'master' && b.type === 'master') {
-                            if (a.id === id) return -1;
-                            if (b.id === id) return 1;
-                        }
-                        return a.slot_number - b.slot_number;
-                    });
-
-                    // Pass 1: Move to temporary high slots to avoid unique constraint collisions
-                    for (let i = 0; i < sorted.length; i++) {
-                        await supabaseAdmin
-                            .from(assignmentTable)
-                            .update({ slot_number: sorted[i].slot_number + 1000 })
-                            .eq('id', sorted[i].id);
-                    }
-
-                    // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
-                    for (let i = 0; i < sorted.length; i++) {
-                        const updates: { slot_number: number; type?: string } = { slot_number: i };
-                        if (i > 0 && sorted[i].type === 'master') {
-                            updates.type = 'user'; // Force others to be user
-                        }
-                        
-                        await supabaseAdmin
-                            .from(assignmentTable)
-                            .update(updates)
-                            .eq('id', sorted[i].id);
-                    }
-                }
-
-                // Sync used_slots (Include both active and inactive but non-deleted)
-                const { count: actualCount } = await supabaseAdmin
-                    .from(assignmentTable)
-                    .select('*', { count: 'exact', head: true })
-                    .eq('account_id', updatedData.account_id)
-                    .eq('is_deleted', false);
-
-                await supabaseAdmin
-                    .from('accounts')
-                    .update({ used_slots: actualCount || 0 })
-                    .eq('id', updatedData.account_id);
+                await reindexSlots(updatedData.account_id, 'tidal_assignments', 'tidal_accounts');
             }
         }
 
@@ -156,8 +83,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params; // order_accounts.id or legacy_tidal_account.id
-        const product = req.nextUrl.searchParams.get('product');
-        const assignmentTable = product?.toLowerCase().includes('hifi') ? 'legacy_tidal_account' : 'order_accounts';
+        const assignmentTable = 'tidal_assignments';
 
         // 1. Get info before delete
         const { data: assignment, error: fetchError } = await supabaseAdmin
@@ -189,57 +115,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         if (delError) throw delError;
 
-        // 3. Re-index remaining slots to maintain sequence (1, 2, 3...)
-        // Fetch all remaining active assignments for this account, ordered by their current slot_number
-        const { data: remainingSlots, error: fetchRemainingError } = await supabaseAdmin
-            .from(assignmentTable)
-            .select('id, slot_number, type')
-            .eq('account_id', assignment.account_id)
-            .eq('is_deleted', false)
-            .order('slot_number', { ascending: true });
-
-        if (fetchRemainingError) throw fetchRemainingError;
-
-        if (remainingSlots && remainingSlots.length > 0) {
-            const sorted = [...remainingSlots].sort((a, b) => {
-                if (a.type === 'master') return -1;
-                if (b.type === 'master') return 1;
-                return (a.slot_number ?? 0) - (b.slot_number ?? 0);
-            });
-
-            // Pass 1: Move to temporary high slots
-            for (let i = 0; i < sorted.length; i++) {
-                await supabaseAdmin
-                    .from(assignmentTable)
-                    .update({ slot_number: (sorted[i].slot_number ?? 0) + 1000 })
-                    .eq('id', sorted[i].id);
-            }
-
-            // Pass 2: Assign final sequential slot numbers (0, 1, 2...)
-            for (let i = 0; i < sorted.length; i++) {
-                const updates: { slot_number: number; type?: string } = { slot_number: i };
-                if (i > 0 && sorted[i].type === 'master') {
-                    updates.type = 'user'; // Force others to be user
-                }
-
-                await supabaseAdmin
-                    .from(assignmentTable)
-                    .update(updates)
-                    .eq('id', sorted[i].id);
-            }
-        }
-
-        // 4. Update Account Used Slots (Robust Sync)
-        const { count: actualCount } = await supabaseAdmin
-            .from(assignmentTable)
-            .select('*', { count: 'exact', head: true })
-            .eq('account_id', assignment.account_id)
-            .eq('is_deleted', false);
-
-        await supabaseAdmin
-            .from('accounts')
-            .update({ used_slots: actualCount || 0 })
-            .eq('id', assignment.account_id);
+        // 3. Re-index remaining slots
+        await reindexSlots(assignment.account_id, 'tidal_assignments', 'tidal_accounts');
 
         // 5. Update Order Status logic
         // If it was an active assignment, we might want to set order to 'waiting' if we are "Unassigning".

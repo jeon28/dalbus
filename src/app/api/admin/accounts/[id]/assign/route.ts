@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { addDays, format, parseISO } from 'date-fns';
+import { syncUsedSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         // 1. If no order_id, create a MANUAL order
         if (!targetOrderId && (buyer_name || buyer_email)) {
-            const { data: acc } = await supabaseAdmin.from('accounts').select('product_id').eq('id', account_id).single();
+            const { data: acc } = await supabaseAdmin.from('tidal_accounts').select('product_id').eq('id', account_id).single();
 
             let targetProductId = null;
             let targetPlanId = null;
@@ -105,10 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             finalEndDate = finalEndDate || format(addDays(parseISO(finalStartDate), durationMonths * 30), 'yyyy-MM-dd');
         }
 
-        // Determine table based on product param
-        const product = req.nextUrl.searchParams.get('product');
-        const isHifiTidal = product?.toLowerCase().includes('hifi');
-        const assignmentTable = isHifiTidal ? 'legacy_tidal_account' : 'order_accounts';
+        const assignmentTable = 'tidal_assignments';
 
         // 2. Determine Slot Number and Type
         let finalSlotNumber = slot_number;
@@ -175,10 +173,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 is_active: true
             };
 
-            // legacy_tidal_account does NOT have order_id column
-            if (!isHifiTidal) {
-                updatePayload.order_id = targetOrderId;
-            }
+            updatePayload.order_id = targetOrderId;
 
             const { error: updateError } = await supabaseAdmin
                 .from(assignmentTable)
@@ -204,18 +199,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 memo: memo || null
             };
 
-            // legacy_tidal_account does NOT have order_id column
-            if (!isHifiTidal) {
-                insertPayload.order_id = targetOrderId;
-            }
+            insertPayload.order_id = targetOrderId;
 
             // Check if this tidal_id already exists (even if deleted) across ALL tables to avoid unique constraint 23505
             if (tidal_id) {
                 const cleanedId = tidal_id.trim();
                 console.log(`[DEBUG] Checking duplication for cleanedId: ${cleanedId}`);
 
-                // Check BOTH tables to be absolutely sure
-                const tables = ['order_accounts', 'legacy_tidal_account'];
+                // Check unified table
+                const tables = ['tidal_assignments'];
                 let activeExisting = null;
                 let deletedExisting = null;
                 let foundTable = '';
@@ -241,7 +233,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 if (activeExisting) {
                     console.warn(`[DEBUG] Active tidal_id found in table: ${foundTable}, account: ${activeExisting.account_id}, slot: ${activeExisting.slot_number}`);
                     return NextResponse.json({ 
-                        error: `이미 다른 곳에서 사용 중인 Tidal ID입니다. (위치: ${foundTable === 'order_accounts' ? 'Tidal' : 'HifiTidal'} 계정 ${activeExisting.account_id}, 슬롯 ${activeExisting.slot_number + 1})` 
+                        error: `이미 다른 곳에서 사용 중인 Tidal ID입니다. (위치: Tidal 계정 ${activeExisting.account_id}, 슬롯 ${activeExisting.slot_number + 1})` 
                     }, { status: 409 });
                 }
                 
@@ -272,15 +264,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         // Sync Used Slots
-        const { count: actualCount } = await supabaseAdmin
-            .from(assignmentTable)
-            .select('*', { count: 'exact', head: true })
-            .eq('account_id', account_id)
-            .eq('is_active', true)
-            .eq('is_deleted', false);
-
-
-        await supabaseAdmin.from('accounts').update({ used_slots: actualCount || 0 }).eq('id', account_id);
+        await syncUsedSlots(account_id, 'tidal_accounts', assignmentTable);
 
         // Update Order Status (But NOT start_date/end_date on order table)
         await supabaseAdmin

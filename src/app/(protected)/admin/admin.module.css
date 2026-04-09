@@ -13,6 +13,15 @@
     font-weight: 700;
 }
 
+.legacyTitle {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #f97316; /* Orange color for legacy */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .content {
     padding-top: 25px;
     display: flex;

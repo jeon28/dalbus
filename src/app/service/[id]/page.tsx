@@ -176,6 +176,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         } else {
             setUserEmails([]);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     const handleLookup = useCallback(async () => {

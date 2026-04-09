@@ -6,10 +6,10 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         const { data, error } = await supabaseAdmin
-            .from('legacy_tidal_account')
+            .from('legacy_tidal_assignments')
             .select(`
                 *,
-                accounts ( id, login_id )
+                accounts:legacy_tidal_accounts ( id, login_id )
             `)
             .eq('is_active', false)
             .eq('is_deleted', false)

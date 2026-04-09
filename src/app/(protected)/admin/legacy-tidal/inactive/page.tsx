@@ -43,7 +43,7 @@ function LegacyTidalInactiveContent() {
         try {
             setIsLoading(true);
             // 1. Fetch inactive history
-            const res = await apiFetch('/api/admin/legacy-tidal-account/inactive', { cache: 'no-store' });
+            const res = await apiFetch('/api/admin/legacy-tidal/inactive', { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch inactive history');
             const inactiveData = await res.json();
 
@@ -54,11 +54,11 @@ function LegacyTidalInactiveContent() {
             const accountsData = await accRes.json();
 
             // 3. Identify empty slots
-            const emptySlots: any[] = [];
-            accountsData.forEach((acc: any) => {
+            const emptySlots: LegacyTidalHistory[] = [];
+            accountsData.forEach((acc: { id: string; login_id: string; max_slots: number; order_accounts: { slot_number: number; is_active: boolean; is_deleted?: boolean }[] }) => {
                 const maxSlots = acc.max_slots || 6;
                 for (let i = 0; i < maxSlots; i++) {
-                    const isOccupied = acc.order_accounts?.some((oa: any) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
+                    const isOccupied = acc.order_accounts?.some((oa: { slot_number: number; is_active: boolean; is_deleted?: boolean }) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
                     if (!isOccupied) {
                         emptySlots.push({
                             id: `empty-${acc.id}-${i}`,
@@ -97,13 +97,13 @@ function LegacyTidalInactiveContent() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('해당 기록을 삭제하시겠습니까?\n삭제된 데이터는 메인 페이지 \'삭제 데이터\' 보기에서 관리할 수 있습니다.')) return;
+        if (!confirm('해당 기록을 영구적으로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 계정 슬롯 관리에서 제외됩니다.')) return;
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal-account/${id}`, {
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${id}?hardDelete=true`, {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');
-            alert('삭제 완료. 기존 Tidal 메인 페이지 → 삭제 데이터 보기에서 확인하세요.');
+            alert('영구 삭제되었습니다.');
             fetchInactiveRecords();
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '삭제 실패';
@@ -112,7 +112,7 @@ function LegacyTidalInactiveContent() {
     };
 
     const exportToExcel = () => {
-        const excelData = records.map((a: any, idx) => {
+        const excelData = records.map((a: LegacyTidalHistory, idx) => {
             const isEmpty = a.isEmpty === true;
             return {
                 'No.': idx + 1,
@@ -178,8 +178,8 @@ function LegacyTidalInactiveContent() {
                                     </td>
                                 </tr>
                             ) : (
-                                records.map((a: any, idx) => {
-                                    const isEmpty = (a as any).isEmpty === true;
+                                records.map((a: LegacyTidalHistory, idx) => {
+                                    const isEmpty = a.isEmpty === true;
                                     return (
                                         <tr key={a.id} className={`border-b hover:bg-gray-50 h-10 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                             <td className="p-2 text-center opacity-70">{idx + 1}</td>
@@ -204,7 +204,7 @@ function LegacyTidalInactiveContent() {
                                                         size="sm" 
                                                         variant="ghost" 
                                                         className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
-                                                        onClick={() => router.push(`/admin/legacy-tidal?accountId=${a.accounts.id}&slotIdx=${a.slot_number}&action=assign`)} 
+                                                        onClick={() => router.push(`/admin/legacy-tidal?accountId=${a.accounts?.id || ''}&slotIdx=${a.slot_number}&action=assign`)} 
                                                         title="배정하기"
                                                     >
                                                         <Pencil size={16} />

@@ -228,6 +228,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 }
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [accounts, isHydrated, searchParams]);
 
     const fetchAccounts = React.useCallback(async () => {
@@ -238,7 +239,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             } else {
                 params.append('showInactive', 'true');
             }
-            const res = await apiFetch(`/api/admin/accounts?${params.toString()}`, { cache: 'no-store' });
+            const res = await apiFetch(`/api/admin/legacy-tidal?${params.toString()}`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`Failed to fetch (${res.status})`);
             const data = await res.json();
             setAccounts(data);
@@ -409,11 +410,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if (!data) return;
         try {
             if (data.assignment_id) {
-                const res = await apiFetch(`/api/admin/legacy-tidal-account/${data.assignment_id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${data.assignment_id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
                 if (!res.ok) throw new Error('Update failed');
             } else {
                 if (!data.buyer_name && !data.buyer_email) { alert('이름 또는 ID(이메일)를 입력해주세요.'); return; }
-                const res = await apiFetch(`/api/admin/legacy-tidal-account/assign/${accountId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, slot_number: slotIdx }) });
+                const res = await apiFetch(`/api/admin/legacy-tidal/assign/${accountId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, slot_number: slotIdx }) });
                 if (!res.ok) throw new Error('Create failed');
             }
             alert('저장되었습니다.');
@@ -438,7 +439,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if (currentAssignment && currentAssignment.is_active !== false) { alert('비활성화(빨간 행) 상태인 계정만 삭제 가능합니다.'); return; }
         if (!confirm('해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)')) return;
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal-account/${assignmentId}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${assignmentId}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts(); fetchPendingOrders();
         } catch (error) { alert('삭제 실패: ' + (error instanceof Error ? error.message : String(error))); }
@@ -455,7 +456,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const updates: any = { is_active: !currentActive };
             if (isDeleted) { updates.is_deleted = false; updates.is_active = true; }
-            const res = await apiFetch(`/api/admin/legacy-tidal-account/${assignmentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${assignmentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
             if (!res.ok) throw new Error('Action failed');
             alert(isDeleted ? '복구되었습니다.' : (currentActive ? '비활성화 되었습니다.' : '활성화 되었습니다.'));
             fetchAccounts();
@@ -468,7 +469,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             const prodRes = await apiFetch('/api/admin/products');
             const products = await prodRes.json();
             const hifitidal = products.find((p: { name: string }) => p.name.toLowerCase() === 'hifitidal') || products.find((p: { name: string }) => p.name.toLowerCase().includes('hifitidal'));
-            const res = await apiFetch('/api/admin/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newAccount, product_id: hifitidal?.id }) });
+            const res = await apiFetch('/api/admin/legacy-tidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newAccount, product_id: hifitidal?.id }) });
             if (!res.ok) throw new Error('Failed to create');
             alert('생성되었습니다.');
             setIsAddModalOpen(false); fetchAccounts();
@@ -479,7 +480,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleUpdateMasterAccount = async () => {
         if (!editingAccount) return;
         try {
-            const res = await apiFetch(`/api/admin/accounts/${editingAccount.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingAccount) });
+            const res = await apiFetch(`/api/admin/legacy-tidal/${editingAccount.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingAccount) });
             if (!res.ok) throw new Error('Failed to update');
             setIsEditModalOpen(false); fetchAccounts(); alert('수정되었습니다.');
         } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
@@ -489,7 +490,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if ((account.order_accounts?.length || 0) > 0) { alert('슬롯이 배정되어 있는 그룹은 삭제할 수 없습니다.'); return; }
         if (!confirm('그룹을 삭제하시겠습니까?')) return;
         try {
-            const res = await apiFetch(`/api/admin/accounts/${account.id}`, { method: 'DELETE' });
+            const res = await apiFetch(`/api/admin/legacy-tidal/${account.id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts(); alert('삭제되었습니다.');
         } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
@@ -527,7 +528,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 const data = new Uint8Array(event.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                const res = await apiFetch('/api/admin/accounts/import?product=HifiTidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accounts: jsonData }) });
+                const res = await apiFetch('/api/admin/legacy-tidal/import?product=HifiTidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accounts: jsonData }) });
                 if (!res.ok) { const errObj = await res.json().catch(() => null); throw new Error(errObj?.error || `서버 오류 (${res.status})`); }
                 const summary = await res.json();
                 setImportResults(summary); setIsImportResultModalOpen(true); fetchAccounts();
@@ -575,9 +576,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleMove = async () => {
         if (!selectedAssignment) return;
         try {
-            const res = await apiFetch('/api/admin/accounts/move', {
+            const res = await apiFetch('/api/admin/legacy-tidal/move', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ assignment_id: selectedAssignment.id, order_id: selectedAssignment.orders?.id, target_account_id: selectedTargetAccount, target_slot_number: selectedTargetSlot, target_tidal_password: selectedAssignment.tidal_password, source_table: 'legacy_tidal_account' })
+                body: JSON.stringify({ assignment_id: selectedAssignment.id, order_id: selectedAssignment.orders?.id, target_account_id: selectedTargetAccount, target_slot_number: selectedTargetSlot, target_tidal_password: selectedAssignment.tidal_password })
             });
             if (!res.ok) { const data = await res.json().catch(() => ({})); alert(`이동 실패: ${data?.error || '알 수 없는 오류'}`); return; }
             setIsMoveModalOpen(false); fetchAccounts();
@@ -648,7 +649,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleSaveMemo = async () => {
         if (!memoTargetAssignmentId) return;
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal-account/${memoTargetAssignmentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memo: currentMemoInput }) });
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${memoTargetAssignmentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memo: currentMemoInput }) });
             if (!res.ok) throw new Error('Update failed');
             updateGridValue(memoTargetAccountId, memoTargetSlotIdx as number, 'memo', currentMemoInput);
             setIsMemoModalOpen(false); fetchAccounts(); alert('메모가 저장되었습니다.');
@@ -662,7 +663,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             <header className={`${styles.header} glass relative z-50`}>
                 <div className="container flex justify-between items-center bg-white/50 py-2 rounded-lg">
                     <div className="flex items-center gap-4">
-                        <h1 className={styles.title}>기존 Tidal 계정 관리</h1>
+                        <h1 className={styles.legacyTitle}>
+                            <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">Legacy</span>
+                            기존 Tidal 계정 관리
+                        </h1>
                         <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
                             {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
                             {isGridView ? 'List View' : 'Grid View'}
@@ -1012,7 +1016,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                                         if (assignment && !assignment.id.startsWith('empty_')) {
                                                                                             if (confirm('마스터로 변경 시 즉시 1번 슬롯으로 이동합니다. 계속하시겠습니까?')) {
                                                                                                 try {
-                                                                                                    const res = await apiFetch(`/api/admin/legacy-tidal-account/${assignment.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'master' }) });
+                                                                                                    const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${assignment.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'master' }) });
                                                                                                     if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || '변경 실패');
                                                                                                     cancelEdit(acc.id, sIdx); fetchAccounts(); alert('마스터로 변경되었습니다.');
                                                                                                 } catch (error) { alert('변경 실패: ' + (error instanceof Error ? error.message : String(error))); }
