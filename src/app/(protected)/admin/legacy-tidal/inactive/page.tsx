@@ -4,7 +4,10 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { format } from 'date-fns';
+import { format, addDays, differenceInDays, parseISO } from 'date-fns';
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import styles from '../../admin.module.css';
 import * as XLSX from 'xlsx';
 import { apiFetch } from '@/lib/api';
@@ -24,10 +27,25 @@ interface LegacyTidalHistory {
     is_active: boolean;
     is_deleted?: boolean;
     isEmpty?: boolean;
+    master_id?: string;
+    account_id?: string;
     accounts?: {
         id: string;
         login_id: string;
     };
+}
+
+interface EditAssignFormData {
+    assignment_number: string;
+    buyer_name: string;
+    buyer_phone: string;
+    buyer_email: string;
+    tidal_id: string;
+    start_date: string;
+    end_date: string;
+    period_months: number;
+    amount: number;
+    memo: string;
 }
 
 function LegacyTidalInactiveContent() {
@@ -35,6 +53,12 @@ function LegacyTidalInactiveContent() {
     const [records, setRecords] = useState<LegacyTidalHistory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showDeleted, setShowDeleted] = useState(false);
+
+    // Modal state for direct editing
+    const [isEditAssignModalOpen, setIsEditAssignModalOpen] = useState(false);
+    const [editAssignData, setEditAssignData] = useState<EditAssignFormData | null>(null);
+    const [activeEditAccountId, setActiveEditAccountId] = useState<string | null>(null);
+    const [activeEditSlotIdx, setActiveEditSlotIdx] = useState<number | null>(null);
 
     useEffect(() => {
         fetchInactiveRecords();
@@ -61,13 +85,29 @@ function LegacyTidalInactiveContent() {
             if (!accRes.ok) throw new Error('Failed to fetch accounts');
             const accountsData = await accRes.json();
 
-            // 4. Identify empty slots
+            // 4. Create Master ID map and Identfy empty slots
+            const masterMap: Record<string, string> = {};
+            accountsData.forEach((acc: { id: string; login_id: string; max_slots: number; order_accounts: { slot_number: number; is_active: boolean; is_deleted?: boolean; type?: string; tidal_id?: string }[] }) => {
+                const master = acc.order_accounts?.find((oa: { type?: string; slot_number: number }) => oa.type === 'master' || oa.slot_number === 0);
+                if (master) masterMap[acc.id] = (master as { tidal_id?: string }).tidal_id || '';
+            });
+
+            inactiveData.forEach((ina: LegacyTidalHistory) => {
+                const accId = ina.account_id || ina.accounts?.id;
+                if (accId) ina.master_id = masterMap[accId] || '-';
+            });
+
             const emptySlots: LegacyTidalHistory[] = [];
             accountsData.forEach((acc: { id: string; login_id: string; max_slots: number; order_accounts: { slot_number: number; is_active: boolean; is_deleted?: boolean }[] }) => {
                 const maxSlots = acc.max_slots || 6;
                 for (let i = 0; i < maxSlots; i++) {
                     const isOccupied = acc.order_accounts?.some((oa: { slot_number: number; is_active: boolean; is_deleted?: boolean }) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
-                    if (!isOccupied) {
+                    const hasInactive = inactiveData.some((ina: LegacyTidalHistory) => {
+                        const tId = ina.account_id || ina.accounts?.id;
+                        return tId === acc.id && ina.slot_number === i;
+                    });
+
+                    if (!isOccupied && !hasInactive) {
                         emptySlots.push({
                             id: `empty-${acc.id}-${i}`,
                             slot_number: i,
@@ -75,6 +115,7 @@ function LegacyTidalInactiveContent() {
                             buyer_name: '빈 슬롯',
                             is_active: false,
                             isEmpty: true,
+                            master_id: masterMap[acc.id] || '-',
                             accounts: { id: acc.id, login_id: acc.login_id }
                         });
                     }
@@ -144,6 +185,45 @@ function LegacyTidalInactiveContent() {
         }
     };
 
+    const openEditModal = (accountId: string, slotIdx: number, loginId: string) => {
+        setActiveEditAccountId(accountId);
+        setActiveEditSlotIdx(slotIdx);
+        setEditAssignData({
+            assignment_number: `${loginId}-${slotIdx + 1}`,
+            buyer_name: '',
+            buyer_phone: '',
+            buyer_email: '',
+            tidal_id: '',
+            start_date: '',
+            end_date: '',
+            period_months: 0,
+            amount: 0,
+            memo: '',
+        });
+        setIsEditAssignModalOpen(true);
+    };
+
+    const handleUpdateEditAssign = async () => {
+        if (!activeEditAccountId || activeEditSlotIdx === null || !editAssignData) return;
+        if (!editAssignData.buyer_name && !editAssignData.buyer_email) {
+            alert('이름 또는 ID(이메일)를 입력해주세요.');
+            return;
+        }
+        try {
+            const res = await apiFetch(`/api/admin/legacy-tidal/assign/${activeEditAccountId}`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ ...editAssignData, slot_number: activeEditSlotIdx }) 
+            });
+            if (!res.ok) throw new Error('Create failed');
+            alert('배정되었습니다.');
+            setIsEditAssignModalOpen(false);
+            fetchInactiveRecords();
+        } catch (e) {
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
+        }
+    };
+
     const exportToExcel = () => {
         const excelData = records.map((a: LegacyTidalHistory, idx) => {
             const isEmpty = a.isEmpty === true;
@@ -151,6 +231,7 @@ function LegacyTidalInactiveContent() {
                 'No.': idx + 1,
                 '배정번호': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
                 '상태': isEmpty ? '빈 슬롯' : '지난 내역',
+                'Master ID': a.master_id || '-',
                 'Tidal ID': a.tidal_id,
                 '구매자명': isEmpty ? '-' : (a.buyer_name || '-'),
                 '연락처': isEmpty ? '-' : (a.buyer_phone || '-'),
@@ -204,6 +285,7 @@ function LegacyTidalInactiveContent() {
                             <tr className="bg-gray-100 border-b">
                                 <th className="p-3 text-center w-12">No</th>
                                 <th className="p-3 text-center">배정번호</th>
+                                <th className="p-3 text-left">Master ID</th>
                                 <th className="p-3 text-left">Tidal ID</th>
                                 <th className="p-3 text-left">구매자</th>
                                 <th className="p-3 text-left">연락처</th>
@@ -229,6 +311,7 @@ function LegacyTidalInactiveContent() {
                                             <td className="p-2 text-center font-bold">
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
+                                            <td className="p-2 font-mono text-gray-500 opacity-80 text-[11px]">{a.master_id || '-'}</td>
                                             <td className="p-2">{a.tidal_id}</td>
                                             <td className="p-2 font-bold">
                                                 {isEmpty ? '빈 슬롯' : (a.buyer_name || '-')}
@@ -247,7 +330,7 @@ function LegacyTidalInactiveContent() {
                                                         size="sm" 
                                                         variant="ghost" 
                                                         className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
-                                                        onClick={() => router.push(`/admin/legacy-tidal?accountId=${a.accounts?.id || ''}&slotIdx=${a.slot_number}&action=assign`)} 
+                                                        onClick={() => openEditModal(a.accounts?.id || '', a.slot_number, a.accounts?.login_id || '')} 
                                                         title="배정하기"
                                                     >
                                                         <Pencil size={16} />
@@ -273,6 +356,62 @@ function LegacyTidalInactiveContent() {
                     </table>
                 </div>
             </div>
+
+            <Dialog open={isEditAssignModalOpen} onOpenChange={setIsEditAssignModalOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader><DialogTitle>정보수정 / {editAssignData?.assignment_number}</DialogTitle></DialogHeader>
+                    {editAssignData && (
+                        <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
+                            <div className="flex gap-4">
+                                <div className="w-[30%] space-y-1"><Label className="text-xs text-gray-500">이름</Label><Input value={editAssignData.buyer_name || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })} className="h-9" /></div>
+                                <div className="flex-1 space-y-1"><Label className="text-xs text-gray-500">Tidal ID</Label><Input value={editAssignData.tidal_id || ''} onChange={e => setEditAssignData({ ...editAssignData, tidal_id: e.target.value })} className="h-9" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1"><Label className="text-xs text-gray-500">전화번호</Label><Input value={editAssignData.buyer_phone || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_phone: e.target.value })} className="h-9" /></div>
+                                <div className="space-y-1"><Label className="text-xs text-gray-500">이메일</Label><Input value={editAssignData.buyer_email || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_email: e.target.value })} className="h-9" /></div>
+                            </div>
+                            <div className="flex gap-2">
+                                <div className="flex-1 space-y-1">
+                                    <Label className="text-[10px] text-gray-500">시작일</Label>
+                                    <Input type="date" value={editAssignData.start_date || ''} onChange={e => {
+                                        const ns = e.target.value; let ne = editAssignData.end_date;
+                                        if (ns && editAssignData.period_months) { try { ne = addDays(parseISO(ns), editAssignData.period_months * 30).toISOString().split('T')[0]; } catch { } }
+                                        setEditAssignData({ ...editAssignData, start_date: ns, end_date: ne });
+                                    }} className="h-9 text-xs px-1" />
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <Label className="text-[10px] text-gray-500">종료일</Label>
+                                    <Input type="date" value={editAssignData.end_date || ''} onChange={e => {
+                                        const ne = e.target.value; let nm = editAssignData.period_months;
+                                        if (editAssignData.start_date && ne) { try { nm = Math.max(0, Math.floor(differenceInDays(parseISO(ne), parseISO(editAssignData.start_date)) / 30)); } catch { } }
+                                        setEditAssignData({ ...editAssignData, end_date: ne, period_months: nm });
+                                    }} className="h-9 text-xs px-1" />
+                                </div>
+                                <div className="w-12 space-y-1">
+                                    <Label className="text-[10px] text-gray-500">개월</Label>
+                                    <Input type="number" value={editAssignData.period_months || ''} onChange={e => {
+                                        const m = parseInt(e.target.value) || 0; let ne = editAssignData.end_date;
+                                        if (editAssignData.start_date && m >= 0) { try { ne = addDays(parseISO(editAssignData.start_date), m * 30).toISOString().split('T')[0]; } catch { } }
+                                        setEditAssignData({ ...editAssignData, period_months: m, end_date: ne });
+                                    }} className="h-9 text-xs px-1" />
+                                </div>
+                                <div className="w-24 space-y-1">
+                                    <Label className="text-[10px] text-gray-500">계약금액(원)</Label>
+                                    <Input type="text" value={editAssignData.amount ? editAssignData.amount.toLocaleString() : ''} onChange={e => setEditAssignData({ ...editAssignData, amount: parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0 })} className="h-9 text-xs px-1" />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs text-gray-500">메모</Label>
+                                <textarea rows={3} className="w-full p-2 text-sm border rounded-md focus:ring-1 focus:ring-blue-500 outline-none" value={editAssignData.memo || ''} onChange={e => setEditAssignData({ ...editAssignData, memo: e.target.value })} />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditAssignModalOpen(false)}>취소</Button>
+                        <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">배정하기</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }

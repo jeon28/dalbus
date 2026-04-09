@@ -23,6 +23,7 @@ interface AssignmentHistory {
     assigned_at?: string;
     is_active: boolean;
     isEmpty?: boolean;
+    account_id?: string;
     accounts?: {
         id: string;
         login_id: string;
@@ -69,7 +70,7 @@ function InactiveAccountsContent() {
                     // Check if there is an ACTIVE assignment for this slot
                     const isOccupied = acc.order_accounts?.some((oa: { slot_number: number; is_active: boolean; is_deleted?: boolean }) => oa.slot_number === i && oa.is_active && !oa.is_deleted);
                     // Check if there is an INACTIVE history for this slot
-                    const hasInactive = inactiveData.some((ina: AssignmentHistory) => ina.accounts?.id === acc.id && ina.slot_number === i);
+                    const hasInactive = inactiveData.some((ina: AssignmentHistory) => ina.account_id === acc.id && ina.slot_number === i);
                     
                     if (!isOccupied && !hasInactive) {
                         emptySlots.push({
