@@ -1,7 +1,23 @@
 # Changelog
 
 
-## [Unreleased]
+## [Unreleased] - 2026-04-09
+
+### 🎵 Tidal ID 더블클릭 로그인 팝업
+- **Tidal 로그인 스타일 팝업**: 비활성 페이지(`/admin/legacy-tidal/inactive`)에서 Tidal ID를 **더블클릭**하면 Tidal 실제 로그인 화면을 모방한 다크 테마 팝업이 표시됩니다.
+- **클립보드 복사**: 팝업 내 이메일 옆 복사 버튼 클릭 시 Tidal ID가 클립보드에 복사되며, 성공 시 초록색 토스트 알림이 표시됩니다.
+- **Continue 버튼**: 클릭 시 Tidal 로그인 페이지를 새 탭에서 열어 빠른 접근이 가능합니다.
+- **Google/Apple 소셜 로그인 버튼**: 실제 Tidal UI와 동일한 디자인으로 시각적 일관성을 유지합니다.
+
+### 🛠️ Legacy Tidal 비활성 페이지 고도화
+- **Master ID 컬럼 추가**: 비활성 목록 테이블에 `Tidal ID` 앞에 `Master ID` 컬럼을 추가하여 그룹 마스터 계정의 Tidal ID를 표시합니다.
+- **카드형 수정 모달**: 빈 슬롯의 연필(✏️) 버튼 클릭 시 이전처럼 페이지 이동 없이 동일 페이지에서 배정 정보를 입력할 수 있는 카드형 모달이 열립니다.
+- **빈 슬롯 중복 방지**: 비활성 내역이 이미 존재하는 슬롯에 `hasInactive` 체크를 추가하여 빈 슬롯이 중복 생성되지 않도록 수정했습니다.
+
+### 🔧 ESLint / TypeScript 빌드 안정화
+- **`no-explicit-any` 전량 수정**: `legacy-tidal/inactive`, `tidal/inactive`, `hifitidal/inactive` 페이지 및 서비스 파일(`legacyTidalService`, `tidalService`)에서 `any` 타입을 명시적 인터페이스로 교체했습니다.
+- **`EditAssignFormData` 인터페이스 신설**: 수정 모달의 폼 데이터 타입을 명확하게 정의했습니다.
+- **React Hook 의존성 경고 수정**: `exhaustive-deps` 관련 ESLint 경고를 해결했습니다.
 
 ### 🗑️ 삭제 흐름 개선 – "삭제 → 휴지통 → 영구 삭제" 워크플로우
 - **비활성 페이지 삭제 로직 변경**: `/admin/tidal/inactive` 페이지의 삭제 버튼이 **소프트 삭제**(휴지통 이동)로 동작하도록 변경. 기존에는 바로 영구 삭제되던 것을 `is_deleted: true`로 마킹하는 방식으로 전환.

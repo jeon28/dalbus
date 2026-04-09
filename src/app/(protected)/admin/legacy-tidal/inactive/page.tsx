@@ -60,6 +60,10 @@ function LegacyTidalInactiveContent() {
     const [activeEditAccountId, setActiveEditAccountId] = useState<string | null>(null);
     const [activeEditSlotIdx, setActiveEditSlotIdx] = useState<number | null>(null);
 
+    // Tidal Login Popup state
+    const [tidalLoginEmail, setTidalLoginEmail] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+
     useEffect(() => {
         fetchInactiveRecords();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -312,7 +316,9 @@ function LegacyTidalInactiveContent() {
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
                                             <td className="p-2 font-mono text-gray-500 opacity-80 text-[11px]">{a.master_id || '-'}</td>
-                                            <td className="p-2">{a.tidal_id}</td>
+                                            <td className="p-2 cursor-pointer select-none" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title="더블클릭: Tidal 로그인 팝업">
+                                                <span className="hover:underline hover:text-blue-600 transition-colors">{a.tidal_id}</span>
+                                            </td>
                                             <td className="p-2 font-bold">
                                                 {isEmpty ? '빈 슬롯' : (a.buyer_name || '-')}
                                             </td>
@@ -412,6 +418,102 @@ function LegacyTidalInactiveContent() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Tidal Login Style Popup */}
+            {tidalLoginEmail && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setTidalLoginEmail(null)}>
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                    <div
+                        className="relative w-[420px] rounded-2xl overflow-hidden shadow-2xl"
+                        onClick={e => e.stopPropagation()}
+                        style={{ background: 'linear-gradient(180deg, #0a0a14 0%, #111122 100%)' }}
+                    >
+                        {/* Close button */}
+                        <button
+                            onClick={() => setTidalLoginEmail(null)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10"
+                        >
+                            ✕
+                        </button>
+
+                        {/* Tidal Logo */}
+                        <div className="flex flex-col items-center pt-10 pb-4">
+                            <svg width="40" height="26" viewBox="0 0 40 26" fill="none">
+                                <path d="M13.33 0L6.67 6.67L0 0H0L6.67 6.67L0 13.33H6.67L13.33 6.67L20 0H13.33Z" fill="white"/>
+                                <path d="M20 0L13.33 6.67L20 13.33H26.67L20 6.67L26.67 0H20Z" fill="white"/>
+                                <path d="M33.33 0L26.67 6.67L33.33 13.33H40L33.33 6.67L40 0H33.33Z" fill="white"/>
+                                <path d="M13.33 13.33L6.67 20L13.33 26.67L20 20L13.33 13.33Z" fill="white"/>
+                            </svg>
+                            <span className="text-white tracking-[0.4em] text-sm font-light mt-3">T I D A L</span>
+                        </div>
+
+                        {/* Title */}
+                        <h2 className="text-center text-white text-xl font-bold mb-6">
+                            Sign up or <span className="underline underline-offset-4">log in</span>
+                        </h2>
+
+                        {/* Form Card */}
+                        <div className="mx-6 mb-6 p-5 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <label className="text-gray-400 text-xs mb-1 block">Email or username</label>
+                            <div className="flex items-center gap-2 bg-transparent">
+                                <input
+                                    readOnly
+                                    value={tidalLoginEmail}
+                                    className="flex-1 bg-transparent text-white text-base outline-none border-none py-2"
+                                    style={{ caretColor: 'transparent' }}
+                                />
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(tidalLoginEmail);
+                                        setCopied(true);
+                                        setTimeout(() => setCopied(false), 2000);
+                                    }}
+                                    className="flex items-center justify-center w-8 h-8 rounded-lg transition-all"
+                                    style={{ background: copied ? '#22c55e' : '#e04040' }}
+                                    title="클립보드에 복사"
+                                >
+                                    {copied ? (
+                                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    ) : (
+                                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    )}
+                                </button>
+                            </div>
+                            <div className="border-b border-white/10 mt-1 mb-4" />
+
+                            {/* Continue Button */}
+                            <button
+                                className="w-full py-3 rounded-full text-sm font-semibold transition-all hover:opacity-90"
+                                style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}
+                                onClick={() => {
+                                    window.open(`https://login.tidal.com/authorize?email=${encodeURIComponent(tidalLoginEmail)}`, '_blank');
+                                }}
+                            >
+                                Continue
+                            </button>
+
+                            <div className="text-center text-gray-500 text-xs my-4">or</div>
+
+                            {/* Social Buttons */}
+                            <button className="w-full py-3 rounded-full text-sm font-semibold mb-2 flex items-center justify-center gap-2 transition-all hover:opacity-80" style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.9 33.5 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3l5.7-5.7C33.9 5.5 29.2 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.2-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.5 18.8 12 24 12c3.1 0 5.8 1.2 8 3l5.7-5.7C33.9 5.5 29.2 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5 0 9.5-1.8 13.1-4.7l-6-5.2c-2 1.5-4.5 2.4-7.1 2.4-5.3 0-9.8-3.5-11.4-8.3l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.1 5.2C37 39.1 44 34 44 24c0-1.3-.2-2.6-.4-3.9z"/></svg>
+                                Continue with Google
+                            </button>
+                            <button className="w-full py-3 rounded-full text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-80" style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                                Continue with Apple
+                            </button>
+                        </div>
+
+                        {/* Copied Toast */}
+                        {copied && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs px-4 py-2 rounded-full shadow-lg animate-bounce">
+                                ✓ 클립보드에 복사됨
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </main>
     );
 }
