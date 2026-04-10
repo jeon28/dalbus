@@ -793,12 +793,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="flex gap-2 items-center">
                         <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
                             <Search size={14} className="text-gray-400" />
-                            <Input type="text" placeholder="고객명, Tidal ID, 전화번호 검색..." className="border-0 focus-visible:ring-0 h-8 w-60 text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <Input type="text" placeholder="검색..." className="border-0 focus-visible:ring-0 h-8 w-32 text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1 bg-white border rounded-md px-2 py-1">
                                 <span className="text-xs text-gray-500 whitespace-nowrap">잔여</span>
-                                <Input type="number" value={expiredDays} onChange={e => setExpiredDays(parseInt(e.target.value) || 0)} className="w-12 h-7 px-1 text-center text-sm border-none focus-visible:ring-0" />
+                                <Input type="number" value={expiredDays} onChange={e => setExpiredDays(parseInt(e.target.value) || 0)} className="w-10 h-7 px-1 text-center text-sm border-none focus-visible:ring-0" />
                                 <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
                             </div>
                             <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-1 h-7 px-2 text-xs">
@@ -842,18 +842,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         <div className="absolute right-0 top-9 z-20 w-44 bg-white border rounded-lg shadow-lg py-1 text-sm">
                                             <button
                                                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                                onClick={() => { document.getElementById('excel-import-lt')?.click(); setIsMoreMenuOpen(false); }}
+                                                onClick={() => { setIsMoreMenuOpen(false); }}
                                             >
-                                                <Upload className="w-4 h-4" /> 엑셀 가져오기
+                                                <History className="w-4 h-4" /> 기타 메뉴 (준비중)
                                             </button>
-                                            {!isGridView && (
-                                                <button
-                                                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                                    onClick={() => { exportToExcel(); setIsMoreMenuOpen(false); }}
-                                                >
-                                                    <Download className="w-4 h-4" /> 엑셀 내보내기
-                                                </button>
-                                            )}
                                         </div>
                                     </>
                                 )}
@@ -1060,9 +1052,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             </tbody>
                         </table>
                         <div className="flex justify-end items-center gap-2 p-2 bg-gray-50 border-t">
-                            <Button variant="outline" size="sm" onClick={() => exportToExcel()} className="h-7 px-2 text-xs flex items-center gap-1">
-                                <Download className="w-3.5 h-3.5" /> 엑셀 내보내기
-                            </Button>
                             <Button onClick={() => setIsAddModalOpen(true)} size="sm" className="h-7 px-2 text-xs flex items-center gap-1">
                                 <Plus className="w-3.5 h-3.5" /> 그룹 추가
                             </Button>
@@ -1272,6 +1261,24 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         })}
                     </div>
                 )}
+            </div>
+
+            {/* ===== EXCEL ACTIONS (BOTTOM) ===== */}
+            <div className="container mt-8 mb-12 flex justify-center items-center gap-4 border-t border-gray-100 pt-8">
+                <Button 
+                    variant="outline" 
+                    onClick={() => document.getElementById('excel-import-lt')?.click()}
+                    className="flex items-center gap-2 bg-white hover:bg-green-50 text-green-700 border-green-200"
+                >
+                    <Upload className="w-4 h-4" /> 엑셀 가져오기 (Import)
+                </Button>
+                <Button 
+                    variant="outline" 
+                    onClick={() => exportToExcel()}
+                    className="flex items-center gap-2 bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
+                >
+                    <Download className="w-4 h-4" /> 엑셀 내보내기 (Export)
+                </Button>
             </div>
 
             {/* ===== MODALS ===== */}
