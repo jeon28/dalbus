@@ -33,7 +33,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText, MoreHorizontal, Zap } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText, MoreHorizontal, Zap, UserPlus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -1213,7 +1213,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         </td>
                                                                     </>
                                                                 ) : isEmpty ? (
-                                                                    <><td /><td /><td /><td /><td /><td /><td /><td /><td /></>
+                                                                    <>
+                                                                        <td /><td /><td /><td /><td /><td /><td /><td /><td />
+                                                                        <td className="px-2">
+                                                                            <div className="flex justify-center gap-1 items-center">
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="직접 입력" onClick={() => openEditAssignModal(acc.id, assignment.slot_number)}><Pencil size={14} /></Button>
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-green-600" title="주문 배정" onClick={() => openAssignModal(acc, assignment.slot_number)}><UserPlus size={14} /></Button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </>
                                                                 ) : (
                                                                     <>
                                                                         <td 
