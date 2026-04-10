@@ -63,6 +63,18 @@ function LegacyTidalInactiveContent() {
     // Tidal Login Popup state
     const [tidalLoginEmail, setTidalLoginEmail] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleMasterIdClick = (e: React.MouseEvent, id?: string) => {
+        e.stopPropagation();
+        if (!id || id === '-') return;
+        
+        navigator.clipboard.writeText(id);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+        
+        window.open('https://account.tidal.com/family', '_blank');
+    };
 
     useEffect(() => {
         fetchInactiveRecords();
@@ -316,11 +328,14 @@ function LegacyTidalInactiveContent() {
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
                                             <td 
-                                                className="p-2 font-mono text-gray-500 opacity-80 text-[11px] cursor-pointer select-none" 
-                                                onDoubleClick={() => { if (a.master_id && a.master_id !== '-') { setTidalLoginEmail(a.master_id); setCopied(false); } }} 
-                                                title="더블클릭: Tidal 로그인 팝업"
+                                                className="p-2 font-mono text-gray-500 opacity-80 text-[11px] cursor-pointer select-none relative group" 
+                                                onClick={(e) => handleMasterIdClick(e, a.master_id)} 
+                                                title="클릭: 복사 및 Tidal 가족관리 이동"
                                             >
                                                 <span className="hover:underline hover:text-blue-600 transition-colors">{a.master_id || '-'}</span>
+                                                {copiedId === a.master_id && (
+                                                    <span className="absolute -top-4 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce whitespace-nowrap z-10">Copied!</span>
+                                                )}
                                             </td>
                                             <td className="p-2 cursor-pointer select-none" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title="더블클릭: Tidal 로그인 팝업">
                                                 <span className="hover:underline hover:text-blue-600 transition-colors">{a.tidal_id}</span>
