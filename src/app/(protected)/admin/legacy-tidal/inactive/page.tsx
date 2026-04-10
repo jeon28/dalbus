@@ -27,6 +27,7 @@ interface LegacyTidalHistory {
     is_active: boolean;
     is_deleted?: boolean;
     isEmpty?: boolean;
+    updated_at?: string;
     master_id?: string;
     account_id?: string;
     accounts?: {
@@ -141,6 +142,11 @@ function LegacyTidalInactiveContent() {
             // 4. Combine and Sort
             const combined = [...emptySlots, ...inactiveData];
             combined.sort((a, b) => {
+                if (showDeleted) {
+                    const uA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                    const uB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                    return uB - uA;
+                }
                 const idA = a.accounts?.login_id || '';
                 const idB = b.accounts?.login_id || '';
                 if (idA !== idB) return idA.localeCompare(idB);
@@ -254,7 +260,8 @@ function LegacyTidalInactiveContent() {
                 '이메일': isEmpty ? '-' : (a.buyer_email || '-'),
                 '시작일': a.start_date || '-',
                 '종료일': a.end_date || '-',
-                '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-'
+                '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-',
+                '삭제일': (showDeleted && a.updated_at) ? new Date(a.updated_at).toLocaleString() : '-'
             };
         });
 
@@ -308,13 +315,14 @@ function LegacyTidalInactiveContent() {
                                 <th className="p-3 text-left">이메일</th>
                                 <th className="p-3 text-center">기간</th>
                                 <th className="p-3 text-center">배정일시</th>
+                                {showDeleted && <th className="p-3 text-center">삭제일시</th>}
                                 <th className="p-3 text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody>
                             {records.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="p-8 text-center text-gray-500">
+                                    <td colSpan={showDeleted ? 11 : 10} className="p-8 text-center text-gray-500">
                                         지난 내역이 없습니다.
                                     </td>
                                 </tr>
@@ -351,6 +359,11 @@ function LegacyTidalInactiveContent() {
                                             <td className="p-2 text-center text-[10px] opacity-70">
                                                 {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
                                             </td>
+                                            {showDeleted && (
+                                                <td className="p-2 text-center text-[10px] text-red-600 font-semibold italic">
+                                                    {a.updated_at ? new Date(a.updated_at).toLocaleString() : '-'}
+                                                </td>
+                                            )}
                                             <td className="p-2 text-center">
                                                 {isEmpty ? (
                                                     <Button 

@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const showDeleted = searchParams.get('showDeleted') === 'true';
 
+        const orderBy = showDeleted ? 'updated_at' : 'assigned_at';
+
         const { data, error } = await supabaseAdmin
             .from('legacy_tidal_assignments')
             .select(`
@@ -16,7 +18,7 @@ export async function GET(req: NextRequest) {
             `)
             .eq('is_active', false)
             .eq('is_deleted', showDeleted)
-            .order('assigned_at', { ascending: false });
+            .order(orderBy, { ascending: false });
 
         if (error) throw error;
 
