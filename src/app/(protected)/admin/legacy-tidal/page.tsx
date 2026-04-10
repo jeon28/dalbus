@@ -196,6 +196,23 @@ function LegacyTidalContent() {
     });
     const [, setResizingCol] = useState<string | null>(null);
 
+    // Master ID Copy & Popup State
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleMasterIdClick = (e: React.MouseEvent, id: string | null | undefined) => {
+        if (!id || id === '-') return;
+        e.stopPropagation();
+        
+        // 1. Copy to clipboard
+        navigator.clipboard.writeText(id).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+
+        // 2. Immediate Popup
+        window.open('https://account.tidal.com/family', '_blank');
+    };
+
     const startResizing = (id: string, e: React.MouseEvent) => {
         e.preventDefault();
         setResizingCol(id);
@@ -1002,8 +1019,20 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     <><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.tidal_id }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_name }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_email }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_phone }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.start_date }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.end_date }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.period }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.amount }} /></>
                                                 ) : (
                                                     <>
-                                                        <td className={`px-1 py-1.5 border-r truncate max-w-[110px] ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold' : ''}`} title={assignment.tidal_id || undefined} style={{ width: columnWidths.tidal_id }}>
+                                                        <td 
+                                                            className={`px-1 py-1.5 border-r truncate max-w-[110px] relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
+                                                            title={assignment.tidal_id || undefined} 
+                                                            style={{ width: columnWidths.tidal_id }}
+                                                            onClick={(e) => {
+                                                                if (assignment.type === 'master') {
+                                                                    handleMasterIdClick(e, assignment.tidal_id);
+                                                                }
+                                                            }}
+                                                        >
                                                             {assignment.tidal_id || '-'}
+                                                            {assignment.type === 'master' && copiedId === assignment.tidal_id && (
+                                                                <span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
+                                                            )}
                                                         </td>
                                                         <td className="px-1 py-1.5 border-r truncate max-w-[70px]" title={assignment.buyer_name || undefined} style={{ width: columnWidths.buyer_name }}>
                                                             {assignment.buyer_name || '-'}
@@ -1099,7 +1128,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         <div className="col-span-1 text-gray-700 font-medium cursor-pointer truncate" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
                                         <div className="col-span-2 truncate cursor-pointer" title={acc.payment_email} onClick={() => toggleRow(acc.id)}><span className="text-blue-600 font-semibold text-xs truncate">{acc.payment_email}</span></div>
                                         <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>{acc.payment_day}일</div>
-                                        <div className="col-span-2 text-gray-700 text-[11px] truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>{tidalId}</div>
+                                        <div 
+                                            className="col-span-2 text-gray-700 text-[11px] truncate cursor-pointer hover:text-blue-600 relative group" 
+                                            title={tidalId} 
+                                            onClick={(e) => handleMasterIdClick(e, tidalId)}
+                                        >
+                                            {tidalId}
+                                            {copiedId === tidalId && (
+                                                <span className="absolute -top-4 left-0 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
+                                            )}
+                                        </div>
                                         <div className={`col-span-2 font-mono text-[11px] cursor-pointer ${isWarning ? 'text-red-600 font-bold' : 'text-gray-900'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>
                                         <div className="col-span-1 text-gray-500 font-mono text-[11px] cursor-pointer" onClick={() => toggleRow(acc.id)}>{duration}</div>
                                         <div className="col-span-1 text-right text-gray-500 font-mono text-[11px] pr-2 cursor-pointer" onClick={() => toggleRow(acc.id)}>-</div>
@@ -1178,8 +1216,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     <><td /><td /><td /><td /><td /><td /><td /><td /><td /></>
                                                                 ) : (
                                                                     <>
-                                                                        <td className={`px-2 truncate ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold' : ''}`} title={val.tidal_id || undefined}>
+                                                                        <td 
+                                                                            className={`px-2 truncate relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
+                                                                            title={val.tidal_id || undefined}
+                                                                            onClick={(e) => {
+                                                                                if (assignment.type === 'master') {
+                                                                                    handleMasterIdClick(e, val.tidal_id);
+                                                                                }
+                                                                            }}
+                                                                        >
                                                                             {val.tidal_id || '-'}
+                                                                            {assignment.type === 'master' && copiedId === val.tidal_id && (
+                                                                                <span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
+                                                                            )}
                                                                         </td>
                                                                         <td className="px-2 text-gray-700 truncate max-w-[80px]">
                                                                             {val.buyer_name || '-'}
