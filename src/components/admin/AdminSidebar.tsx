@@ -15,6 +15,7 @@ export const menuItems = [
     { title: "HifiTidal 관리", href: "/admin/hifitidal" },
     { title: "기존 Tidal 계정", href: "/admin/legacy-tidal" },
     { title: "메일 발송 이력", href: "/admin/mail-history" },
+    { title: "메일 템플릿 관리", href: "/admin/email-templates" },
 ];
 
 export function AdminSidebar() {
