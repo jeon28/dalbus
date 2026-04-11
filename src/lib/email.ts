@@ -49,7 +49,7 @@ const logMailHistory = async (details: {
 /**
  * DB에서 메일 템플릿을 가져와 치환자를 적용하는 함수
  */
-const getDynamicTemplate = async (key: string, variables: Record<string, any>) => {
+const getDynamicTemplate = async (key: string, variables: Record<string, string | number | boolean | null | undefined>) => {
     try {
         const { data, error } = await supabaseAdmin
             .from('email_templates')
