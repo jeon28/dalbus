@@ -190,9 +190,9 @@ function LegacyTidalContent() {
     const [expiredDays, setExpiredDays] = useState(7);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-        checkbox: 20, login_id: 50, tidal_id: 120,
-        tidal_password: 100, buyer_name: 60, buyer_email: 120, buyer_phone: 90,
-        order_number: 100, start_date: 70, end_date: 70, period: 25, amount: 40
+        checkbox: 25, login_id: 60, tidal_id: 120,
+        tidal_password: 100, buyer_name: 60, buyer_email: 120, buyer_phone: 120,
+        order_number: 100, start_date: 70, end_date: 70, period: 35, amount: 60
     });
     const [, setResizingCol] = useState<string | null>(null);
 
