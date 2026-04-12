@@ -368,21 +368,21 @@ function LegacyTidalInactiveContent() {
 
             <div className={`${styles.content} container`}>
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="w-full text-xs">
+                    <table className="w-full text-[10px]">
                         <thead>
                             <tr className="bg-gray-100 border-b">
-                                <th className="p-3 text-center w-12">No</th>
-                                <th className="p-3 text-center">배정번호</th>
-                                {!showDeleted && <th className="p-3 text-left">Master ID</th>}
-                                <th className="p-3 text-left">Tidal ID</th>
-                                <th className="p-3 text-left">구매자</th>
-                                <th className="p-3 text-left">연락처</th>
-                                <th className="p-3 text-left">이메일</th>
-                                <th className="p-3 text-center">기간</th>
-                                <th className="p-3 text-center">배정일시</th>
-                                {showDeleted && <th className="p-3 text-center">삭제일</th>}
-                                {showDeleted && <th className="p-3 text-center w-20">메모</th>}
-                                <th className="p-3 text-center">관리</th>
+                                <th className="p-1.5 text-center w-8">No</th>
+                                <th className="p-1.5 text-center w-20">배정번호</th>
+                                {!showDeleted && <th className="p-1.5 text-left w-32">Master ID</th>}
+                                <th className="p-1.5 text-left">Tidal ID</th>
+                                <th className="p-1.5 text-left w-16">구매자</th>
+                                <th className="p-1.5 text-left w-24">연락처</th>
+                                <th className="p-1.5 text-left">이메일</th>
+                                <th className="p-1.5 text-center w-24">기간</th>
+                                <th className="p-1.5 text-center w-20">배정일</th>
+                                {showDeleted && <th className="p-1.5 text-center w-20">삭제일</th>}
+                                {showDeleted && <th className="p-1.5 text-center w-32">메모</th>}
+                                <th className="p-1.5 text-center w-20">관리</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -396,16 +396,16 @@ function LegacyTidalInactiveContent() {
                                 records.map((a: LegacyTidalHistory, idx) => {
                                     const isEmpty = a.isEmpty === true;
                                     return (
-                                        <tr key={a.id} className={`border-b hover:bg-gray-50 h-10 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                            <td className="p-2 text-center opacity-70">{idx + 1}</td>
-                                            <td className="p-2 text-center font-bold">
+                                        <tr key={a.id} className={`border-b hover:bg-gray-50 h-8 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                            <td className="p-1 text-center opacity-70">{idx + 1}</td>
+                                            <td className="p-1 text-center font-bold truncate max-w-[80px]">
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
                                             {!showDeleted && (
                                                 <td 
-                                                    className="p-2 font-mono text-gray-500 opacity-80 text-[11px] cursor-pointer select-none relative group" 
+                                                    className="p-1 font-mono text-gray-500 opacity-80 text-[10px] cursor-pointer select-none relative group truncate max-w-[120px]" 
                                                     onClick={(e) => handleMasterIdClick(e, a.master_id)} 
-                                                    title="클릭: 복사 및 Tidal 가족관리 이동"
+                                                    title={a.master_id}
                                                 >
                                                     <span className="hover:underline hover:text-blue-600 transition-colors">{a.master_id || '-'}</span>
                                                     {copiedId === a.master_id && (
@@ -413,58 +413,58 @@ function LegacyTidalInactiveContent() {
                                                     )}
                                                 </td>
                                             )}
-                                            <td className="p-2 cursor-pointer select-none" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title="더블클릭: Tidal 로그인 팝업">
-                                                <span className="hover:underline hover:text-blue-600 transition-colors">{a.tidal_id}</span>
+                                            <td className="p-1 cursor-pointer select-none truncate max-w-[150px]" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title={a.tidal_id}>
+                                                <span className="hover:underline hover:text-blue-600 transition-colors text-[10px]">{a.tidal_id}</span>
                                             </td>
-                                            <td className="p-2 font-bold">
+                                            <td className="p-1 font-bold truncate max-w-[60px]">
                                                 {isEmpty ? '빈 슬롯' : (a.buyer_name || '-')}
                                             </td>
-                                            <td className="p-2">{a.buyer_phone || '-'}</td>
-                                            <td className="p-2">{a.buyer_email || '-'}</td>
-                                            <td className="p-2 text-center text-[10px] opacity-80">
-                                                {isEmpty ? '-' : `${a.start_date} ~ ${a.end_date}`}
+                                            <td className="p-1 truncate max-w-[100px]">{a.buyer_phone || '-'}</td>
+                                            <td className="p-1 truncate max-w-[120px]">{a.buyer_email || '-'}</td>
+                                            <td className="p-1 text-center text-[9px] opacity-80 whitespace-nowrap">
+                                                {isEmpty ? '-' : `${a.start_date.split('-').slice(1).join('/')} ~ ${a.end_date.split('-').slice(1).join('/')}`}
                                             </td>
-                                            <td className="p-2 text-center text-[10px] opacity-70">
+                                            <td className="p-1 text-center text-[9px] opacity-70">
                                                 {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
                                             </td>
                                             {showDeleted && (
-                                                <td className="p-2 text-center text-[10px] text-red-600 font-semibold italic">
+                                                <td className="p-1 text-center text-[9px] text-red-600 font-semibold italic">
                                                     {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-'}
                                                 </td>
                                             )}
                                             {showDeleted && (
-                                                <td className="p-2">
+                                                <td className="p-1">
                                                     {!isEmpty && (
-                                                        <div className="flex items-center justify-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(a.memo || '', a.id); }}>
-                                                            <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${a.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
-                                                            <span className="text-[10px] text-gray-500 truncate cursor-pointer max-w-[40px]">{a.memo?.split('\n')[0] || ''}</span>
+                                                        <div className="flex items-center justify-start gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(a.memo || '', a.id); }}>
+                                                            <MessageSquareText size={12} className={`flex-shrink-0 cursor-pointer ${a.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
+                                                            <span className="text-[9px] text-gray-500 truncate cursor-pointer max-w-[80px]">{a.memo?.split('\n')[0] || ''}</span>
                                                         </div>
                                                     )}
                                                 </td>
                                             )}
-                                            <td className="p-2 text-center">
+                                            <td className="p-1 text-center">
                                                 {isEmpty ? (
                                                     <Button 
                                                         size="sm" 
                                                         variant="ghost" 
-                                                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
+                                                        className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
                                                         onClick={() => openEditModal(a.accounts?.id || '', a.slot_number, a)} 
                                                         title="배정하기"
                                                     >
-                                                        <Pencil size={16} />
+                                                        <Pencil size={14} />
                                                     </Button>
                                                 ) : (
                                                     <div className="flex justify-center gap-1">
                                                         {showDeleted ? (
                                                             <>
-                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditModal(a.account_id || a.accounts?.id || '', a.slot_number, a)}><Pencil size={14} /></Button>
-                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700" onClick={() => handleRestore(a.id)} title="복구">
-                                                                    <RotateCcw size={16} />
+                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditModal(a.account_id || a.accounts?.id || '', a.slot_number, a)}><Pencil size={12} /></Button>
+                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700" onClick={() => handleRestore(a.id)} title="복구">
+                                                                    <RotateCcw size={14} />
                                                                 </Button>
                                                             </>
                                                         ) : null}
-                                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(a.id)} title={showDeleted ? "영구 삭제" : "삭제 내역으로 이동"}>
-                                                            <Trash2 size={16} />
+                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(a.id)} title={showDeleted ? "영구 삭제" : "삭제 내역으로 이동"}>
+                                                            <Trash2 size={14} />
                                                         </Button>
                                                     </div>
                                                 )}
