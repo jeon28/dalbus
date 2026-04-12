@@ -1,0 +1,8 @@
+
+> dalbus@1.5.8 build
+> next build
+
+   ??Next.js 15.5.12
+   - Environments: .env.local
+
+   Creating an optimized production build ...

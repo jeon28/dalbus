@@ -17,13 +17,18 @@ import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
 import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
 
+interface Placeholder {
+    key: string;
+    label: string;
+}
+
 interface EmailTemplate {
     id: string;
     key: string;
     name: string;
     subject: string;
     content: string;
-    placeholders: any;
+    placeholders: Placeholder[];
     updated_at: string;
 }
 
@@ -85,7 +90,7 @@ export default function EmailTemplateListPage() {
             } else {
                 throw new Error('Delete failed');
             }
-        } catch (error) {
+        } catch {
             alert('❌ 삭제 중 오류가 발생했습니다.');
         }
     };

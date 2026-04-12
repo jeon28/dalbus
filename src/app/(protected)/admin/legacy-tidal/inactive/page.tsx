@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History, MessageSquareText, Save } from 'lucide-react';
+import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History, MessageSquareText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 import { Label } from "@/components/ui/label";
@@ -64,11 +64,13 @@ function LegacyTidalInactiveContent() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
 
+    // Tidal Login Popup state
+    const [tidalLoginEmail, setTidalLoginEmail] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+
     // Memo modal state
     const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
     const [currentMemoInput, setCurrentMemoInput] = useState('');
-    const [memoTargetAccountId, setMemoTargetAccountId] = useState('');
-    const [memoTargetSlotIdx, setMemoTargetSlotIdx] = useState<number | null>(null);
     const [memoTargetAssignmentId, setMemoTargetAssignmentId] = useState('');
 
     const handleMasterIdClick = (e: React.MouseEvent, id?: string) => {
@@ -281,9 +283,7 @@ function LegacyTidalInactiveContent() {
         }
     };
 
-    const openMemoModal = (accountId: string, slotIdx: number | null, currentMemo: string, assignmentId: string) => {
-        setMemoTargetAccountId(accountId);
-        setMemoTargetSlotIdx(slotIdx);
+    const openMemoModal = (currentMemo: string, assignmentId: string) => {
         setMemoTargetAssignmentId(assignmentId);
         setCurrentMemoInput(currentMemo || '');
         setIsMemoModalOpen(true);
@@ -309,7 +309,7 @@ function LegacyTidalInactiveContent() {
     const exportToExcel = () => {
         const excelData = records.map((a: LegacyTidalHistory, idx) => {
             const isEmpty = a.isEmpty === true;
-            const data: any = {
+            const data: Record<string, string | number> = {
                 'No.': idx + 1,
                 '배정번호': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
                 '상태': isEmpty ? '빈 슬롯' : '지난 내역',
@@ -435,7 +435,7 @@ function LegacyTidalInactiveContent() {
                                             {showDeleted && (
                                                 <td className="p-2">
                                                     {!isEmpty && (
-                                                        <div className="flex items-center justify-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(a.id, a.slot_number, a.memo || '', a.id); }}>
+                                                        <div className="flex items-center justify-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(a.memo || '', a.id); }}>
                                                             <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${a.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
                                                             <span className="text-[10px] text-gray-500 truncate cursor-pointer max-w-[40px]">{a.memo?.split('\n')[0] || ''}</span>
                                                         </div>
@@ -629,7 +629,6 @@ function LegacyTidalInactiveContent() {
                     </div>
                 </div>
             )}
-            </Dialog>
 
             <Dialog open={isMemoModalOpen} onOpenChange={setIsMemoModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
