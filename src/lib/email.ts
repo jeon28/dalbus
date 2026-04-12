@@ -47,6 +47,36 @@ const logMailHistory = async (details: {
 };
 
 /**
+ * DB에서 메일 템플릿을 가져와 치환자를 적용하는 함수
+ */
+const getDynamicTemplate = async (key: string, variables: Record<string, string | number | boolean | null | undefined>) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('email_templates')
+            .select('subject, content')
+            .eq('key', key)
+            .single();
+
+        if (error || !data) return null;
+
+        let { subject, content } = data;
+
+        // 치환자 적용
+        Object.keys(variables).forEach(vKey => {
+            const regex = new RegExp(`{${vKey}}`, 'g');
+            const value = variables[vKey]?.toString() || '';
+            subject = subject.replace(regex, value);
+            content = content.replace(regex, value);
+        });
+
+        return { subject, content };
+    } catch (error) {
+        console.error(`Error fetching dynamic template (${key}):`, error);
+        return null;
+    }
+};
+
+/**
  * 메일 발송 및 이력 로깅을 위한 범용 함수
  */
 export const sendEmail = async (details: {
@@ -162,8 +192,19 @@ export const sendUserOrderNotification = async (
     order: OrderNotificationProps
 ) => {
     const { orderId, productName, planName, amount, buyerName, depositorName } = order;
-    const subject = `[Dalbus] 주문 접수 안내 - ${buyerName}님`;
-    const html = `
+
+    // DB 템플릿 시도
+    const dynamic = await getDynamicTemplate('ORDER_RECEIVED_USER', {
+        buyer_name: buyerName,
+        order_id: orderId,
+        product_name: productName,
+        plan_name: planName,
+        amount: amount.toLocaleString(),
+        depositor_name: depositorName
+    });
+
+    const subject = dynamic?.subject || `[Dalbus] 주문 접수 안내 - ${buyerName}님`;
+    const html = dynamic?.content || `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
           <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">주문이 정상적으로 접수되었습니다.</h2>
           <p>안녕하세요, <strong>${buyerName}</strong>님! Dalbus를 이용해 주셔서 감사합니다.</p>
@@ -208,8 +249,17 @@ export const sendExpiryNotification = async (
     details: ExpiryNotificationProps
 ) => {
     const { buyerName, tidalId, endDate, message } = details;
-    const subject = `[Dalbus] 서비스 만료 안내 - ${buyerName}님`;
-    const html = `
+
+    // DB 템플릿 시도
+    const dynamic = await getDynamicTemplate('EXPIRY_NOTICE', {
+        buyer_name: buyerName,
+        tidal_id: tidalId,
+        end_date: endDate,
+        message: message // message 자체에 {buyer_name} 등이 포함되어 있을 수 있으므로 넘겨줌
+    });
+
+    const subject = dynamic?.subject || `[Dalbus] 서비스 만료 안내 - ${buyerName}님`;
+    const html = dynamic?.content || `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
           <h2 style="color: #2563eb;">서비스 만료 안내</h2>
           <div style="white-space: pre-wrap; margin-bottom: 20px;">
@@ -244,8 +294,18 @@ export const sendAssignmentNotification = async (
     details: AssignmentNotificationProps
 ) => {
     const { buyerName, productName, tidalId, tidalPw, endDate } = details;
-    const subject = `[Dalbus] 계정 세팅 완료 안내 - ${buyerName}님`;
-    const html = `
+
+    // DB 템플릿 시도
+    const dynamic = await getDynamicTemplate('ASSIGNMENT_COMPLETE', {
+        buyer_name: buyerName,
+        product_name: productName,
+        tidal_id: tidalId,
+        tidal_pw: tidalPw,
+        end_date: endDate
+    });
+
+    const subject = dynamic?.subject || `[Dalbus] 계정 세팅 완료 안내 - ${buyerName}님`;
+    const html = dynamic?.content || `
         <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
           <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">계정 세팅 완료 안내</h2>
           <p>안녕하세요, <strong>${buyerName}</strong>님!</p>

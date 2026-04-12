@@ -53,6 +53,11 @@ export default function Header() {
                             </>
                         ) : (
                             <>
+                                <Link href="/signup">
+                                    <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">
+                                        가입하기
+                                    </Button>
+                                </Link>
                                 <Link href="/login">
                                     <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3">
                                         로그인

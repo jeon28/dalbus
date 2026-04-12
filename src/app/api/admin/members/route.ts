@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     // 1. Fetching profiles with role 'user' (paginated)
     let query = supabaseAdmin
         .from('profiles')
-        .select('id, name, email, phone, birth_date, created_at, memo', { count: 'exact' })
+        .select('id, name, email, phone, birth_date, created_at, memo, signup_method', { count: 'exact' })
         .eq('role', 'user');
 
     if (search) {

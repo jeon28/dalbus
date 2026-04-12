@@ -45,6 +45,7 @@ export interface Member {
     created_at: string;
     memo?: string | null;
     is_active: boolean;
+    signup_method?: string | null;
 }
 
 interface MemberAccount {
@@ -100,6 +101,7 @@ export default function MemberListPage() {
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         email: 200,
         joined: 100,
+        signupMethod: 80,
         name: 100,
         birth: 100,
         status: 60,
@@ -315,6 +317,7 @@ export default function MemberListPage() {
             const exportData = allMembers.map((m: Member) => ({
                 'ID': m.email,
                 '가입일': new Date(m.created_at).toLocaleDateString(),
+                '가입경로': m.signup_method || 'email',
                 '이름': m.name,
                 '생년월일': m.birth_date || '-',
                 '이메일': m.email,
@@ -411,6 +414,10 @@ export default function MemberListPage() {
                                         </div>
                                         <div onMouseDown={(e) => startResizing('joined', e)} className={styles.resizer} />
                                     </th>
+                                    <th style={{ width: columnWidths.signupMethod }} className="relative group p-3 text-xs font-bold text-gray-600 uppercase">
+                                        <div className="flex items-center gap-2 cursor-pointer select-none">가입경로</div>
+                                        <div onMouseDown={(e) => startResizing('signupMethod', e)} className={styles.resizer} />
+                                    </th>
                                     <th style={{ width: columnWidths.name }} className="relative group p-3 text-xs font-bold text-gray-600 uppercase">
                                         <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => handleSort('name')}>
                                             이름
@@ -478,6 +485,16 @@ export default function MemberListPage() {
                                             </td>
                                             <td className="p-3 text-xs text-slate-600">
                                                 {new Date(member.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="p-3 text-xs text-center">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                    member.signup_method === 'google' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 
+                                                    member.signup_method === 'kakao' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' : 
+                                                    'bg-slate-50 text-slate-600 border border-slate-100'
+                                                }`}>
+                                                    {member.signup_method === 'google' ? 'Google' : 
+                                                     member.signup_method === 'kakao' ? 'Kakao' : 'Email'}
+                                                </span>
                                             </td>
                                             <td className="p-3 text-xs font-medium text-slate-800">
                                                 {member.name}

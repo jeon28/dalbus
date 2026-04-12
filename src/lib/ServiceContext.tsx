@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from './supabase';
 
 export interface Service {
@@ -52,6 +53,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isHydrated, setIsHydrated] = useState(false);
+    const router = useRouter();
+    const pathname = usePathname();
 
     const isMounted = useRef(true);
     useEffect(() => {
@@ -180,6 +183,25 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('dalbus-user', JSON.stringify(userObj));
         }
     }, [user, fetchUserProfile, safeSetUser]);
+    
+    // Global Redirect Guard for Mandatory Profile Completion
+    useEffect(() => {
+        if (!isHydrated) return;
+
+        const publicPaths = ['/login', '/signup', '/public', '/api'];
+        const isPublicPath = publicPaths.some(path => pathname?.startsWith(path));
+        const isCompletePage = pathname === '/signup/complete';
+
+        if (user && !isPublicPath && !isCompletePage) {
+            // Check if profile is incomplete
+            const isProfileIncomplete = !user.phone || !user.birth_date;
+            
+            if (isProfileIncomplete) {
+                console.log('ServiceContext: Redirecting to profile completion');
+                router.replace('/signup/complete');
+            }
+        }
+    }, [user, isHydrated, pathname, router]);
 
     useEffect(() => {
         const init = async () => {

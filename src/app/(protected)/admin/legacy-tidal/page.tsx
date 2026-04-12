@@ -190,9 +190,9 @@ function LegacyTidalContent() {
     const [expiredDays, setExpiredDays] = useState(7);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-        checkbox: 30, login_id: 64, memo: 80, tidal_id: 110,
-        tidal_password: 100, buyer_name: 70, buyer_email: 110, buyer_phone: 95,
-        order_number: 100, start_date: 75, end_date: 75, period: 40, amount: 70
+        checkbox: 25, login_id: 60, tidal_id: 120,
+        tidal_password: 100, buyer_name: 60, buyer_email: 120, buyer_phone: 120,
+        order_number: 100, start_date: 70, end_date: 70, period: 35, amount: 60
     });
     const [, setResizingCol] = useState<string | null>(null);
 
@@ -839,63 +839,74 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 {isMoreMenuOpen && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setIsMoreMenuOpen(false)} />
-                                        <div className="absolute right-0 top-9 z-20 w-44 bg-white border rounded-lg shadow-lg py-1 text-sm">
-                                            <button
-                                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                                onClick={() => { setIsMoreMenuOpen(false); }}
-                                            >
-                                                <History className="w-4 h-4" /> 기타 메뉴 (준비중)
-                                            </button>
+                                        <div className="absolute right-0 top-9 z-20 w-32 bg-white border rounded-lg shadow-lg py-1 text-xs">
+                                            <div className="px-3 py-2 text-gray-400 text-center italic">메뉴 없음</div>
                                         </div>
                                     </>
                                 )}
                             </div>
                             
                             {/* Management Actions */}
-                    <div className="container flex flex-wrap items-center gap-2 px-4 py-2 bg-gray-50/50 rounded-lg border border-gray-100">
-                        {selectedAssignmentIds.size > 0 && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                                {Object.keys(editingSlots).some(key => editingSlots[key]) ? (
-                                    <Button 
-                                        variant="default" 
-                                        size="sm" 
-                                        className="h-8 bg-green-600 hover:bg-green-700 text-xs"
-                                        onClick={handleBulkSave}
-                                    >
-                                        일괄 저장
-                                    </Button>
-                                ) : (
-                                    <Button 
-                                        variant="default" 
-                                        size="sm" 
-                                        className="h-8 bg-blue-600 hover:bg-blue-700 text-xs"
-                                        onClick={handleBulkEdit}
-                                    >
-                                        정보 수정 ({selectedAssignmentIds.size})
-                                    </Button>
+                            <div className="container flex flex-wrap items-center gap-2 px-4 py-2 bg-gray-50/50 rounded-lg border border-gray-100">
+                                {selectedAssignmentIds.size > 0 && (
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {Object.keys(editingSlots).some(key => editingSlots[key]) ? (
+                                            <Button 
+                                                variant="default" 
+                                                size="sm" 
+                                                className="h-8 bg-green-600 hover:bg-green-700 text-xs"
+                                                onClick={handleBulkSave}
+                                            >
+                                                일괄 저장
+                                            </Button>
+                                        ) : (
+                                            <Button 
+                                                variant="default" 
+                                                size="sm" 
+                                                className="h-8 bg-blue-600 hover:bg-blue-700 text-xs"
+                                                onClick={handleBulkEdit}
+                                            >
+                                                정보 수정 ({selectedAssignmentIds.size})
+                                            </Button>
+                                        )}
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline" size="sm" className="h-8 text-xs">
+                                                    추가 관리 <ChevronDown size={14} className="ml-1" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40">
+                                                <DropdownMenuItem onClick={handleBulkMove} className="gap-2">
+                                                    <ArrowRightLeft size={14} /> 이동
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={handleBulkDeactivate} className="gap-2">
+                                                    <PowerOff size={14} /> 비활성화/활성
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600 gap-2">
+                                                    <Trash2 size={14} /> 삭제
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 )}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-8 text-xs">
-                                            추가 관리 <ChevronDown size={14} className="ml-1" />
+                                <div className="flex items-center gap-2 ml-auto">
+                                    {isGridView && (
+                                        <Button variant="default" size="sm" disabled={selectedAssignmentIds.size === 0} onClick={() => { setNotificationMessage(defaultTemplate); setIsNotifyModalOpen(true); }} className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-1 px-3 text-xs`}>
+                                            <Mail size={14} /> <span className="hidden sm:inline">알림</span> ({selectedAssignmentIds.size})
                                         </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                        <DropdownMenuItem onClick={handleBulkMove} className="gap-2">
-                                            <ArrowRightLeft size={14} /> 이동
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={handleBulkDeactivate} className="gap-2">
-                                            <PowerOff size={14} /> 비활성화/활성
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600 gap-2">
-                                            <Trash2 size={14} /> 삭제
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                    )}
+                                    {!isGridView && (
+                                        <Button onClick={() => setIsAddModalOpen(true)} className="gap-1 h-8 px-3 text-xs" size="sm">
+                                            <Plus size={14} /> <span className="hidden sm:inline">그룹 추가</span>
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                        <div className="flex items-center gap-2 ml-auto">
+                        </div>
+                    </div>
+                </div>
+            </header>
                             {isGridView && (
                                 <Button variant="default" size="sm" disabled={selectedAssignmentIds.size === 0} onClick={() => { setNotificationMessage(defaultTemplate); setIsNotifyModalOpen(true); }} className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-1 px-3 text-xs`}>
                                     <Mail size={14} /> <span className="hidden sm:inline">알림</span> ({selectedAssignmentIds.size})
@@ -915,25 +926,25 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 {isGridView ? (
                     /* ===== GRID VIEW ===== */
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
-                        <table className="w-full text-xs min-w-[840px]">
+                        <table className="w-full text-xs min-w-[840px] table-fixed">
                             <thead>
                                 <tr className="bg-gray-100 border-b">
                                     <th className="text-center py-2 border-r border-gray-200" style={{ width: columnWidths.checkbox }}>
                                         <input type="checkbox" checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length} onChange={() => toggleSelectAll(getFlattenedAssignments())} />
                                     </th>
                                     {[
-                                        { id: 'login_id', label: '번호', sortable: true },
+                                        { id: 'login_id', label: '그룹 ID', sortable: true },
                                         { id: 'tidal_id', label: 'Tidal ID', sortable: false },
                                         { id: 'buyer_name', label: '고객명', sortable: false },
                                         { id: 'buyer_email', label: '이메일', sortable: true },
-                                        { id: 'buyer_phone', label: '전화번호', sortable: false },
+                                        { id: 'buyer_phone', label: '연락처', sortable: false },
                                         { id: 'start_date', label: '시작일', sortable: true },
                                         { id: 'end_date', label: '종료일', sortable: true },
-                                        { id: 'period', label: '개월', sortable: true },
+                                        { id: 'period', label: '지속개월', sortable: true },
                                         { id: 'amount', label: '계약금액', sortable: true },
                                         { id: 'memo', label: '메모', sortable: false },
                                     ].map(col => (
-                                        <th key={col.id} className="relative px-1 py-1.5 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths[col.id] }}>
+                                        <th key={col.id} className="relative px-1 py-1.5 text-center border-r cursor-pointer hover:bg-gray-200" style={col.id !== 'memo' ? { width: columnWidths[col.id] } : {}}>
                                             <div className="flex items-center justify-center gap-1" onClick={() => col.sortable && handleSort(col.id)}>
                                                 {col.label} {sortConfig?.key === col.id && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
                                             </div>
@@ -1039,7 +1050,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="px-1 py-1.5 text-right border-r font-mono">{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                     </>
                                                 )}
-                                                <td className="px-1 py-1.5 border-r" style={{ width: columnWidths.memo }}>
+                                                <td className="px-1 py-1.5 border-r" style={item.assignment.id.startsWith('empty_') ? {} : {}}>
                                                     {!isEmpty && (
                                                         <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
                                                             <MessageSquareText size={12} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
