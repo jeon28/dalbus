@@ -190,9 +190,9 @@ function LegacyTidalContent() {
     const [expiredDays, setExpiredDays] = useState(7);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-        checkbox: 30, login_id: 64, memo: 80, tidal_id: 110,
-        tidal_password: 100, buyer_name: 70, buyer_email: 110, buyer_phone: 95,
-        order_number: 100, start_date: 75, end_date: 75, period: 40, amount: 70
+        checkbox: 20, login_id: 50, tidal_id: 120,
+        tidal_password: 100, buyer_name: 60, buyer_email: 120, buyer_phone: 90,
+        order_number: 100, start_date: 70, end_date: 70, period: 25, amount: 40
     });
     const [, setResizingCol] = useState<string | null>(null);
 
@@ -913,25 +913,25 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 {isGridView ? (
                     /* ===== GRID VIEW ===== */
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
-                        <table className="w-full text-xs min-w-[840px]">
+                        <table className="w-full text-xs min-w-[840px] table-fixed">
                             <thead>
                                 <tr className="bg-gray-100 border-b">
                                     <th className="text-center py-2 border-r border-gray-200" style={{ width: columnWidths.checkbox }}>
                                         <input type="checkbox" checked={selectedAssignmentIds.size > 0 && selectedAssignmentIds.size === getFlattenedAssignments().length} onChange={() => toggleSelectAll(getFlattenedAssignments())} />
                                     </th>
                                     {[
-                                        { id: 'login_id', label: '번호', sortable: true },
+                                        { id: 'login_id', label: '그룹 ID', sortable: true },
                                         { id: 'tidal_id', label: 'Tidal ID', sortable: false },
                                         { id: 'buyer_name', label: '고객명', sortable: false },
                                         { id: 'buyer_email', label: '이메일', sortable: true },
-                                        { id: 'buyer_phone', label: '전화번호', sortable: false },
+                                        { id: 'buyer_phone', label: '연락처', sortable: false },
                                         { id: 'start_date', label: '시작일', sortable: true },
                                         { id: 'end_date', label: '종료일', sortable: true },
-                                        { id: 'period', label: '개월', sortable: true },
+                                        { id: 'period', label: '지속개월', sortable: true },
                                         { id: 'amount', label: '계약금액', sortable: true },
                                         { id: 'memo', label: '메모', sortable: false },
                                     ].map(col => (
-                                        <th key={col.id} className="relative px-1 py-1.5 text-center border-r cursor-pointer hover:bg-gray-200" style={{ width: columnWidths[col.id] }}>
+                                        <th key={col.id} className="relative px-1 py-1.5 text-center border-r cursor-pointer hover:bg-gray-200" style={col.id !== 'memo' ? { width: columnWidths[col.id] } : {}}>
                                             <div className="flex items-center justify-center gap-1" onClick={() => col.sortable && handleSort(col.id)}>
                                                 {col.label} {sortConfig?.key === col.id && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
                                             </div>
@@ -1037,7 +1037,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="px-1 py-1.5 text-right border-r font-mono">{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                     </>
                                                 )}
-                                                <td className="px-1 py-1.5 border-r" style={{ width: columnWidths.memo }}>
+                                                <td className="px-1 py-1.5 border-r" style={item.assignment.id.startsWith('empty_') ? {} : {}}>
                                                     {!isEmpty && (
                                                         <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
                                                             <MessageSquareText size={12} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
