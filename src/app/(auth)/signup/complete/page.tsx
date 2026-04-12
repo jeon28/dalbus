@@ -390,7 +390,10 @@ export default function SignupCompletePage() {
 
                 <button
                     type="button"
-                    onClick={() => logout()}
+                    onClick={async () => {
+                        await supabase.auth.signOut();
+                        window.location.href = '/';
+                    }}
                     className="mt-4 w-full h-12 rounded-xl text-sm font-medium transition-all duration-200 border border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-2"
                     style={{
                         color: '#64748b',
