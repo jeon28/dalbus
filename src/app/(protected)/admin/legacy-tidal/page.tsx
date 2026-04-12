@@ -779,30 +779,30 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     return (
         <main className={styles.main}>
             <header className={`${styles.header} glass relative z-50`}>
-                <div className="container flex justify-between items-center bg-white/50 py-2 rounded-lg">
-                    <div className="flex items-center gap-4">
-                        <h1 className={styles.legacyTitle}>
-                            <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">Legacy</span>
-                            기존 Tidal 계정 관리
+                <div className="container flex flex-col lg:flex-row justify-between items-center bg-white/50 py-3 rounded-lg gap-4">
+                    <div className="flex w-full lg:w-auto items-center justify-between lg:justify-start gap-3 sm:gap-4 px-1">
+                        <h1 className={`${styles.legacyTitle} text-sm sm:text-base md:text-lg`}>
+                            <span className="hidden xs:inline bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">Legacy</span>
+                            기존 Tidal 관리
                         </h1>
-                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
-                            {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                            {isGridView ? 'List View' : 'Grid View'}
+                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8 shrink-0">
+                            {isGridView ? <List size={16} className="mr-1 sm:mr-2" /> : <LayoutGrid size={16} className="mr-1 sm:mr-2" />}
+                            <span className="text-xs sm:text-sm">{isGridView ? 'List View' : 'Grid View'}</span>
                         </Button>
                     </div>
-                    <div className="flex gap-2 items-center">
-                        <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
+                    <div className="flex flex-wrap w-full lg:w-auto items-center justify-center lg:justify-end gap-2 px-1">
+                        <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500 h-8">
                             <Search size={14} className="text-gray-400" />
-                            <Input type="text" placeholder="검색..." className="border-0 focus-visible:ring-0 h-8 w-32 text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <Input type="text" placeholder="검색..." className="border-0 focus-visible:ring-0 h-full w-24 sm:w-32 text-xs sm:text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 bg-white border rounded-md px-2 py-1">
-                                <span className="text-xs text-gray-500 whitespace-nowrap">잔여</span>
-                                <Input type="number" value={expiredDays} onChange={e => setExpiredDays(parseInt(e.target.value) || 0)} className="w-10 h-7 px-1 text-center text-sm border-none focus-visible:ring-0" />
-                                <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="flex items-center gap-1 bg-white border rounded-md px-1.5 sm:px-2 py-1 h-8">
+                                <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">잔여</span>
+                                <Input type="number" value={expiredDays} onChange={e => setExpiredDays(parseInt(e.target.value) || 0)} className="w-8 sm:w-10 h-full px-1 text-center text-xs sm:text-sm border-none focus-visible:ring-0" />
+                                <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">일</span>
                             </div>
-                            <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-1 h-7 px-2 text-xs">
-                                <Filter className="w-3.5 h-3.5" /> 잔여일
+                            <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-1 h-8 px-2 text-[10px] sm:text-xs">
+                                <Filter size={14} /> <span className="hidden xs:inline">잔여일</span>
                             </Button>
                             <Button 
                                 variant={sortConfig?.key === 'updated_at' ? "default" : "outline"}
@@ -814,17 +814,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         setSortConfig({ key: 'updated_at', direction: 'desc' });
                                     }
                                 }} 
-                                className="flex items-center gap-1 h-7 px-2 text-xs"
+                                className="flex items-center gap-1 h-8 px-2 text-[10px] sm:text-xs"
                             >
-                                <Zap className="w-3.5 h-3.5" /> 변경일
+                                <Zap size={14} /> <span className="hidden xs:inline">변경일</span>
                             </Button>
                             <Button 
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => router.push('/admin/legacy-tidal/inactive')} 
-                                className="flex items-center gap-1 h-7 px-2 text-xs"
+                                className="flex items-center gap-1 h-8 px-2 text-[10px] sm:text-xs"
                             >
-                                <History className="w-3.5 h-3.5" /> 비활성
+                                <History size={14} /> <span className="hidden xs:inline">비활성</span>
                             </Button>
                             <div className="relative">
                                 <input id="excel-import-lt" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportExcel} />
@@ -832,9 +832,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setIsMoreMenuOpen(v => !v)}
-                                    className="flex items-center gap-1 h-8"
+                                    className="flex items-center gap-1 h-8 px-2"
                                 >
-                                    <MoreHorizontal className="w-4 h-4" />
+                                    <MoreHorizontal size={16} />
                                 </Button>
                                 {isMoreMenuOpen && (
                                     <>
@@ -852,56 +852,58 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             </div>
                             
                             {/* Management Actions */}
-                            {selectedAssignmentIds.size > 0 && (
-                                <div className="flex items-center gap-1">
-                                    {Object.keys(editingSlots).some(key => editingSlots[key]) ? (
-                                        <Button 
-                                            variant="default" 
-                                            size="sm" 
-                                            className="h-8 bg-green-600 hover:bg-green-700"
-                                            onClick={handleBulkSave}
-                                        >
-                                            일괄 저장
+                    <div className="container flex flex-wrap items-center gap-2 px-4 py-2 bg-gray-50/50 rounded-lg border border-gray-100">
+                        {selectedAssignmentIds.size > 0 && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {Object.keys(editingSlots).some(key => editingSlots[key]) ? (
+                                    <Button 
+                                        variant="default" 
+                                        size="sm" 
+                                        className="h-8 bg-green-600 hover:bg-green-700 text-xs"
+                                        onClick={handleBulkSave}
+                                    >
+                                        일괄 저장
+                                    </Button>
+                                ) : (
+                                    <Button 
+                                        variant="default" 
+                                        size="sm" 
+                                        className="h-8 bg-blue-600 hover:bg-blue-700 text-xs"
+                                        onClick={handleBulkEdit}
+                                    >
+                                        정보 수정 ({selectedAssignmentIds.size})
+                                    </Button>
+                                )}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-8 text-xs">
+                                            추가 관리 <ChevronDown size={14} className="ml-1" />
                                         </Button>
-                                    ) : (
-                                        <Button 
-                                            variant="default" 
-                                            size="sm" 
-                                            className="h-8 bg-blue-600 hover:bg-blue-700"
-                                            onClick={handleBulkEdit}
-                                        >
-                                            정보 수정 ({selectedAssignmentIds.size})
-                                        </Button>
-                                    )}
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-8">
-                                                추가 관리 <ChevronDown size={14} className="ml-1" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-40">
-                                            <DropdownMenuItem onClick={handleBulkMove} className="gap-2">
-                                                <ArrowRightLeft size={14} /> 이동
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={handleBulkDeactivate} className="gap-2">
-                                                <PowerOff size={14} /> 비활성화/활성
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600 gap-2">
-                                                <Trash2 size={14} /> 삭제
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                            )}
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                        <DropdownMenuItem onClick={handleBulkMove} className="gap-2">
+                                            <ArrowRightLeft size={14} /> 이동
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={handleBulkDeactivate} className="gap-2">
+                                            <PowerOff size={14} /> 비활성화/활성
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600 gap-2">
+                                            <Trash2 size={14} /> 삭제
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2 ml-auto">
                             {isGridView && (
-                                <Button variant="default" size="sm" disabled={selectedAssignmentIds.size === 0} onClick={() => { setNotificationMessage(defaultTemplate); setIsNotifyModalOpen(true); }} className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-7 gap-1 px-2 text-xs`}>
-                                    <Mail className="w-3.5 h-3.5" /> 알림 ({selectedAssignmentIds.size})
+                                <Button variant="default" size="sm" disabled={selectedAssignmentIds.size === 0} onClick={() => { setNotificationMessage(defaultTemplate); setIsNotifyModalOpen(true); }} className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-1 px-3 text-xs`}>
+                                    <Mail size={14} /> <span className="hidden sm:inline">알림</span> ({selectedAssignmentIds.size})
                                 </Button>
                             )}
                             {!isGridView && (
-                                <Button onClick={() => setIsAddModalOpen(true)} className="gap-1 h-7 px-2 text-xs" size="sm">
-                                    <Plus className="w-3.5 h-3.5" /> 그룹 추가
+                                <Button onClick={() => setIsAddModalOpen(true)} className="gap-1 h-8 px-3 text-xs" size="sm">
+                                    <Plus size={14} /> <span className="hidden sm:inline">그룹 추가</span>
                                 </Button>
                             )}
                         </div>
@@ -1059,8 +1061,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </div>
                 ) : (
                     /* ===== LIST VIEW ===== */
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="grid grid-cols-14 gap-2 p-2 bg-gray-50 font-bold border-b text-xs">
+                    <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto min-w-full">
+                        <div className="min-w-[1280px]">
+                            <div className="grid grid-cols-14 gap-2 p-2 bg-gray-50 font-bold border-b text-xs">
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
                             <div className="col-span-2">결제계좌</div>
                             <div className="col-span-1 text-center font-bold">결제일</div>
@@ -1263,21 +1266,20 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 )}
             </div>
 
-            {/* ===== EXCEL ACTIONS (BOTTOM) ===== */}
-            <div className="container mt-8 mb-12 flex justify-center items-center gap-4 border-t border-gray-100 pt-8">
+            <div className="container mt-8 mb-12 flex flex-col sm:flex-row justify-center items-center gap-4 border-t border-gray-100 pt-8 px-4">
                 <Button 
                     variant="outline" 
                     onClick={() => document.getElementById('excel-import-lt')?.click()}
-                    className="flex items-center gap-2 bg-white hover:bg-green-50 text-green-700 border-green-200"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-green-50 text-green-700 border-green-200 h-10 px-6"
                 >
-                    <Upload className="w-4 h-4" /> 엑셀 가져오기 (Import)
+                    <Upload size={18} /> 엑셀 가져오기 (Import)
                 </Button>
                 <Button 
                     variant="outline" 
                     onClick={() => exportToExcel()}
-                    className="flex items-center gap-2 bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-blue-50 text-blue-700 border-blue-200 h-10 px-6"
                 >
-                    <Download className="w-4 h-4" /> 엑셀 내보내기 (Export)
+                    <Download size={18} /> 엑셀 내보내기 (Export)
                 </Button>
             </div>
 

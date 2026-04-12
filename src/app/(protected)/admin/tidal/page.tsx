@@ -1271,123 +1271,110 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     return (
         <main className={styles.main}>
-            <header className={`${styles.header} glass`}>
-                <div className="container flex justify-between items-center bg-white/50 py-2 rounded-lg">
-                    <div className="flex items-center gap-4">
-                        <h1 className={styles.title}>Tidal 계정 관리</h1>
-                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
-                            {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                            {isGridView ? 'List View' : 'Grid View'}
-                        </Button>
-                    </div>
-
-                    <div className="flex gap-2 items-center">
-                        {/* 1. 검색창 */}
-                        <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
-                            <Search size={14} className="text-gray-400" />
-                            <Input
-                                type="text"
-                                placeholder="고객명, Tidal ID, 전화번호 검색..."
-                                className="border-0 focus-visible:ring-0 h-8 w-60 text-sm"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+            <header className={`${styles.header} glass sticky top-0 z-50`}>
+                <div className="container mx-auto px-4 py-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <h1 className={`${styles.title} text-xl md:text-2xl`}>Tidal 계정 관리</h1>
+                                <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-9">
+                                    {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
+                                    <span className="hidden sm:inline">{isGridView ? 'List View' : 'Grid View'}</span>
+                                </Button>
+                            </div>
+                            <div className="md:hidden">
+                                <Button onClick={() => setIsAddModalOpen(true)} size="sm" className="h-9 gap-2">
+                                    <Plus size={16} /> 추가
+                                </Button>
+                            </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 bg-white border rounded-md px-2 py-1">
-                                <span className="text-xs text-gray-500 whitespace-nowrap">잔여</span>
+                        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                            {/* 1. 검색창 */}
+                            <div className="relative flex-1 sm:min-w-[200px] flex items-center bg-white border rounded-md px-3 focus-within:ring-2 focus-within:ring-blue-500 shadow-sm transition-all h-10">
+                                <Search size={16} className="text-gray-400 shrink-0" />
                                 <Input
-                                    type="number"
-                                    value={expiredDays}
-                                    onChange={(e) => setExpiredDays(parseInt(e.target.value) || 0)}
-                                    className="w-12 h-7 px-1 text-center text-sm border-none focus-visible:ring-0"
+                                    type="text"
+                                    placeholder="고객명, ID, 전화번호..."
+                                    className="border-0 focus-visible:ring-0 h-full w-full text-sm"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
                                 />
-                                <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
                             </div>
-                            <Button
-                                variant={showExpiredOnly ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setShowExpiredOnly(!showExpiredOnly)}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <Filter className="w-4 h-4" />
-                                잔여일 조회
-                            </Button>
-                            <Button
-                                variant={showDeletedOnly ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setShowDeletedOnly(!showDeletedOnly)}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                삭제 데이터
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push('/admin/tidal/inactive')}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <History className="w-4 h-4" />
-                                내역
-                            </Button>
-                            <div className="h-4 w-px bg-gray-200" />
-                            <div className="relative">
-                                <input
-                                    id="excel-import"
-                                    type="file"
-                                    accept=".xlsx, .xls"
-                                    className="hidden"
-                                    onChange={handleImportExcel}
-                                />
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-1 bg-white border rounded-md px-2 h-9 shadow-sm">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase">EXP</span>
+                                    <Input
+                                        type="number"
+                                        value={expiredDays}
+                                        onChange={(e) => setExpiredDays(parseInt(e.target.value) || 0)}
+                                        className="w-10 h-7 px-1 text-center text-sm border-none focus-visible:ring-0 font-bold"
+                                    />
+                                    <span className="text-[10px] text-gray-500">일</span>
+                                </div>
+                                <Button
+                                    variant={showExpiredOnly ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                    className="h-9 gap-1 text-xs"
+                                >
+                                    <Filter className="w-4 h-4" />
+                                    <span className="hidden lg:inline">잔여일 조회</span>
+                                </Button>
+                                <Button
+                                    variant={showDeletedOnly ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setShowDeletedOnly(!showDeletedOnly)}
+                                    className="h-9 gap-1 text-xs"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    <span className="hidden lg:inline">삭제 데이터</span>
+                                </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => document.getElementById('excel-import')?.click()}
-                                    className="flex items-center gap-2 h-8"
+                                    onClick={() => router.push('/admin/tidal/inactive')}
+                                    className="h-9 gap-1 text-xs"
                                 >
-                                    <Upload className="w-4 h-4" />
-                                    엑셀
+                                    <History className="w-4 h-4" />
+                                    <span className="hidden lg:inline">비활성 내역</span>
                                 </Button>
+                                
+                                <div className="hidden md:flex items-center gap-2">
+                                    <div className="h-4 w-px bg-gray-200 mx-1" />
+                                    <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-9 shadow-md" size="sm">
+                                        <Plus size={16} /> <span className="hidden lg:inline text-xs">그룹 추가</span>
+                                    </Button>
+                                </div>
                             </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={exportToExcel}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <Download className="w-4 h-4" />
-                                엑셀
-                            </Button>
-
-                            {isGridView && (
-                                <Button
-                                    variant="default"
-                                    size="sm"
-                                    disabled={selectedAssignmentIds.size === 0}
-                                    onClick={() => {
-                                        setNotificationMessage(defaultTemplate);
-                                        setIsNotifyModalOpen(true);
-                                    }}
-                                    className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}
-                                >
-                                    <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
-                                </Button>
-                            )}
-
-                            <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8" size="sm">
-                                <Plus size={16} /> 그룹 추가
-                            </Button>
                         </div>
                     </div>
+                    
+                    {/* 모바일 하단 알림 보내기 버튼 (Grid View 선택 시) */}
+                    {isGridView && selectedAssignmentIds.size > 0 && (
+                        <div className="mt-4 flex animate-in slide-in-from-top duration-300">
+                             <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => {
+                                    setNotificationMessage(defaultTemplate);
+                                    setIsNotifyModalOpen(true);
+                                }}
+                                className="w-full bg-orange-600 hover:bg-orange-700 h-10 gap-2 shadow-lg"
+                            >
+                                <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size}개 행 선택됨)
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </header>
 
-            <div className={`${styles.content} container`}>
+            <div className={`${styles.content} container mx-auto px-4 py-6 pb-24`}>
                 {isGridView ? (
-                    <div className="bg-white rounded-lg shadow overflow-x-auto">
-                        <table className="w-full text-sm min-w-[1400px]">
+                    <div className="bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100/80 sticky top-0 z-10 border-b border-gray-200 shadow-sm text-sm">
                                     <th className="relative p-2 text-center border-r border-gray-100" style={{ width: columnWidths['checkbox'] }}>
@@ -1709,8 +1696,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         </table>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-base">
+                    <div className="bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-base min-w-[1200px]">
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>
                                 GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
@@ -2536,7 +2524,36 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         </div>
                     )}
                 </DialogContent>
-            </Dialog>
+            {/* Excel Actions (Responsive) */}
+            <div className="fixed bottom-6 right-6 flex flex-col sm:flex-row gap-3 z-40 pointer-events-none">
+                <div className="flex gap-2 pointer-events-auto">
+                    <div className="relative">
+                        <input
+                            id="excel-import"
+                            type="file"
+                            accept=".xlsx, .xls"
+                            className="hidden"
+                            onChange={handleImportExcel}
+                        />
+                        <Button
+                            variant="secondary"
+                            onClick={() => document.getElementById('excel-import')?.click()}
+                            className="bg-green-600 hover:bg-green-700 text-white shadow-xl h-12 px-6 rounded-full gap-2 transition-transform hover:scale-105"
+                        >
+                            <Upload className="w-5 h-5" />
+                            <span className="font-bold">엑셀 가져오기</span>
+                        </Button>
+                    </div>
+                    <Button
+                        variant="secondary"
+                        onClick={exportToExcel}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-xl h-12 px-6 rounded-full gap-2 transition-transform hover:scale-105"
+                    >
+                        <Download className="w-5 h-5" />
+                        <span className="font-bold">엑셀 내보내기</span>
+                    </Button>
+                </div>
+            </div>
         </main >
     );
 }

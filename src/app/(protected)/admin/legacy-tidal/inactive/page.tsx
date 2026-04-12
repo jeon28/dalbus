@@ -275,48 +275,49 @@ function LegacyTidalInactiveContent() {
 
     return (
         <main className={styles.main}>
-            <header className={`${styles.header} glass`}>
-                <div className="container flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-                            <ArrowLeft size={20} />
+            <header className={`${styles.header} glass border-b border-gray-100`}>
+                <div className="container flex flex-col md:flex-row justify-between items-center gap-4 px-4">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-8 w-8 p-0">
+                            <ArrowLeft size={18} />
                         </Button>
-                        <h1 className={styles.title}>
-                            {showDeleted ? '삭제된 데이터 (휴지통)' : '기존 Tidal 지난 배정 내역 (비활성)'}
+                        <h1 className={`${styles.title} text-sm sm:text-base line-clamp-1`}>
+                            {showDeleted ? '삭제 데이터 (휴지통)' : 'Tidal 지난 내역 (비활성)'}
                         </h1>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full md:w-auto justify-end">
                         <Button 
                             onClick={() => setShowDeleted(!showDeleted)} 
                             variant={showDeleted ? "default" : "outline"} 
-                            className="gap-2"
+                            size="sm"
+                            className="gap-1.5 h-8 text-xs flex-1 md:flex-none"
                         >
-                            {showDeleted ? <History size={16} /> : <Trash2 size={16} />}
-                            {showDeleted ? '내역 보기' : '삭제 내역'}
+                            {showDeleted ? <History size={14} /> : <Trash2 size={14} />}
+                            <span>{showDeleted ? '내역 보기' : '삭제 내역'}</span>
                         </Button>
-                        <Button onClick={exportToExcel} variant="outline" className="gap-2">
-                            <Download size={16} /> 엑셀 다운로드
+                        <Button onClick={exportToExcel} variant="outline" size="sm" className="gap-1.5 h-8 text-xs flex-1 md:flex-none">
+                            <Download size={14} /> <span>엑셀</span>
                         </Button>
                     </div>
                 </div>
             </header>
 
-            <div className={`${styles.content} container`}>
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="w-full text-xs">
+            <div className={`${styles.content} container px-4 py-6`}>
+                <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto w-full">
+                    <table className="w-full text-[10px] sm:text-xs min-w-[900px]">
                         <thead>
-                            <tr className="bg-gray-100 border-b">
-                                <th className="p-3 text-center w-12">No</th>
-                                <th className="p-3 text-center">배정번호</th>
-                                <th className="p-3 text-left">Master ID</th>
-                                <th className="p-3 text-left">Tidal ID</th>
-                                <th className="p-3 text-left">구매자</th>
-                                <th className="p-3 text-left">연락처</th>
-                                <th className="p-3 text-left">이메일</th>
-                                <th className="p-3 text-center">기간</th>
-                                <th className="p-3 text-center">배정일시</th>
-                                {showDeleted && <th className="p-3 text-center">삭제일시</th>}
-                                <th className="p-3 text-center">관리</th>
+                            <tr className="bg-gray-50 border-b">
+                                <th className="p-2 sm:p-3 text-center w-10 sm:w-12">No</th>
+                                <th className="p-2 sm:p-3 text-center">배정번호</th>
+                                <th className="p-2 sm:p-3 text-left">Master ID</th>
+                                <th className="p-2 sm:p-3 text-left">Tidal ID</th>
+                                <th className="p-2 sm:p-3 text-left">구매자</th>
+                                <th className="p-2 sm:p-3 text-left">연락처</th>
+                                <th className="p-2 sm:p-3 text-left">이메일</th>
+                                <th className="p-2 sm:p-3 text-center">기간</th>
+                                <th className="p-2 sm:p-3 text-center">배정일시</th>
+                                {showDeleted && <th className="p-2 sm:p-3 text-center">삭제일시</th>}
+                                <th className="p-2 sm:p-3 text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody>

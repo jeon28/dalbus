@@ -1179,97 +1179,20 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     return (
         <main className={styles.main}>
-            <header className={`${styles.header} glass`}>
-                <div className="container flex justify-between items-center bg-white/50 py-2 rounded-lg">
-                    <div className="flex items-center gap-4">
-                        <h1 className={styles.title}>HifiTidal 계정 관리</h1>
-                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
-                            {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                            {isGridView ? 'List View' : 'Grid View'}
-                        </Button>
-                    </div>
-
-                    <div className="flex gap-2 items-center">
-                        {/* 1. 검색창 */}
-                        <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
-                            <Search size={14} className="text-gray-400" />
-                            <Input
-                                type="text"
-                                placeholder="고객명, Tidal ID, 전화번호 검색..."
-                                className="border-0 focus-visible:ring-0 h-8 w-60 text-sm"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+            <header className={`${styles.header} sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b shadow-sm`}>
+                <div className="container mx-auto px-4 py-3 space-y-3">
+                    {/* Top Row: Title & Main Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-xl font-bold text-gray-800 whitespace-nowrap">HifiTidal 관리</h1>
+                            <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-9 rounded-full px-4 shadow-sm hover:shadow-md transition-all">
+                                {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
+                                <span className="hidden sm:inline">{isGridView ? 'List View' : 'Grid View'}</span>
+                            </Button>
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 bg-white border rounded-md px-2 py-1">
-                                <span className="text-xs text-gray-500 whitespace-nowrap">잔여</span>
-                                <Input
-                                    type="number"
-                                    value={expiredDays}
-                                    onChange={(e) => setExpiredDays(parseInt(e.target.value) || 0)}
-                                    className="w-12 h-7 px-1 text-center text-sm border-none focus-visible:ring-0"
-                                />
-                                <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
-                            </div>
-                            <Button
-                                variant={showExpiredOnly ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setShowExpiredOnly(!showExpiredOnly)}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <Filter className="w-4 h-4" />
-                                잔여일 조회
-                            </Button>
-                            <Button
-                                variant={showDeletedOnly ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setShowDeletedOnly(!showDeletedOnly)}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                삭제 데이터
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push('/admin/hifitidal/inactive')}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <History className="w-4 h-4" />
-                                내역
-                            </Button>
-                            <div className="h-4 w-px bg-gray-200" />
-                            <div className="relative">
-                                <input
-                                    id="excel-import"
-                                    type="file"
-                                    accept=".xlsx, .xls"
-                                    className="hidden"
-                                    onChange={handleImportExcel}
-                                />
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => document.getElementById('excel-import')?.click()}
-                                    className="flex items-center gap-2 h-8"
-                                >
-                                    <Upload className="w-4 h-4" />
-                                    엑셀
-                                </Button>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={exportToExcel}
-                                className="flex items-center gap-2 h-8"
-                            >
-                                <Download className="w-4 h-4" />
-                                엑셀
-                            </Button>
-
-                            {isGridView && (
+                             {isGridView && (
                                 <Button
                                     variant="default"
                                     size="sm"
@@ -1278,24 +1201,95 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         setNotificationMessage(defaultTemplate);
                                         setIsNotifyModalOpen(true);
                                     }}
-                                    className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''} h-8 gap-2`}
+                                    className={`${selectedAssignmentIds.size > 0 ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-200'} h-9 rounded-full shadow-sm transition-all text-sm font-medium`}
                                 >
-                                    <Mail size={16} /> 알림 보내기 ({selectedAssignmentIds.size})
+                                    <Mail size={16} className={selectedAssignmentIds.size > 0 ? "mr-1" : ""} />
+                                    <span className="hidden sm:inline">알림 보내기</span> 
+                                    {selectedAssignmentIds.size > 0 && <span className="ml-1 inline-flex items-center justify-center bg-white text-orange-600 rounded-full w-5 h-5 text-[10px] font-black">{selectedAssignmentIds.size}</span>}
                                 </Button>
                             )}
+                            <Button onClick={() => setIsAddModalOpen(true)} className="h-9 rounded-full bg-blue-600 hover:bg-blue-700 shadow-sm transition-all text-sm font-medium px-4" size="sm">
+                                <Plus size={16} className="sm:mr-1" />
+                                <span className="hidden sm:inline">그룹 추가</span>
+                            </Button>
+                        </div>
+                    </div>
 
-                            <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-8" size="sm">
-                                <Plus size={16} /> 그룹 추가
+                    {/* Bottom Row: Filters & Search (Responsive layout) */}
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                        {/* Search & Expiry - Limited to < 50% on desktop */}
+                        <div className="flex flex-1 items-center gap-2 max-w-full md:max-w-[45%]">
+                            <div className="relative flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-lg px-3 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
+                                <Search size={14} className="text-gray-400 mr-2" />
+                                <Input
+                                    type="text"
+                                    placeholder="검색 (이름, ID, 번호)"
+                                    className="border-0 bg-transparent focus-visible:ring-0 h-9 p-0 text-sm w-full"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex items-center bg-white border border-gray-200 rounded-lg px-2 h-9">
+                                <span className="text-xs text-gray-500 mr-1">잔여</span>
+                                <input
+                                    type="number"
+                                    value={expiredDays}
+                                    onChange={(e) => setExpiredDays(parseInt(e.target.value) || 0)}
+                                    className="w-10 h-full text-center text-sm border-none focus:outline-none bg-transparent font-medium"
+                                />
+                                <span className="text-xs text-gray-500 mr-2">일</span>
+                                <button
+                                    onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                    className={`p-1.5 rounded-md transition-all ${showExpiredOnly ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-400'}`}
+                                    title="잔여일 조회"
+                                >
+                                    <Filter className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* View Filters */}
+                        <div className="flex items-center justify-end gap-1">
+                            <Button
+                                variant={showDeletedOnly ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setShowDeletedOnly(!showDeletedOnly)}
+                                className={`h-9 gap-1.5 rounded-lg text-xs font-medium transition-all ${showDeletedOnly ? 'bg-red-500 hover:bg-red-600' : 'hover:bg-gray-50'}`}
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">삭제 데이터</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push('/admin/hifitidal/inactive')}
+                                className="h-9 gap-1.5 rounded-lg text-xs font-medium border-gray-200 hover:bg-gray-50 transition-all"
+                            >
+                                <History className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">내역</span>
                             </Button>
                         </div>
                     </div>
                 </div>
             </header>
 
-            <div className={`${styles.content} container`}>
+            <div className={`${styles.content} container mx-auto px-4 py-6`}>
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Status</span>
+                        <span>전체 계정 현황 (HifiTidal)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                         <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                         <span className="text-xs text-gray-400">데이터가 실시간으로 동기화됩니다.</span>
+                    </div>
+                </div>
+
                 {isGridView ? (
-                    <div className="bg-white rounded-lg shadow overflow-x-auto">
-                        <table className="w-full text-sm min-w-[1400px]">
+                    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto custom-scrollbar">
+                            <table className="w-full text-sm min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100/80 sticky top-0 z-10 border-b border-gray-200 shadow-sm text-sm">
                                     <th className="relative p-2 text-center border-r border-gray-100" style={{ width: columnWidths['checkbox'] }}>
@@ -1610,10 +1604,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 })()}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50 font-bold border-b text-base">
+                    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50/80 font-bold border-b text-sm text-gray-600 min-w-[1200px]">
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>
                                 GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
@@ -1718,7 +1714,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                 return (
                                     <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
-                                        <div className="grid grid-cols-13 gap-4 p-4 items-center text-base">
+                                        <div className="grid grid-cols-13 gap-4 p-4 items-center text-sm min-w-[1200px]">
                                             <div className="col-span-1 text-gray-700 font-medium cursor-pointer truncate" title={acc.login_id} onClick={() => toggleRow(acc.id)}>
                                                 {acc.login_id}
                                             </div>
@@ -1954,6 +1950,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     </div>
                                 );
                             })}
+                        </div>
                     </div>
                 )}
             </div>
@@ -2427,6 +2424,59 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Bottom Actions Section (Excel, etc.) */}
+            <div className="container mx-auto px-4 py-8 mt-4 border-t border-gray-100">
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 shadow-inner">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="space-y-1 text-center md:text-left">
+                            <h3 className="text-lg font-bold text-gray-800">데이터 관리 (Excel)</h3>
+                            <p className="text-sm text-gray-500">배정 데이터를 엑셀 파일로 백업하거나 일괄 업로드할 수 있습니다.</p>
+                        </div>
+                        
+                        <div className="flex flex-wrap justify-center gap-3">
+                            <div className="relative">
+                                <input
+                                    id="excel-import-bottom"
+                                    type="file"
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                    onChange={handleImportExcel}
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="lg"
+                                    onClick={() => document.getElementById('excel-import-bottom')?.click()}
+                                    className="bg-white hover:bg-green-50 hover:text-green-700 hover:border-green-200 h-14 px-8 rounded-xl shadow-sm transition-all flex items-center gap-3 font-semibold border-gray-200"
+                                >
+                                    <div className="bg-green-100 p-2 rounded-lg text-green-600">
+                                        <Upload className="w-5 h-5" />
+                                    </div>
+                                    엑셀 데이터 가져오기 (Import)
+                                </Button>
+                            </div>
+                            
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                onClick={exportToExcel}
+                                className="bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 h-14 px-8 rounded-xl shadow-sm transition-all flex items-center gap-3 font-semibold border-gray-200"
+                            >
+                                <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                                    <Download className="w-5 h-5" />
+                                </div>
+                                엑셀 데이터 내보내기 (Export)
+                            </Button>
+                        </div>
+                    </div>
+                    
+                    <div className="mt-6 pt-6 border-t border-dashed border-gray-200 flex flex-wrap justify-center gap-4 text-xs text-gray-400">
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400"></span> 형식: .xlsx, .xls 지원</span>
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span> 백업 전용 데이터 포맷 사용</span>
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span> 마지막 업데이트: {new Date().toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
         </main >
     );
 }

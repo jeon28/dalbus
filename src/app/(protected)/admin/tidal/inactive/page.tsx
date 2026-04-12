@@ -152,91 +152,121 @@ function InactiveAccountsContent() {
     if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
     return (
-        <main className={styles.main}>
-            <header className={`${styles.header} glass`}>
-                <div className="container flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-                            <ArrowLeft size={20} />
+        <main className={`${styles.main} bg-gray-50 min-h-screen pb-20 md:pb-8`}>
+            <header className={`${styles.header} glass sticky top-0 z-10 py-3 md:py-4`}>
+                <div className="container mx-auto px-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4">
+                        <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-8 w-8 p-0">
+                            <ArrowLeft size={18} />
                         </Button>
-                        <h1 className={styles.title}>Tidal 지난 배정 내역 (비활성)</h1>
+                        <h1 className={`${styles.title} text-lg md:text-xl font-bold truncate`}>Tidal 지난 배정 내역 (비활성)</h1>
                     </div>
-                    <div>
-                        <Button onClick={exportToExcel} variant="outline" className="gap-2">
+                    <div className="hidden sm:block">
+                        <Button onClick={exportToExcel} variant="outline" className="gap-2 bg-white/50 hover:bg-white shadow-sm transition-all duration-200">
                             <Download size={16} /> 엑셀 다운로드
                         </Button>
                     </div>
                 </div>
             </header>
 
-            <div className={`${styles.content} container`}>
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="w-full text-xs">
-                        <thead>
-                            <tr className="bg-gray-100 border-b">
-                                <th className="p-3 text-center w-12">No</th>
-                                <th className="p-3 text-center">배정번호</th>
-                                <th className="p-3 text-left">Tidal ID</th>
-                                <th className="p-3 text-left">구매자</th>
-                                <th className="p-3 text-left">연락처</th>
-                                <th className="p-3 text-center">기간</th>
-                                <th className="p-3 text-center">배정일시</th>
-                                <th className="p-3 text-center">관리</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {assignments.length === 0 ? (
-                                <tr>
-                                    <td colSpan={9} className="p-8 text-center text-gray-500">
-                                        지난 내역이 없습니다.
-                                    </td>
+            <div className={`${styles.content} container mx-auto px-4 mt-6`}>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto scrollbar-hide">
+                        <table className="w-full text-xs min-w-[800px]">
+                            <thead>
+                                <tr className="bg-gray-50/80 border-b">
+                                    <th className="p-3 text-center w-12 font-semibold text-gray-600">No</th>
+                                    <th className="p-3 text-center font-semibold text-gray-600">배정번호</th>
+                                    <th className="p-3 text-left font-semibold text-gray-600">Tidal ID</th>
+                                    <th className="p-3 text-left font-semibold text-gray-600">구매자</th>
+                                    <th className="p-3 text-left font-semibold text-gray-600">연락처</th>
+                                    <th className="p-3 text-center font-semibold text-gray-600">기간</th>
+                                    <th className="p-3 text-center font-semibold text-gray-600">배정일시</th>
+                                    <th className="p-3 text-center font-semibold text-gray-600">관리</th>
                                 </tr>
-                            ) : (
-                                assignments.map((a: AssignmentHistory & { isEmpty?: boolean }, idx) => {
-                                    const isEmpty = a.isEmpty === true;
-                                    return (
-                                        <tr key={a.id} className={`border-b hover:bg-gray-50 h-10 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                            <td className="p-2 text-center opacity-70">{idx + 1}</td>
-                                            <td className="p-2 text-center font-bold">
-                                                {a.accounts?.login_id || '-'}-{a.slot_number + 1}
-                                            </td>
-                                            <td className="p-2">{a.tidal_id}</td>
-                                            <td className="p-2 font-bold">
-                                                {isEmpty ? '빈 슬롯' : (a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-')}
-                                            </td>
-                                            <td className="p-2">{a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'}</td>
-                                            <td className="p-2 text-center text-[10px] opacity-80">
-                                                {isEmpty ? '-' : `${a.start_date} ~ ${a.end_date}`}
-                                            </td>
-                                            <td className="p-2 text-center text-[10px] opacity-70">
-                                                {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
-                                            </td>
-                                            <td className="p-2 text-center">
-                                                {isEmpty ? (
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="ghost" 
-                                                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
-                                                        onClick={() => router.push(`/admin/tidal?accountId=${a.accounts?.id || ''}&slotIdx=${a.slot_number}&action=assign`)} 
-                                                        title="배정하기"
-                                                    >
-                                                        <Pencil size={16} />
-                                                    </Button>
-                                                ) : (
-                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-700" onClick={() => handleDelete(a.id)} title="영구 삭제">
-                                                        <Trash2 size={16} />
-                                                    </Button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {assignments.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={8} className="p-12 text-center text-gray-400 bg-white">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <div className="p-4 bg-gray-50 rounded-full">
+                                                    <Trash2 size={24} className="text-gray-300" />
+                                                </div>
+                                                <p>지난 내역이 없습니다.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    assignments.map((a: AssignmentHistory & { isEmpty?: boolean }, idx) => {
+                                        const isEmpty = a.isEmpty === true;
+                                        return (
+                                            <tr key={a.id} className={`transition-colors h-11 ${isEmpty ? 'bg-emerald-50/30 hover:bg-emerald-50/50 text-emerald-800' : 'bg-rose-50/30 hover:bg-rose-50/50 text-rose-800'}`}>
+                                                <td className="p-2 text-center text-gray-400 font-medium">{idx + 1}</td>
+                                                <td className="p-2 text-center font-bold">
+                                                    <span className="bg-white/50 px-2 py-0.5 rounded border border-current/10">
+                                                        {a.accounts?.login_id || '-'}-{a.slot_number + 1}
+                                                    </span>
+                                                </td>
+                                                <td className="p-2 font-medium">{a.tidal_id}</td>
+                                                <td className="p-2 font-bold">
+                                                    {isEmpty ? (
+                                                        <span className="text-emerald-600">빈 슬롯</span>
+                                                    ) : (
+                                                        <span className="text-rose-600">{a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-'}</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-2 text-gray-600">{a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'}</td>
+                                                <td className="p-2 text-center text-[10px] text-gray-500 font-medium">
+                                                    {isEmpty ? '-' : `${a.start_date} ~ ${a.end_date}`}
+                                                </td>
+                                                <td className="p-2 text-center text-[10px] text-gray-400">
+                                                    {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    {isEmpty ? (
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="ghost" 
+                                                            className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50 rounded-lg transition-colors" 
+                                                            onClick={() => router.push(`/admin/tidal?accountId=${a.accounts?.id || ''}&slotIdx=${a.slot_number}&action=assign`)} 
+                                                            title="배정하기"
+                                                        >
+                                                            <Pencil size={14} />
+                                                        </Button>
+                                                    ) : (
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="ghost" 
+                                                            className="h-8 w-8 p-0 text-rose-400 hover:text-rose-600 hover:bg-rose-100/50 rounded-lg transition-colors" 
+                                                            onClick={() => handleDelete(a.id)} 
+                                                            title="영구 삭제"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+
+            {/* Mobile Floating Action Button */}
+            <div className="fixed bottom-6 right-6 flex flex-col gap-3 sm:hidden z-20">
+                <Button 
+                    onClick={exportToExcel} 
+                    className="w-12 h-12 rounded-full shadow-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center p-0 border-none transition-transform active:scale-95"
+                >
+                    <Download size={20} />
+                </Button>
+            </div>
         </main>
+
     );
 }
 

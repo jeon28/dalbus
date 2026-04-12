@@ -194,15 +194,18 @@ export default function AdminPage() {
 
     return (
         <main className={styles.main}>
-            <header className={`${styles.header} glass`}>
-                <div className="container flex justify-between items-center px-4">
-                    <h1 className={styles.title}>관리자 대시보드</h1>
+            <header className={`${styles.header} glass border-b border-gray-100`}>
+                <div className="container flex flex-col sm:flex-row justify-between items-center px-4 gap-3 sm:gap-0">
+                    <h1 className={`${styles.title} text-center sm:text-left`}>관리자 대시보드</h1>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 hidden xs:inline">Today: {new Date().toLocaleDateString()}</span>
+                    </div>
                 </div>
             </header>
 
-            <div className={`${styles.content} container px-4 pb-20`}>
+            <div className={`${styles.content} container px-4 pb-20 pt-6 sm:pt-8`}>
                 <section className={styles.stats}>
-                    <div className={`${styles.statCard} glass shadow-sm`}>
+                    <div className={`${styles.statCard} glass shadow-sm border-l-4 border-l-orange-500`}>
                         <span className="text-gray-500 font-medium">대기 중인 분배</span>
                         <strong className="text-2xl mt-1">{waitingDistributions}</strong>
                     </div>
@@ -216,9 +219,9 @@ export default function AdminPage() {
                     </div>
                 </section>
 
-                <div className="mt-8 mb-12 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                    <p className="text-sm text-gray-500">
-                        * 대시보드는 현황을 요약하여 보여줍니다. 상세 관리는 상단 메뉴를 이용해 주세요.
+                <div className="mt-6 mb-8 p-4 bg-gray-50/80 rounded-lg border border-dashed border-gray-200">
+                    <p className="text-xs sm:text-sm text-gray-500 text-center sm:text-left">
+                        * 대시보드는 현황을 요약하여 보여줍니다. 상세 관리는 상단 메뉴 또는 사이드바를 이용해 주세요.
                     </p>
                 </div>
 
