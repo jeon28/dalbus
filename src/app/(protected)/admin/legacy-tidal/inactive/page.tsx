@@ -422,7 +422,7 @@ function LegacyTidalInactiveContent() {
                                             <td className="p-1 truncate max-w-[100px]">{a.buyer_phone || '-'}</td>
                                             <td className="p-1 truncate max-w-[120px]">{a.buyer_email || '-'}</td>
                                             <td className="p-1 text-center text-[9px] opacity-80 whitespace-nowrap">
-                                                {isEmpty ? '-' : `${a.start_date.split('-').slice(1).join('/')} ~ ${a.end_date.split('-').slice(1).join('/')}`}
+                                                {isEmpty ? '-' : `${(a.start_date || '').split('-').slice(1).join('/')} ~ ${(a.end_date || '').split('-').slice(1).join('/')}`}
                                             </td>
                                             <td className="p-1 text-center text-[9px] opacity-70">
                                                 {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
