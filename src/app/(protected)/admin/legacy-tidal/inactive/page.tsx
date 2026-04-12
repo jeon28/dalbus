@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History } from 'lucide-react';
+import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History, MessageSquareText, Save } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,7 @@ interface LegacyTidalHistory {
     updated_at?: string;
     master_id?: string;
     account_id?: string;
+    memo?: string;
     accounts?: {
         id: string;
         login_id: string;
@@ -60,11 +61,15 @@ function LegacyTidalInactiveContent() {
     const [editAssignData, setEditAssignData] = useState<EditAssignFormData | null>(null);
     const [activeEditAccountId, setActiveEditAccountId] = useState<string | null>(null);
     const [activeEditSlotIdx, setActiveEditSlotIdx] = useState<number | null>(null);
-
-    // Tidal Login Popup state
-    const [tidalLoginEmail, setTidalLoginEmail] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+
+    // Memo modal state
+    const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
+    const [currentMemoInput, setCurrentMemoInput] = useState('');
+    const [memoTargetAccountId, setMemoTargetAccountId] = useState('');
+    const [memoTargetSlotIdx, setMemoTargetSlotIdx] = useState<number | null>(null);
+    const [memoTargetAssignmentId, setMemoTargetAssignmentId] = useState('');
 
     const handleMasterIdClick = (e: React.MouseEvent, id?: string) => {
         e.stopPropagation();
@@ -207,40 +212,95 @@ function LegacyTidalInactiveContent() {
         }
     };
 
-    const openEditModal = (accountId: string, slotIdx: number, loginId: string) => {
+    const openEditModal = (accountId: string, slotIdx: number, assignment?: LegacyTidalHistory) => {
         setActiveEditAccountId(accountId);
         setActiveEditSlotIdx(slotIdx);
-        setEditAssignData({
-            assignment_number: `${loginId}-${slotIdx + 1}`,
-            buyer_name: '',
-            buyer_phone: '',
-            buyer_email: '',
-            tidal_id: '',
-            start_date: '',
-            end_date: '',
-            period_months: 0,
-            amount: 0,
-            memo: '',
-        });
+        if (assignment && !assignment.isEmpty) {
+            setSelectedAssignmentId(assignment.id);
+            setEditAssignData({
+                assignment_number: `${assignment.accounts?.login_id || '-'}-${assignment.slot_number + 1}`,
+                buyer_name: assignment.buyer_name || '',
+                buyer_phone: assignment.buyer_phone || '',
+                buyer_email: assignment.buyer_email || '',
+                tidal_id: assignment.tidal_id || '',
+                start_date: assignment.start_date || '',
+                end_date: assignment.end_date || '',
+                period_months: 0, // Will be calculated if needed
+                amount: 0,
+                memo: assignment.memo || '',
+            });
+        } else {
+            setSelectedAssignmentId(null);
+            setEditAssignData({
+                assignment_number: `${assignment?.accounts?.login_id || '-'}-${slotIdx + 1}`,
+                buyer_name: '',
+                buyer_phone: '',
+                buyer_email: '',
+                tidal_id: '',
+                start_date: '',
+                end_date: '',
+                period_months: 0,
+                amount: 0,
+                memo: '',
+            });
+        }
         setIsEditAssignModalOpen(true);
     };
 
     const handleUpdateEditAssign = async () => {
-        if (!activeEditAccountId || activeEditSlotIdx === null || !editAssignData) return;
-        if (!editAssignData.buyer_name && !editAssignData.buyer_email) {
-            alert('이름 또는 ID(이메일)를 입력해주세요.');
-            return;
-        }
+        if (!activeEditAccountId || !editAssignData) return;
+        
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal/assign/${activeEditAccountId}`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ ...editAssignData, slot_number: activeEditSlotIdx }) 
-            });
-            if (!res.ok) throw new Error('Create failed');
-            alert('배정되었습니다.');
+            if (selectedAssignmentId) {
+                // Update existing
+                const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${selectedAssignmentId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(editAssignData)
+                });
+                if (!res.ok) throw new Error('Update failed');
+                alert('수정되었습니다.');
+            } else {
+                // Create new
+                if (!editAssignData.buyer_name && !editAssignData.buyer_email) {
+                    alert('이름 또는 ID(이메일)를 입력해주세요.');
+                    return;
+                }
+                const res = await apiFetch(`/api/admin/legacy-tidal/assign/${activeEditAccountId}`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ ...editAssignData, slot_number: activeEditSlotIdx }) 
+                });
+                if (!res.ok) throw new Error('Create failed');
+                alert('배정되었습니다.');
+            }
             setIsEditAssignModalOpen(false);
             fetchInactiveRecords();
+        } catch (e) {
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
+        }
+    };
+
+    const openMemoModal = (accountId: string, slotIdx: number | null, currentMemo: string, assignmentId: string) => {
+        setMemoTargetAccountId(accountId);
+        setMemoTargetSlotIdx(slotIdx);
+        setMemoTargetAssignmentId(assignmentId);
+        setCurrentMemoInput(currentMemo || '');
+        setIsMemoModalOpen(true);
+    };
+
+    const handleSaveMemo = async () => {
+        if (!memoTargetAssignmentId) return;
+        try {
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${memoTargetAssignmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ memo: currentMemoInput })
+            });
+            if (!res.ok) throw new Error('Update failed');
+            setIsMemoModalOpen(false);
+            fetchInactiveRecords();
+            alert('메모가 저장되었습니다.');
         } catch (e) {
             alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
         }
@@ -249,11 +309,10 @@ function LegacyTidalInactiveContent() {
     const exportToExcel = () => {
         const excelData = records.map((a: LegacyTidalHistory, idx) => {
             const isEmpty = a.isEmpty === true;
-            return {
+            const data: any = {
                 'No.': idx + 1,
                 '배정번호': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
                 '상태': isEmpty ? '빈 슬롯' : '지난 내역',
-                'Master ID': a.master_id || '-',
                 'Tidal ID': a.tidal_id,
                 '구매자명': isEmpty ? '-' : (a.buyer_name || '-'),
                 '연락처': isEmpty ? '-' : (a.buyer_phone || '-'),
@@ -261,8 +320,14 @@ function LegacyTidalInactiveContent() {
                 '시작일': a.start_date || '-',
                 '종료일': a.end_date || '-',
                 '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-',
-                '삭제일': (showDeleted && a.updated_at) ? new Date(a.updated_at).toLocaleString() : '-'
+                '메모': a.memo || ''
             };
+            if (!showDeleted) {
+                data['Master ID'] = a.master_id || '-';
+            } else {
+                data['삭제일'] = a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-';
+            }
+            return data;
         });
 
         const wb = XLSX.utils.book_new();
@@ -308,14 +373,15 @@ function LegacyTidalInactiveContent() {
                             <tr className="bg-gray-100 border-b">
                                 <th className="p-3 text-center w-12">No</th>
                                 <th className="p-3 text-center">배정번호</th>
-                                <th className="p-3 text-left">Master ID</th>
+                                {!showDeleted && <th className="p-3 text-left">Master ID</th>}
                                 <th className="p-3 text-left">Tidal ID</th>
                                 <th className="p-3 text-left">구매자</th>
                                 <th className="p-3 text-left">연락처</th>
                                 <th className="p-3 text-left">이메일</th>
                                 <th className="p-3 text-center">기간</th>
                                 <th className="p-3 text-center">배정일시</th>
-                                {showDeleted && <th className="p-3 text-center">삭제일시</th>}
+                                {showDeleted && <th className="p-3 text-center">삭제일</th>}
+                                {showDeleted && <th className="p-3 text-center w-20">메모</th>}
                                 <th className="p-3 text-center">관리</th>
                             </tr>
                         </thead>
@@ -335,16 +401,18 @@ function LegacyTidalInactiveContent() {
                                             <td className="p-2 text-center font-bold">
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
-                                            <td 
-                                                className="p-2 font-mono text-gray-500 opacity-80 text-[11px] cursor-pointer select-none relative group" 
-                                                onClick={(e) => handleMasterIdClick(e, a.master_id)} 
-                                                title="클릭: 복사 및 Tidal 가족관리 이동"
-                                            >
-                                                <span className="hover:underline hover:text-blue-600 transition-colors">{a.master_id || '-'}</span>
-                                                {copiedId === a.master_id && (
-                                                    <span className="absolute -top-4 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce whitespace-nowrap z-10">Copied!</span>
-                                                )}
-                                            </td>
+                                            {!showDeleted && (
+                                                <td 
+                                                    className="p-2 font-mono text-gray-500 opacity-80 text-[11px] cursor-pointer select-none relative group" 
+                                                    onClick={(e) => handleMasterIdClick(e, a.master_id)} 
+                                                    title="클릭: 복사 및 Tidal 가족관리 이동"
+                                                >
+                                                    <span className="hover:underline hover:text-blue-600 transition-colors">{a.master_id || '-'}</span>
+                                                    {copiedId === a.master_id && (
+                                                        <span className="absolute -top-4 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce whitespace-nowrap z-10">Copied!</span>
+                                                    )}
+                                                </td>
+                                            )}
                                             <td className="p-2 cursor-pointer select-none" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title="더블클릭: Tidal 로그인 팝업">
                                                 <span className="hover:underline hover:text-blue-600 transition-colors">{a.tidal_id}</span>
                                             </td>
@@ -361,7 +429,17 @@ function LegacyTidalInactiveContent() {
                                             </td>
                                             {showDeleted && (
                                                 <td className="p-2 text-center text-[10px] text-red-600 font-semibold italic">
-                                                    {a.updated_at ? new Date(a.updated_at).toLocaleString() : '-'}
+                                                    {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-'}
+                                                </td>
+                                            )}
+                                            {showDeleted && (
+                                                <td className="p-2">
+                                                    {!isEmpty && (
+                                                        <div className="flex items-center justify-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(a.id, a.slot_number, a.memo || '', a.id); }}>
+                                                            <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${a.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
+                                                            <span className="text-[10px] text-gray-500 truncate cursor-pointer max-w-[40px]">{a.memo?.split('\n')[0] || ''}</span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             )}
                                             <td className="p-2 text-center">
@@ -370,18 +448,21 @@ function LegacyTidalInactiveContent() {
                                                         size="sm" 
                                                         variant="ghost" 
                                                         className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
-                                                        onClick={() => openEditModal(a.accounts?.id || '', a.slot_number, a.accounts?.login_id || '')} 
+                                                        onClick={() => openEditModal(a.accounts?.id || '', a.slot_number, a)} 
                                                         title="배정하기"
                                                     >
                                                         <Pencil size={16} />
                                                     </Button>
                                                 ) : (
                                                     <div className="flex justify-center gap-1">
-                                                        {showDeleted && (
-                                                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700" onClick={() => handleRestore(a.id)} title="복구">
-                                                                <RotateCcw size={16} />
-                                                            </Button>
-                                                        )}
+                                                        {showDeleted ? (
+                                                            <>
+                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditModal(a.account_id || a.accounts?.id || '', a.slot_number, a)}><Pencil size={14} /></Button>
+                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700" onClick={() => handleRestore(a.id)} title="복구">
+                                                                    <RotateCcw size={16} />
+                                                                </Button>
+                                                            </>
+                                                        ) : null}
                                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(a.id)} title={showDeleted ? "영구 삭제" : "삭제 내역으로 이동"}>
                                                             <Trash2 size={16} />
                                                         </Button>
@@ -448,7 +529,7 @@ function LegacyTidalInactiveContent() {
                     )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsEditAssignModalOpen(false)}>취소</Button>
-                        <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">배정하기</Button>
+                        <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">저장하기</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -548,6 +629,20 @@ function LegacyTidalInactiveContent() {
                     </div>
                 </div>
             )}
+            </Dialog>
+
+            <Dialog open={isMemoModalOpen} onOpenChange={setIsMemoModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader><DialogTitle>메모 편집</DialogTitle></DialogHeader>
+                    <div className="py-4">
+                        <textarea className="w-full min-h-[100px] p-3 border rounded-md text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="메모를 입력하세요..." value={currentMemoInput} onChange={e => setCurrentMemoInput(e.target.value)} />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsMemoModalOpen(false)}>취소</Button>
+                        <Button onClick={handleSaveMemo}>저장</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }
