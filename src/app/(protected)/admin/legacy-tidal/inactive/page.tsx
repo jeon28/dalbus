@@ -314,7 +314,7 @@ function LegacyTidalInactiveContent() {
                 '배정번호': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
                 '상태': isEmpty ? '빈 슬롯' : '지난 내역',
                 'Tidal ID': a.tidal_id,
-                '구매자명': isEmpty ? '-' : (a.buyer_name || '-'),
+                '고객명': isEmpty ? '-' : (a.buyer_name || '-'),
                 '연락처': isEmpty ? '-' : (a.buyer_phone || '-'),
                 '이메일': isEmpty ? '-' : (a.buyer_email || '-'),
                 '시작일': a.start_date || '-',
@@ -368,21 +368,21 @@ function LegacyTidalInactiveContent() {
 
             <div className={`${styles.content} container`}>
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="w-full text-[10px]">
+                    <table className="w-full text-[10px] table-fixed">
                         <thead>
                             <tr className="bg-gray-100 border-b">
-                                <th className="p-1.5 text-center w-8">No</th>
-                                <th className="p-1.5 text-center w-20">배정번호</th>
+                                <th className="p-1.5 text-center w-[20px]">No</th>
+                                <th className="p-1.5 text-center w-[70px]">배정번호</th>
                                 {!showDeleted && <th className="p-1.5 text-left w-32">Master ID</th>}
-                                <th className="p-1.5 text-left">Tidal ID</th>
-                                <th className="p-1.5 text-left w-16">구매자</th>
-                                <th className="p-1.5 text-left w-24">연락처</th>
-                                <th className="p-1.5 text-left">이메일</th>
-                                <th className="p-1.5 text-center w-24">기간</th>
-                                <th className="p-1.5 text-center w-20">배정일</th>
-                                {showDeleted && <th className="p-1.5 text-center w-20">삭제일</th>}
-                                {showDeleted && <th className="p-1.5 text-center w-32">메모</th>}
-                                <th className="p-1.5 text-center w-20">관리</th>
+                                <th className="p-1.5 text-left w-[120px]">Tidal ID</th>
+                                <th className="p-1.5 text-left w-[60px]">고객명</th>
+                                <th className="p-1.5 text-left w-[90px]">연락처</th>
+                                <th className="p-1.5 text-left w-[120px]">이메일</th>
+                                <th className="p-1.5 text-center w-[90px]">기간</th>
+                                <th className="p-1.5 text-center w-[80px]">배정일</th>
+                                {showDeleted && <th className="p-1.5 text-center w-[80px]">삭제일</th>}
+                                {showDeleted && <th className="p-1.5 text-center">메모</th>}
+                                <th className="p-1.5 text-center w-[60px]">관리</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -397,13 +397,13 @@ function LegacyTidalInactiveContent() {
                                     const isEmpty = a.isEmpty === true;
                                     return (
                                         <tr key={a.id} className={`border-b hover:bg-gray-50 h-8 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                            <td className="p-1 text-center opacity-70">{idx + 1}</td>
-                                            <td className="p-1 text-center font-bold truncate max-w-[80px]">
+                                            <td className="p-1 text-center opacity-70 overflow-hidden">{idx + 1}</td>
+                                            <td className="p-1 text-center font-bold truncate">
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
                                             {!showDeleted && (
                                                 <td 
-                                                    className="p-1 font-mono text-gray-500 opacity-80 text-[10px] cursor-pointer select-none relative group truncate max-w-[120px]" 
+                                                    className="p-1 font-mono text-gray-500 opacity-80 text-[10px] cursor-pointer select-none relative group truncate" 
                                                     onClick={(e) => handleMasterIdClick(e, a.master_id)} 
                                                     title={a.master_id}
                                                 >
@@ -413,14 +413,14 @@ function LegacyTidalInactiveContent() {
                                                     )}
                                                 </td>
                                             )}
-                                            <td className="p-1 cursor-pointer select-none truncate max-w-[150px]" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title={a.tidal_id}>
+                                            <td className="p-1 cursor-pointer select-none truncate" onDoubleClick={() => { if (a.tidal_id && a.tidal_id !== '-') { setTidalLoginEmail(a.tidal_id); setCopied(false); } }} title={a.tidal_id}>
                                                 <span className="hover:underline hover:text-blue-600 transition-colors text-[10px]">{a.tidal_id}</span>
                                             </td>
-                                            <td className="p-1 font-bold truncate max-w-[60px]">
+                                            <td className="p-1 font-bold truncate">
                                                 {isEmpty ? '빈 슬롯' : (a.buyer_name || '-')}
                                             </td>
-                                            <td className="p-1 truncate max-w-[100px]">{a.buyer_phone || '-'}</td>
-                                            <td className="p-1 truncate max-w-[120px]">{a.buyer_email || '-'}</td>
+                                            <td className="p-1 truncate">{a.buyer_phone || '-'}</td>
+                                            <td className="p-1 truncate">{a.buyer_email || '-'}</td>
                                             <td className="p-1 text-center text-[9px] opacity-80 whitespace-nowrap">
                                                 {isEmpty ? '-' : `${(a.start_date || '').split('-').slice(1).join('/')} ~ ${(a.end_date || '').split('-').slice(1).join('/')}`}
                                             </td>
@@ -437,7 +437,7 @@ function LegacyTidalInactiveContent() {
                                                     {!isEmpty && (
                                                         <div className="flex items-center justify-start gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(a.memo || '', a.id); }}>
                                                             <MessageSquareText size={12} className={`flex-shrink-0 cursor-pointer ${a.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
-                                                            <span className="text-[9px] text-gray-500 truncate cursor-pointer max-w-[80px]">{a.memo?.split('\n')[0] || ''}</span>
+                                                            <span className="text-[9px] text-gray-500 truncate cursor-pointer">{a.memo?.split('\n')[0] || ''}</span>
                                                         </div>
                                                     )}
                                                 </td>
