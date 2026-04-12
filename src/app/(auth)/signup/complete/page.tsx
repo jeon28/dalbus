@@ -46,32 +46,27 @@ export default function SignupCompletePage() {
 
     // Check if user is authenticated and if profile is already complete
     useEffect(() => {
-        const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+        let mounted = true;
 
-            if (!session?.user) {
-                // Not authenticated, redirect to signup
-                router.replace('/signup');
-                return;
-            }
-
-            setUserId(session.user.id);
+        const handleUser = async (userId: string, metadata: Record<string, string>) => {
+            if (!mounted) return;
+            setUserId(userId);
 
             // Pre-fill name from Google metadata if available
-            const googleName = session.user.user_metadata?.full_name
-                || session.user.user_metadata?.name
-                || '';
+            const googleName = metadata?.full_name || metadata?.name || '';
 
             // Check if profile already has phone (meaning already completed)
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('name, phone, birth_date')
-                .eq('id', session.user.id)
+                .eq('id', userId)
                 .single();
+
+            if (!mounted) return;
 
             if (profile?.phone && profile?.birth_date) {
                 // Already completed, go home
-                router.replace('/');
+                window.location.replace('/');
                 return;
             }
 
@@ -83,8 +78,41 @@ export default function SignupCompletePage() {
             setChecking(false);
         };
 
-        checkSession();
-    }, [router]);
+        // First try getSession (works for returning users)
+        const init = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (session?.user) {
+                await handleUser(session.user.id, session.user.user_metadata as Record<string, string>);
+            }
+            // If no session yet, onAuthStateChange below will catch it
+        };
+
+        init();
+
+        // Listen for auth state changes (catches OAuth callback)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (!mounted) return;
+                if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+                    await handleUser(session.user.id, session.user.user_metadata as Record<string, string>);
+                }
+            }
+        );
+
+        // Safety timeout: if nothing happens in 5 seconds, redirect to signup
+        const timeout = setTimeout(() => {
+            if (mounted && checking) {
+                router.replace('/signup');
+            }
+        }, 5000);
+
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+            clearTimeout(timeout);
+        };
+    }, [router, checking]);
 
     const isFormValid =
         formData.name.trim() !== '' &&
