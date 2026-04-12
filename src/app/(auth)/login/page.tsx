@@ -95,6 +95,7 @@ export default function LoginPage() {
                 provider,
                 options: {
                     redirectTo: `${window.location.origin}/signup/complete`,
+                    queryParams: provider === 'google' ? { prompt: 'select_account' } : undefined,
                 }
             });
             if (error) throw error;
