@@ -783,23 +783,23 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="flex items-center gap-4">
                         <h1 className={styles.legacyTitle}>
                             <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">Legacy</span>
-                            기존 Tidal 계정 관리
+                            TIDAL 관리
                         </h1>
-                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
-                            {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
+                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8 w-[100px]">
+                            {isGridView ? <List size={16} className="mr-1" /> : <LayoutGrid size={16} className="mr-1" />}
                             {isGridView ? 'List View' : 'Grid View'}
                         </Button>
                     </div>
                     <div className="flex gap-2 items-center">
                         <div className="relative flex items-center bg-white border rounded-md px-2 focus-within:ring-2 focus-within:ring-blue-500">
                             <Search size={14} className="text-gray-400" />
-                            <Input type="text" placeholder="검색..." className="border-0 focus-visible:ring-0 h-8 w-32 text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <Input type="text" placeholder="검색..." className="border-0 focus-visible:ring-0 h-8 w-[120px] text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 bg-white border rounded-md px-2 py-1">
-                                <span className="text-xs text-gray-500 whitespace-nowrap">잔여</span>
-                                <Input type="number" value={expiredDays} onChange={e => setExpiredDays(parseInt(e.target.value) || 0)} className="w-10 h-7 px-1 text-center text-sm border-none focus-visible:ring-0" />
-                                <span className="text-xs text-gray-500 whitespace-nowrap">일</span>
+                            <div className="flex items-center gap-1 bg-white border rounded-md px-1 py-1 w-[60px] overflow-hidden">
+                                <span className="text-[10px] text-gray-500 whitespace-nowrap">잔여</span>
+                                <Input type="number" value={expiredDays} onChange={e => setExpiredDays(parseInt(e.target.value) || 0)} className="w-8 h-7 px-0 text-center text-xs border-none focus-visible:ring-0" />
+                                <span className="text-[10px] text-gray-500 whitespace-nowrap">일</span>
                             </div>
                             <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-1 h-7 px-2 text-xs">
                                 <Filter className="w-3.5 h-3.5" /> 잔여일
@@ -839,13 +839,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 {isMoreMenuOpen && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setIsMoreMenuOpen(false)} />
-                                        <div className="absolute right-0 top-9 z-20 w-44 bg-white border rounded-lg shadow-lg py-1 text-sm">
-                                            <button
-                                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                                onClick={() => { setIsMoreMenuOpen(false); }}
-                                            >
-                                                <History className="w-4 h-4" /> 기타 메뉴 (준비중)
-                                            </button>
+                                        <div className="absolute right-0 top-9 z-20 w-32 bg-white border rounded-lg shadow-lg py-1 text-xs">
+                                            <div className="px-3 py-2 text-gray-400 text-center italic">메뉴 없음</div>
                                         </div>
                                     </>
                                 )}
@@ -858,7 +853,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         <Button 
                                             variant="default" 
                                             size="sm" 
-                                            className="h-8 bg-green-600 hover:bg-green-700"
+                                            className="h-8 w-[60px] p-0 text-[10px] bg-green-600 hover:bg-green-700"
                                             onClick={handleBulkSave}
                                         >
                                             일괄 저장
@@ -875,8 +870,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     )}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-8">
-                                                추가 관리 <ChevronDown size={14} className="ml-1" />
+                                            <Button variant="outline" size="sm" className="h-8 w-[60px] p-0 text-[10px]">
+                                                추가 관리
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-40">
