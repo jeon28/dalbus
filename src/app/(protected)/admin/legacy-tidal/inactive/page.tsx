@@ -386,8 +386,6 @@ function LegacyTidalInactiveContent() {
                                 <th className="p-2 sm:p-3 text-center">관리</th>
                             </tr>
                         </thead>
-                            </tr>
-                        </thead>
                         <tbody>
                             {records.length === 0 ? (
                                 <tr>

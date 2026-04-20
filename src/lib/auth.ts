@@ -12,6 +12,18 @@ export interface ServerSessionUser {
  */
 export async function getServerSession(req: NextRequest): Promise<ServerSessionUser | null> {
     try {
+        // Quick Access: X-Quick-Token 헤더로 비밀번호 인증 (Supabase 로그인 없이 접근)
+        const quickToken = req.headers.get('X-Quick-Token');
+        const quickPassword = process.env.ADMIN_QUICK_PASSWORD;
+        if (quickToken && quickPassword && quickToken === quickPassword) {
+            console.log('[getServerSession] Quick access authenticated');
+            return {
+                id: 'quick-access-admin',
+                email: 'quick@admin.local',
+                role: 'admin'
+            };
+        }
+
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
             console.log('[getServerSession] No Authorization header');

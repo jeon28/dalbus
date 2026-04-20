@@ -1,39 +1,10 @@
-/*
-# Walkthrough - Legacy Tidal Premium UI Redesign
-
-I have completed the UI/UX improvements for the Legacy Tidal management page. The new design focuses on efficiency, bulk management, and a premium "admin dashboard" feel.
-
-## Key Changes
-
-### 1. Database & Service Layer
-- Database Migration: Added an updated_at column to the legacy_tidal_assignments table with an automatic trigger.
-- Service Update: Updated the legacyTidalService to fetch and include the updated_at timestamp.
-
-### 2. Premium Management UI
-- Top Action Bar:
-  - 정보 수정 (Bulk Edit): Toggles inline editing for all selected rows.
-  - 일괄 저장 (Bulk Save): Saves all currently edited rows in one click.
-  - 추가 관리 (More Actions): A sleek dropdown menu containing '이동', '비활성화/활성', and '삭제'.
-- Sorting: Added a new "변경일순 조회" button to quickly sort assignments by their last update time.
-
-### 3. Refined Table Layout (Grid View)
-- Checkbox Support: Added individual and "Select All" checkboxes for bulk operations.
-- Memo Column: Replaced the bulky memo field with a compact icon. Hovering shows the first line, and clicking opens the full memo modal.
-- Master Account Highlighting: Master accounts are now visually distinct with a purple background/bold font in the Tidal ID cell.
-- Clutter Reduction: Removed the 'Type' and 'Manage' columns. Type is now indicated by row highlighting, and management is handled via the top bar.
-- Responsive Sizing: Adjusted column widths for a balanced, professional look.
-
-### 4. Consolidated Sub-Table (List View)
-- Synced the List View's expanded table with the new Grid View logic (Memo icon, Master highlighting, cleaner columns).
-*/
 "use client";
 
-import React, { useEffect, useState, Suspense } from 'react';
-import { useServices } from '@/lib/ServiceContext';
-import styles from '../admin.module.css';
+import React, { useEffect, useState, Suspense, useCallback } from 'react';
+import styles from '../../(protected)/admin/admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText, MoreHorizontal, Zap, UserPlus } from 'lucide-react';
+import { quickFetch } from '@/lib/quickFetch';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText, MoreHorizontal, Zap, UserPlus, Lock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -141,8 +112,77 @@ interface GridValue {
     orders?: any;
 }
 
-function LegacyTidalContent() {
-    const { isAdmin, isHydrated } = useServices();
+/* ===== PASSWORD GATE ===== */
+function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            const res = await fetch('/api/quick/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                sessionStorage.setItem('quick-token', data.token);
+                onUnlock();
+            } else {
+                setError('비밀번호가 올바르지 않습니다.');
+            }
+        } catch {
+            setError('서버 연결 실패');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+            <div className="w-full max-w-sm mx-4">
+                <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/20">
+                    <div className="flex flex-col items-center mb-6">
+                        <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                            <Lock className="w-8 h-8 text-white" />
+                        </div>
+                        <h1 className="text-xl font-bold text-white">Quick Access</h1>
+                        <p className="text-sm text-slate-400 mt-1">Legacy Tidal 관리자</p>
+                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <Input
+                                type="password"
+                                placeholder="비밀번호 입력"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="h-12 bg-white/10 border-white/20 text-white placeholder:text-slate-400 text-center text-lg tracking-widest focus-visible:ring-orange-500"
+                                autoFocus
+                            />
+                        </div>
+                        {error && (
+                            <p className="text-red-400 text-sm text-center animate-pulse">{error}</p>
+                        )}
+                        <Button
+                            type="submit"
+                            disabled={loading || !password}
+                            className="w-full h-12 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold text-base shadow-lg"
+                        >
+                            {loading ? '확인 중...' : '접속'}
+                        </Button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ===== MAIN CONTENT (mirrors legacy-tidal page with quickFetch) ===== */
+function QuickLegacyTidalContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -196,20 +236,15 @@ function LegacyTidalContent() {
     });
     const [, setResizingCol] = useState<string | null>(null);
 
-    // Master ID Copy & Popup State
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
     const handleMasterIdClick = (e: React.MouseEvent, id: string | null | undefined) => {
         if (!id || id === '-') return;
         e.stopPropagation();
-        
-        // 1. Copy to clipboard
         navigator.clipboard.writeText(id).then(() => {
             setCopiedId(id);
             setTimeout(() => setCopiedId(null), 2000);
         });
-
-        // 2. Immediate Popup
         window.open('https://account.tidal.com/family', '_blank');
     };
 
@@ -222,13 +257,9 @@ function LegacyTidalContent() {
         const onMouseMove = (ev: MouseEvent) => {
             const diff = ev.pageX - startX;
             let newWidth = Math.max(40, startWidth + diff);
-
             if (id !== 'memo') {
                 let newMemoWidth = startMemoWidth - diff;
-                if (newMemoWidth < 40) {
-                    newMemoWidth = 40;
-                    newWidth = startWidth + (startMemoWidth - 40);
-                }
+                if (newMemoWidth < 40) { newMemoWidth = 40; newWidth = startWidth + (startMemoWidth - 40); }
                 setColumnWidths(prev => ({ ...prev, [id]: newWidth, memo: newMemoWidth }));
             } else {
                 setColumnWidths(prev => ({ ...prev, [id]: newWidth }));
@@ -247,17 +278,15 @@ function LegacyTidalContent() {
 {tidal_id} 서비스가 {end_date}에 만료됩니다.
 
 연장을 원하시면 아래 링크로 접속하여서 신청바랍니다.
-${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL}/public`, []);
+${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     useEffect(() => { setNotificationMessage(defaultTemplate); }, [defaultTemplate]);
 
     useEffect(() => {
-        if (isHydrated && isAdmin) {
-            fetchAccounts();
-            fetchPendingOrders();
-        }
+        fetchAccounts();
+        fetchPendingOrders();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAdmin, isHydrated, showInactive, router]);
+    }, [showInactive]);
 
 
     useEffect(() => {
@@ -276,37 +305,30 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     }, [showExpiredOnly, accounts, expiredDays]);
 
-    // Handle deep linking from Inactive page (history)
     useEffect(() => {
-        if (accounts.length > 0 && isHydrated) {
+        if (accounts.length > 0) {
             const action = searchParams.get('action');
             const accountId = searchParams.get('accountId');
             const slotIdxStr = searchParams.get('slotIdx');
-
             if (action === 'assign' && accountId && slotIdxStr !== null) {
                 const acc = accounts.find(a => a.id === accountId);
                 const sIdx = parseInt(slotIdxStr);
                 if (acc && !isNaN(sIdx)) {
-                    // Force refresh grid values for this slot if needed, then open modal
                     openAssignModal(acc, sIdx);
-                    // Clear search params to avoid re-opening on refresh
                     const newUrl = window.location.pathname;
                     window.history.replaceState({}, '', newUrl);
                 }
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [accounts, isHydrated, searchParams]);
+    }, [accounts, searchParams]);
 
-    const fetchAccounts = React.useCallback(async () => {
+    const fetchAccounts = useCallback(async () => {
         try {
             const params = new URLSearchParams({ product: 'HifiTidal' });
-            if (showInactive) {
-                params.append('showDeleted', 'true');
-            } else {
-                params.append('showInactive', 'true');
-            }
-            const res = await apiFetch(`/api/admin/legacy-tidal?${params.toString()}`, { cache: 'no-store' });
+            if (showInactive) { params.append('showDeleted', 'true'); }
+            else { params.append('showInactive', 'true'); }
+            const res = await quickFetch(`/api/admin/legacy-tidal?${params.toString()}`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`Failed to fetch (${res.status})`);
             const data = await res.json();
             setAccounts(data);
@@ -343,7 +365,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     const fetchPendingOrders = async () => {
         try {
-            const res = await apiFetch('/api/admin/orders', { cache: 'no-store' });
+            const res = await quickFetch('/api/admin/orders', { cache: 'no-store' });
             if (res.ok) {
                 const responseData = await res.json();
                 const ordersArray = Array.isArray(responseData) ? responseData : responseData.data;
@@ -424,14 +446,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 case 'login_id': aVal = a.login_id; bVal = b.login_id; break;
                 case 'used_slots': aVal = a.order_accounts?.length || 0; bVal = b.order_accounts?.length || 0; break;
                 case 'updated_at':
-                    aVal = a.order_accounts?.reduce((max, oa) => {
-                        const date = oa.updated_at || oa.assigned_at || '1970-01-01';
-                        return date > max ? date : max;
-                    }, '1970-01-01') || '1970-01-01';
-                    bVal = b.order_accounts?.reduce((max, oa) => {
-                        const date = oa.updated_at || oa.assigned_at || '1970-01-01';
-                        return date > max ? date : max;
-                    }, '1970-01-01') || '1970-01-01';
+                    aVal = a.order_accounts?.reduce((max, oa) => { const date = oa.updated_at || oa.assigned_at || '1970-01-01'; return date > max ? date : max; }, '1970-01-01') || '1970-01-01';
+                    bVal = b.order_accounts?.reduce((max, oa) => { const date = oa.updated_at || oa.assigned_at || '1970-01-01'; return date > max ? date : max; }, '1970-01-01') || '1970-01-01';
                     break;
                 case 'end_date':
                     aVal = a.order_accounts?.find(oa => oa.type === 'master')?.end_date || '9999-12-31';
@@ -489,11 +505,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if (!data) return;
         try {
             if (data.assignment_id) {
-                const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${data.assignment_id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                const res = await quickFetch(`/api/admin/legacy-tidal/assignment/${data.assignment_id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
                 if (!res.ok) throw new Error('Update failed');
             } else {
                 if (!data.buyer_name && !data.buyer_email) { alert('이름 또는 ID(이메일)를 입력해주세요.'); return; }
-                const res = await apiFetch(`/api/admin/legacy-tidal/assign/${accountId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, slot_number: slotIdx }) });
+                const res = await quickFetch(`/api/admin/legacy-tidal/assign/${accountId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, slot_number: slotIdx }) });
                 if (!res.ok) throw new Error('Create failed');
             }
             alert('저장되었습니다.');
@@ -502,14 +518,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         } catch (e) { alert('저장 실패: ' + (e instanceof Error ? e.message : String(e))); }
     };
 
-
     const handleCreateAccount = async () => {
         if (!newAccount.login_id.trim() || !newAccount.payment_email.trim()) { alert('필수 항목을 입력해주세요.'); return; }
         try {
-            const prodRes = await apiFetch('/api/admin/products');
+            const prodRes = await quickFetch('/api/admin/products');
             const products = await prodRes.json();
             const hifitidal = products.find((p: { name: string }) => p.name.toLowerCase() === 'hifitidal') || products.find((p: { name: string }) => p.name.toLowerCase().includes('hifitidal'));
-            const res = await apiFetch('/api/admin/legacy-tidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newAccount, product_id: hifitidal?.id }) });
+            const res = await quickFetch('/api/admin/legacy-tidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newAccount, product_id: hifitidal?.id }) });
             if (!res.ok) throw new Error('Failed to create');
             alert('생성되었습니다.');
             setIsAddModalOpen(false); fetchAccounts();
@@ -520,7 +535,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleUpdateMasterAccount = async () => {
         if (!editingAccount) return;
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal/${editingAccount.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingAccount) });
+            const res = await quickFetch(`/api/admin/legacy-tidal/${editingAccount.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingAccount) });
             if (!res.ok) throw new Error('Failed to update');
             setIsEditModalOpen(false); fetchAccounts(); alert('수정되었습니다.');
         } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
@@ -530,7 +545,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if ((account.order_accounts?.length || 0) > 0) { alert('슬롯이 배정되어 있는 그룹은 삭제할 수 없습니다.'); return; }
         if (!confirm('그룹을 삭제하시겠습니까?')) return;
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal/${account.id}`, { method: 'DELETE' });
+            const res = await quickFetch(`/api/admin/legacy-tidal/${account.id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
             fetchAccounts(); alert('삭제되었습니다.');
         } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
@@ -568,7 +583,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 const data = new Uint8Array(event.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                const res = await apiFetch('/api/admin/legacy-tidal/import?product=HifiTidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accounts: jsonData }) });
+                const res = await quickFetch('/api/admin/legacy-tidal/import?product=HifiTidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accounts: jsonData }) });
                 if (!res.ok) { const errObj = await res.json().catch(() => null); throw new Error(errObj?.error || `서버 오류 (${res.status})`); }
                 const summary = await res.json();
                 setImportResults(summary); setIsImportResultModalOpen(true); fetchAccounts();
@@ -616,7 +631,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleMove = async () => {
         if (!selectedAssignment) return;
         try {
-            const res = await apiFetch('/api/admin/legacy-tidal/move', {
+            const res = await quickFetch('/api/admin/legacy-tidal/move', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ assignment_id: selectedAssignment.id, order_id: selectedAssignment.orders?.id, target_account_id: selectedTargetAccount, target_slot_number: selectedTargetSlot, target_tidal_password: selectedAssignment.tidal_password })
             });
@@ -624,8 +639,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             setIsMoveModalOpen(false); fetchAccounts();
         } catch { alert('이동 실패: 네트워크 오류'); }
     };
-
-
 
     const toggleSelectAll = (filteredFlat: { id: string }[]) => {
         if (selectedAssignmentIds.size === filteredFlat.length) setSelectedAssignmentIds(new Set());
@@ -638,14 +651,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     const handleBulkEdit = () => {
         if (selectedAssignmentIds.size === 0) return;
-        const flatIndices = getFlattenedAssignments()
-            .filter(item => selectedAssignmentIds.has(item.assignment.id));
-        
+        const flatIndices = getFlattenedAssignments().filter(item => selectedAssignmentIds.has(item.assignment.id));
         const newEditing = { ...editingSlots };
-        flatIndices.forEach(item => {
-            const key = `${item.account.id}_${item.assignment.slot_number}`;
-            newEditing[key] = true;
-        });
+        flatIndices.forEach(item => { const key = `${item.account.id}_${item.assignment.slot_number}`; newEditing[key] = true; });
         setEditingSlots(newEditing);
     };
 
@@ -654,64 +662,38 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             const targetId = Array.from(selectedAssignmentIds)[0];
             const item = getFlattenedAssignments().find(i => i.assignment.id === targetId);
             if (item) openMoveModal(item.assignment);
-        } else {
-            alert('이동은 한 번에 하나씩만 가능합니다.');
-        }
+        } else { alert('이동은 한 번에 하나씩만 가능합니다.'); }
     };
 
     const handleBulkSave = async () => {
         const editingKeys = Object.keys(editingSlots).filter(key => editingSlots[key]);
         if (editingKeys.length === 0) return;
-        
         if (!confirm(`${editingKeys.length}개의 항목을 저장하시겠습니까?`)) return;
-        
         try {
-            await Promise.all(
-                editingKeys.map(key => {
-                    const [accountId, slotIdx] = key.split('_');
-                    return handleSaveRow(accountId, parseInt(slotIdx));
-                })
-            );
+            await Promise.all(editingKeys.map(key => { const [accountId, slotIdx] = key.split('_'); return handleSaveRow(accountId, parseInt(slotIdx)); }));
             alert('일괄 저장이 완료되었습니다.');
-        } catch (error) {
-            console.error(error);
-            alert('일괄 저장 중 오류가 발생했습니다.');
-        }
+        } catch (error) { console.error(error); alert('일괄 저장 중 오류가 발생했습니다.'); }
     };
 
     const handleBulkDeactivate = async () => {
         if (!confirm(`${selectedAssignmentIds.size}개의 항목을 일괄 활성/비활성화 하시겠습니까?`)) return;
         try {
-            const results = await Promise.all(
-                Array.from(selectedAssignmentIds).map(id => 
-                    apiFetch(`/api/admin/legacy-tidal/assignment/${id}/toggle-active`, { method: 'POST' })
-                )
-            );
+            const results = await Promise.all(Array.from(selectedAssignmentIds).map(id => quickFetch(`/api/admin/legacy-tidal/assignment/${id}/toggle-active`, { method: 'POST' })));
             const failed = results.filter(r => !r.ok).length;
             if (failed > 0) alert(`${failed}개 항목 처리 실패`);
             fetchAccounts();
-        } catch (error) {
-            console.error(error);
-            alert('일괄 처리 중 오류가 발생했습니다.');
-        }
+        } catch (error) { console.error(error); alert('일괄 처리 중 오류가 발생했습니다.'); }
     };
 
     const handleBulkDelete = async () => {
         if (!confirm(`${selectedAssignmentIds.size}개의 항목을 정말 삭제하시겠습니까?`)) return;
         try {
-            const results = await Promise.all(
-                Array.from(selectedAssignmentIds).map(id => 
-                    apiFetch(`/api/admin/legacy-tidal/assignment/${id}`, { method: 'DELETE' })
-                )
-            );
+            const results = await Promise.all(Array.from(selectedAssignmentIds).map(id => quickFetch(`/api/admin/legacy-tidal/assignment/${id}`, { method: 'DELETE' })));
             const failed = results.filter(r => !r.ok).length;
             if (failed > 0) alert(`${failed}개 항목 삭제 실패`);
             setSelectedAssignmentIds(new Set());
             fetchAccounts();
-        } catch (error) {
-            console.error(error);
-            alert('일괄 삭제 중 오류가 발생했습니다.');
-        }
+        } catch (error) { console.error(error); alert('일괄 삭제 중 오류가 발생했습니다.'); }
     };
 
     const handleBulkNotify = async () => {
@@ -722,7 +704,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 .filter(item => selectedAssignmentIds.has(item.id))
                 .map(item => ({ email: item.assignment.buyer_email, buyerName: item.assignment.buyer_name || '고객', tidalId: item.assignment.tidal_id || '알 수 없음', endDate: item.assignment.end_date || '알 수 없음' }))
                 .filter(r => !!r.email);
-            const res = await apiFetch('/api/admin/tidal/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipients, messageTemplate: notificationMessage }) });
+            const res = await quickFetch('/api/admin/tidal/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipients, messageTemplate: notificationMessage }) });
             if (res.ok) { alert('발송되었습니다.'); setIsNotifyModalOpen(false); setSelectedAssignmentIds(new Set()); }
             else alert('발송 실패');
         } catch { alert('오류 발생'); } finally { setIsSendingNotify(false); }
@@ -767,14 +749,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const handleSaveMemo = async () => {
         if (!memoTargetAssignmentId) return;
         try {
-            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${memoTargetAssignmentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memo: currentMemoInput }) });
+            const res = await quickFetch(`/api/admin/legacy-tidal/assignment/${memoTargetAssignmentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memo: currentMemoInput }) });
             if (!res.ok) throw new Error('Update failed');
             updateGridValue(memoTargetAccountId, memoTargetSlotIdx as number, 'memo', currentMemoInput);
             setIsMemoModalOpen(false); fetchAccounts(); alert('메모가 저장되었습니다.');
         } catch (e) { alert('저장 실패: ' + (e instanceof Error ? e.message : String(e))); }
     };
-
-    if (!isAdmin) return null;
 
     return (
         <main className={styles.main}>
@@ -782,7 +762,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 <div className="container flex justify-between items-center bg-white/50 py-2 rounded-lg">
                     <div className="flex items-center gap-4">
                         <h1 className={styles.legacyTitle}>
-                            <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">Legacy</span>
+                            <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">Quick</span>
                             기존 Tidal 계정 관리
                         </h1>
                         <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-8">
@@ -804,92 +784,55 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             <Button variant={showExpiredOnly ? "default" : "outline"} size="sm" onClick={() => setShowExpiredOnly(!showExpiredOnly)} className="flex items-center gap-1 h-7 px-2 text-xs">
                                 <Filter className="w-3.5 h-3.5" /> 잔여일
                             </Button>
-                            <Button 
+                            <Button
                                 variant={sortConfig?.key === 'updated_at' ? "default" : "outline"}
-                                size="sm" 
-                                onClick={() => {
-                                    if (sortConfig?.key === 'updated_at') {
-                                        setSortConfig(null);
-                                    } else {
-                                        setSortConfig({ key: 'updated_at', direction: 'desc' });
-                                    }
-                                }} 
+                                size="sm"
+                                onClick={() => { if (sortConfig?.key === 'updated_at') { setSortConfig(null); } else { setSortConfig({ key: 'updated_at', direction: 'desc' }); } }}
                                 className="flex items-center gap-1 h-7 px-2 text-xs"
                             >
                                 <Zap className="w-3.5 h-3.5" /> 변경일
                             </Button>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => router.push('/admin/legacy-tidal/inactive')} 
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push('/quick/legacy-tidal/inactive')}
                                 className="flex items-center gap-1 h-7 px-2 text-xs"
                             >
                                 <History className="w-3.5 h-3.5" /> 비활성
                             </Button>
                             <div className="relative">
                                 <input id="excel-import-lt" type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportExcel} />
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setIsMoreMenuOpen(v => !v)}
-                                    className="flex items-center gap-1 h-8"
-                                >
+                                <Button variant="outline" size="sm" onClick={() => setIsMoreMenuOpen(v => !v)} className="flex items-center gap-1 h-8">
                                     <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                                 {isMoreMenuOpen && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setIsMoreMenuOpen(false)} />
                                         <div className="absolute right-0 top-9 z-20 w-44 bg-white border rounded-lg shadow-lg py-1 text-sm">
-                                            <button
-                                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                                                onClick={() => { setIsMoreMenuOpen(false); }}
-                                            >
+                                            <button className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700" onClick={() => { setIsMoreMenuOpen(false); }}>
                                                 <History className="w-4 h-4" /> 기타 메뉴 (준비중)
                                             </button>
                                         </div>
                                     </>
                                 )}
                             </div>
-                            
-                            {/* Management Actions */}
+
                             {selectedAssignmentIds.size > 0 && (
                                 <div className="flex items-center gap-1">
                                     {Object.keys(editingSlots).some(key => editingSlots[key]) ? (
-                                        <Button 
-                                            variant="default" 
-                                            size="sm" 
-                                            className="h-8 bg-green-600 hover:bg-green-700"
-                                            onClick={handleBulkSave}
-                                        >
-                                            일괄 저장
-                                        </Button>
+                                        <Button variant="default" size="sm" className="h-8 bg-green-600 hover:bg-green-700" onClick={handleBulkSave}>일괄 저장</Button>
                                     ) : (
-                                        <Button 
-                                            variant="default" 
-                                            size="sm" 
-                                            className="h-8 bg-blue-600 hover:bg-blue-700"
-                                            onClick={handleBulkEdit}
-                                        >
-                                            정보 수정 ({selectedAssignmentIds.size})
-                                        </Button>
+                                        <Button variant="default" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700" onClick={handleBulkEdit}>정보 수정 ({selectedAssignmentIds.size})</Button>
                                     )}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-8">
-                                                추가 관리 <ChevronDown size={14} className="ml-1" />
-                                            </Button>
+                                            <Button variant="outline" size="sm" className="h-8">추가 관리 <ChevronDown size={14} className="ml-1" /></Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-40">
-                                            <DropdownMenuItem onClick={handleBulkMove} className="gap-2">
-                                                <ArrowRightLeft size={14} /> 이동
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={handleBulkDeactivate} className="gap-2">
-                                                <PowerOff size={14} /> 비활성화/활성
-                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={handleBulkMove} className="gap-2"><ArrowRightLeft size={14} /> 이동</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={handleBulkDeactivate} className="gap-2"><PowerOff size={14} /> 비활성화/활성</DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600 gap-2">
-                                                <Trash2 size={14} /> 삭제
-                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600 gap-2"><Trash2 size={14} /> 삭제</DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
@@ -911,7 +854,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
             <div className={`${styles.content} container`}>
                 {isGridView ? (
-                    /* ===== GRID VIEW ===== */
                     <div className="bg-white rounded-lg shadow overflow-x-auto">
                         <table className="w-full text-xs min-w-[840px]">
                             <thead>
@@ -1011,24 +953,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     <><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.tidal_id }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_name }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_email }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_phone }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.start_date }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.end_date }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.period }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.amount }} /></>
                                                 ) : (
                                                     <>
-                                                        <td 
-                                                            className={`px-1 py-1.5 border-r truncate max-w-[110px] relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
-                                                            title={assignment.tidal_id || undefined} 
-                                                            style={{ width: columnWidths.tidal_id }}
-                                                            onClick={(e) => {
-                                                                if (assignment.type === 'master') {
-                                                                    handleMasterIdClick(e, assignment.tidal_id);
-                                                                }
-                                                            }}
-                                                        >
+                                                        <td className={`px-1 py-1.5 border-r truncate max-w-[110px] relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} title={assignment.tidal_id || undefined} style={{ width: columnWidths.tidal_id }} onClick={(e) => { if (assignment.type === 'master') { handleMasterIdClick(e, assignment.tidal_id); } }}>
                                                             {assignment.tidal_id || '-'}
-                                                            {assignment.type === 'master' && copiedId === assignment.tidal_id && (
-                                                                <span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
-                                                            )}
+                                                            {assignment.type === 'master' && copiedId === assignment.tidal_id && (<span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>)}
                                                         </td>
-                                                        <td className="px-1 py-1.5 border-r truncate max-w-[70px]" title={assignment.buyer_name || undefined} style={{ width: columnWidths.buyer_name }}>
-                                                            {assignment.buyer_name || '-'}
-                                                        </td>
+                                                        <td className="px-1 py-1.5 border-r truncate max-w-[70px]" title={assignment.buyer_name || undefined} style={{ width: columnWidths.buyer_name }}>{assignment.buyer_name || '-'}</td>
                                                         <td className="px-1 py-1.5 border-r truncate max-w-[110px]" title={assignment.buyer_email || undefined} style={{ width: columnWidths.buyer_email }}>{assignment.buyer_email || '-'}</td>
                                                         <td className="px-1 py-1.5 border-r truncate max-w-[95px]" title={assignment.buyer_phone || undefined} style={{ width: columnWidths.buyer_phone }}>{assignment.buyer_phone || '-'}</td>
                                                         <td className="px-1 py-1.5 text-center border-r font-mono" style={{ width: columnWidths.start_date }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
@@ -1058,7 +987,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         </div>
                     </div>
                 ) : (
-                    /* ===== LIST VIEW ===== */
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <div className="grid grid-cols-14 gap-2 p-2 bg-gray-50 font-bold border-b text-xs">
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
@@ -1101,31 +1029,19 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             const endDate = masterSlot?.end_date || '-';
                             let isWarning = false;
                             if (masterSlot?.end_date) {
-                                try {
-                                    const end = parseISO(masterSlot.end_date); const today = new Date(); today.setHours(0, 0, 0, 0);
-                                    const warn = new Date(today); warn.setDate(today.getDate() + 30);
-                                    if (end < warn) isWarning = true;
-                                } catch { }
+                                try { const end = parseISO(masterSlot.end_date); const today = new Date(); today.setHours(0, 0, 0, 0); const warn = new Date(today); warn.setDate(today.getDate() + 30); if (end < warn) isWarning = true; } catch { }
                             }
                             let duration = '-';
-                            if (masterSlot?.start_date) {
-                                try { duration = `${Math.floor(differenceInDays(new Date(), parseISO(masterSlot.start_date)) / 30)}개월`; } catch { }
-                            }
+                            if (masterSlot?.start_date) { try { duration = `${Math.floor(differenceInDays(new Date(), parseISO(masterSlot.start_date)) / 30)}개월`; } catch { } }
                             return (
                                 <div key={acc.id} id={`account-${acc.id}`} className="border-b last:border-0 hover:bg-gray-50 transition-colors">
                                     <div className="grid grid-cols-14 gap-2 p-2 items-center text-xs">
                                         <div className="col-span-1 text-gray-700 font-medium cursor-pointer truncate" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
                                         <div className="col-span-2 truncate cursor-pointer" title={acc.payment_email} onClick={() => toggleRow(acc.id)}><span className="text-blue-600 font-semibold text-xs truncate">{acc.payment_email}</span></div>
                                         <div className="col-span-1 text-center text-gray-400 font-mono cursor-pointer" onClick={() => toggleRow(acc.id)}>{acc.payment_day}일</div>
-                                        <div 
-                                            className="col-span-2 text-gray-700 text-[11px] truncate cursor-pointer hover:text-blue-600 relative group" 
-                                            title={tidalId} 
-                                            onClick={(e) => handleMasterIdClick(e, tidalId)}
-                                        >
+                                        <div className="col-span-2 text-gray-700 text-[11px] truncate cursor-pointer hover:text-blue-600 relative group" title={tidalId} onClick={(e) => handleMasterIdClick(e, tidalId)}>
                                             {tidalId}
-                                            {copiedId === tidalId && (
-                                                <span className="absolute -top-4 left-0 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
-                                            )}
+                                            {copiedId === tidalId && (<span className="absolute -top-4 left-0 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>)}
                                         </div>
                                         <div className={`col-span-2 font-mono text-[11px] cursor-pointer ${isWarning ? 'text-red-600 font-bold' : 'text-gray-900'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>
                                         <div className="col-span-1 text-gray-500 font-mono text-[11px] cursor-pointer" onClick={() => toggleRow(acc.id)}>{duration}</div>
@@ -1153,7 +1069,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <th className="py-1 text-left w-24">가입일</th>
                                                         <th className="py-1 text-left w-24">종료일</th>
                                                         <th className="py-1 text-center w-16">개월</th>
-                                             <label htmlFor=""></label>           <th className="py-1 text-right w-20 pr-2">계약금액</th>
+                                                        <th className="py-1 text-right w-20 pr-2">계약금액</th>
                                                         <th className="py-1 text-left w-32">메모</th>
                                                         <th className="py-1 text-center w-20">관리</th>
                                                     </tr>
@@ -1164,20 +1080,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         const key = `${acc.id}_${sIdx}`;
                                                         const val = gridValues[key] || {};
                                                         const isEditing = editingSlots[key];
-                                                        let period = '-'; let isExpired = false;
+                                                        let period = '-'; let isExpiredRow = false;
                                                         if (val.start_date && val.end_date) {
-                                                            try {
-                                                                const start = parseISO(val.start_date); const end = parseISO(val.end_date);
-                                                                const diff = Math.floor(differenceInDays(end, start) / 30);
-                                                                if (diff > 0) period = `${diff}개월`;
-                                                                const today = new Date(); today.setHours(0, 0, 0, 0);
-                                                                if (end < today) isExpired = true;
-                                                            } catch { }
+                                                            try { const start = parseISO(val.start_date); const end = parseISO(val.end_date); const diff = Math.floor(differenceInDays(end, start) / 30); if (diff > 0) period = `${diff}개월`; const today = new Date(); today.setHours(0, 0, 0, 0); if (end < today) isExpiredRow = true; } catch { }
                                                         }
                                                         const isEmpty = assignment.id.startsWith('empty_');
                                                         const isDeactivated = assignment.is_active === false;
                                                         return (
-                                                            <tr key={assignment.id} className={`border-b last:border-0 h-8 hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/20' : (isEmpty ? 'bg-green-100/50 text-green-700' : ''))}`}>
+                                                            <tr key={assignment.id} className={`border-b last:border-0 h-8 hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpiredRow ? 'bg-red-50/20' : (isEmpty ? 'bg-green-100/50 text-green-700' : ''))}`}>
                                                                 <td className="text-center text-[10px] font-bold"><span className={isEmpty ? "text-green-600" : "text-gray-900"}>{acc.login_id}-{assignment.slot_number + 1}</span></td>
                                                                 {isEditing ? (
                                                                     <>
@@ -1213,27 +1123,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <td 
-                                                                            className={`px-2 truncate relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
-                                                                            title={val.tidal_id || undefined}
-                                                                            onClick={(e) => {
-                                                                                if (assignment.type === 'master') {
-                                                                                    handleMasterIdClick(e, val.tidal_id);
-                                                                                }
-                                                                            }}
-                                                                        >
+                                                                        <td className={`px-2 truncate relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} title={val.tidal_id || undefined} onClick={(e) => { if (assignment.type === 'master') { handleMasterIdClick(e, val.tidal_id); } }}>
                                                                             {val.tidal_id || '-'}
-                                                                            {assignment.type === 'master' && copiedId === val.tidal_id && (
-                                                                                <span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
-                                                                            )}
+                                                                            {assignment.type === 'master' && copiedId === val.tidal_id && (<span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>)}
                                                                         </td>
-                                                                        <td className="px-2 text-gray-700 truncate max-w-[80px]">
-                                                                            {val.buyer_name || '-'}
-                                                                        </td>
+                                                                        <td className="px-2 text-gray-700 truncate max-w-[80px]">{val.buyer_name || '-'}</td>
                                                                         <td className="px-2 text-gray-700 truncate max-w-[120px]">{val.buyer_email || '-'}</td>
                                                                         <td className="px-2 text-gray-700 truncate max-w-[100px]">{val.buyer_phone || '-'}</td>
                                                                         <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
-                                                                        <td className="px-2 font-mono"><span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>{val.end_date || '-'}{isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}</span></td>
+                                                                        <td className="px-2 font-mono"><span className={isExpiredRow ? "text-red-500 font-bold" : "text-gray-500"}>{val.end_date || '-'}{isExpiredRow && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}</span></td>
                                                                         <td className="text-center text-gray-500 font-mono">{period}</td>
                                                                         <td className="text-right text-gray-700 font-mono px-2">{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                                         <td className="px-2">
@@ -1263,25 +1161,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 )}
             </div>
 
-            {/* ===== EXCEL ACTIONS (BOTTOM) ===== */}
+            {/* EXCEL ACTIONS */}
             <div className="container mt-8 mb-12 flex justify-center items-center gap-4 border-t border-gray-100 pt-8">
-                <Button 
-                    variant="outline" 
-                    onClick={() => document.getElementById('excel-import-lt')?.click()}
-                    className="flex items-center gap-2 bg-white hover:bg-green-50 text-green-700 border-green-200"
-                >
+                <Button variant="outline" onClick={() => document.getElementById('excel-import-lt')?.click()} className="flex items-center gap-2 bg-white hover:bg-green-50 text-green-700 border-green-200">
                     <Upload className="w-4 h-4" /> 엑셀 가져오기 (Import)
                 </Button>
-                <Button 
-                    variant="outline" 
-                    onClick={() => exportToExcel()}
-                    className="flex items-center gap-2 bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
-                >
+                <Button variant="outline" onClick={() => exportToExcel()} className="flex items-center gap-2 bg-white hover:bg-blue-50 text-blue-700 border-blue-200">
                     <Download className="w-4 h-4" /> 엑셀 내보내기 (Export)
                 </Button>
             </div>
 
-            {/* ===== MODALS ===== */}
+            {/* MODALS */}
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>그룹 추가</DialogTitle></DialogHeader>
@@ -1359,8 +1249,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <DialogFooter><Button onClick={handleMove} disabled={!selectedTargetAccount || selectedTargetSlot === null}>이동 확인</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
-
-
 
             <Dialog open={isImportResultModalOpen} onOpenChange={setIsImportResultModalOpen}>
                 <DialogContent className="max-w-md">
@@ -1487,10 +1375,35 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     );
 }
 
-export default function LegacyTidalPage() {
+/* ===== PAGE COMPONENT WITH PASSWORD GATE ===== */
+function QuickLegacyTidalPage() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    useEffect(() => {
+        // Check if already authenticated
+        const token = sessionStorage.getItem('quick-token');
+        if (token) {
+            // Verify the token is still valid
+            fetch('/api/quick/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: token }),
+            }).then(res => {
+                if (res.ok) setIsAuthenticated(true);
+                else sessionStorage.removeItem('quick-token');
+            }).catch(() => sessionStorage.removeItem('quick-token'));
+        }
+    }, []);
+
+    if (!isAuthenticated) {
+        return <PasswordGate onUnlock={() => setIsAuthenticated(true)} />;
+    }
+
     return (
         <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
-            <LegacyTidalContent />
+            <QuickLegacyTidalContent />
         </Suspense>
     );
 }
+
+export default QuickLegacyTidalPage;

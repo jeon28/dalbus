@@ -1695,6 +1695,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             </tbody>
                         </table>
                     </div>
+                    </div>
                 ) : (
                     <div className="bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
                         <div className="overflow-x-auto">
@@ -2049,6 +2050,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     </div>
                                 );
                             })}
+                    </div>
                     </div>
                 )}
             </div>
@@ -2524,6 +2526,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         </div>
                     )}
                 </DialogContent>
+            </Dialog>
             {/* Excel Actions (Responsive) */}
             <div className="fixed bottom-6 right-6 flex flex-col sm:flex-row gap-3 z-40 pointer-events-none">
                 <div className="flex gap-2 pointer-events-auto">
