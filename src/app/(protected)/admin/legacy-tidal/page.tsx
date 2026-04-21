@@ -33,7 +33,7 @@ import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText, MoreHorizontal, Zap, UserPlus } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText, MoreHorizontal, Zap, UserPlus, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -59,6 +59,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 
 interface Assignment {
@@ -83,6 +88,14 @@ interface Assignment {
     memo?: string;
     assigned_at?: string;
     updated_at?: string;
+}
+
+interface ImportResult {
+    success: {
+        masters: { created: number; updated: number };
+        slots: { created: number; updated: number };
+    };
+    failed: { id: string; reason: string }[];
 }
 
 interface Account {
@@ -150,29 +163,27 @@ function LegacyTidalContent() {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [isGridView, setIsGridView] = useState(true);
     const [gridValues, setGridValues] = useState<Record<string, GridValue>>({});
-    const [editingSlots, setEditingSlots] = useState<Record<string, boolean>>({});
+    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+    const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+
+    // Modal States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [isImportResultModalOpen, setIsImportResultModalOpen] = useState(false);
-    const [importResults, setImportResults] = useState<{
-        success: { masters: { created: number; updated: number }; slots: { created: number; updated: number } };
-        failed: { id: string; reason: string }[];
-    } | null>(null);
+    const [importResults, setImportResults] = useState<ImportResult | null>(null);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
-    const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-
     const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
-    const [moveTargets, setMoveTargets] = useState<Account[]>([]);
-    const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
-    const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
-    const [showInactive] = useState(false);
-    const [isEditAssignModalOpen, setIsEditAssignModalOpen] = useState(false);
-    const [editAssignData, setEditAssignData] = useState<GridValue | null>(null);
-    const [editAssignKey, setEditAssignKey] = useState<string | null>(null);
+    const [moveTargets, setMoveTargets] = useState<Account[]>([]);
+    const [selectedTargetAccount, setSelectedTargetAccount] = useState('');
+    const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
+
+    // Quick Edit States
+    const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
+    const [quickEditValues, setQuickEditValues] = useState<GridValue | null>(null);
+    const [quickEditAssignmentId, setQuickEditAssignmentId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [newAccount, setNewAccount] = useState({ login_id: '', login_pw: '', payment_email: '', payment_day: 1, memo: '', product_id: '', max_slots: 6 });
@@ -257,7 +268,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             fetchPendingOrders();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAdmin, isHydrated, showInactive, router]);
+    }, [isAdmin, isHydrated, router]);
 
 
     useEffect(() => {
@@ -339,7 +350,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             });
             setGridValues(initialGrid);
         } catch (error) { console.error(error); }
-    }, [showInactive]);
+    }, []);
 
     const fetchPendingOrders = async () => {
         try {
@@ -483,24 +494,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         });
     };
 
-    const handleSaveRow = async (accountId: string, slotIdx: number, dataOverride?: GridValue) => {
-        const key = `${accountId}_${slotIdx}`;
-        const data = dataOverride || gridValues[key];
-        if (!data) return;
-        try {
-            if (data.assignment_id) {
-                const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${data.assignment_id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-                if (!res.ok) throw new Error('Update failed');
-            } else {
-                if (!data.buyer_name && !data.buyer_email) { alert('이름 또는 ID(이메일)를 입력해주세요.'); return; }
-                const res = await apiFetch(`/api/admin/legacy-tidal/assign/${accountId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, slot_number: slotIdx }) });
-                if (!res.ok) throw new Error('Create failed');
-            }
-            alert('저장되었습니다.');
-            setEditingSlots(prev => ({ ...prev, [key]: false }));
-            fetchAccounts();
-        } catch (e) { alert('저장 실패: ' + (e instanceof Error ? e.message : String(e))); }
-    };
+    // handleSaveRow is no longer needed with popover menus
 
 
     const handleCreateAccount = async () => {
@@ -582,15 +576,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         setSlotPasswordModal(generateTidalPassword()); setIsAssignModalOpen(true);
     };
 
-    const handleAssign = (orderId: string) => {
+    const handleAssign = async (orderId: string) => {
         if (!selectedAccount || selectedSlot === null) return;
         const order = pendingOrders.find(o => o.id === orderId); if (!order) return;
-        const key = `${selectedAccount.id}_${selectedSlot}`;
-        const emailPrefix = order.buyer_email?.split('@')[0] || '';
-        setGridValues(prev => ({
-            ...prev,
-            [key]: {
-                ...prev[key],
+        
+        try {
+            const emailPrefix = order.buyer_email?.split('@')[0] || '';
+            const data = {
                 order_id: order.id,
                 buyer_name: order.buyer_name || order.profiles?.name || '',
                 buyer_email: order.buyer_email || '',
@@ -599,12 +591,25 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 end_date: order.end_date || '',
                 order_number: order.order_number || '',
                 tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : null,
-                tidal_password: slotPasswordModal || '',
-                full_order: order
-            }
-        }));
-        setEditingSlots(prev => ({ ...prev, [key]: true }));
-        setIsAssignModalOpen(false);
+                tidal_password: slotPasswordModal || generateTidalPassword(),
+                slot_number: selectedSlot,
+                type: selectedSlot === 0 ? 'master' : 'user'
+            };
+
+            const res = await apiFetch(`/api/admin/legacy-tidal/assign/${selectedAccount.id}`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(data) 
+            });
+            
+            if (!res.ok) throw new Error('Create failed');
+            
+            setIsAssignModalOpen(false);
+            fetchAccounts();
+            alert('배정되었습니다.');
+        } catch (error) {
+            alert('배정 실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
     };
 
     const openMoveModal = (currentAssignment: Assignment) => {
@@ -625,30 +630,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         } catch { alert('이동 실패: 네트워크 오류'); }
     };
 
-
-
-    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
-        if (selectedAssignmentIds.size === filteredFlat.length) setSelectedAssignmentIds(new Set());
-        else setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
-    };
-
-    const handleToggleSelection = (id: string) => {
-        setSelectedAssignmentIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-    };
-
-    const handleBulkEdit = () => {
-        if (selectedAssignmentIds.size === 0) return;
-        const flatIndices = getFlattenedAssignments()
-            .filter(item => selectedAssignmentIds.has(item.assignment.id));
-        
-        const newEditing = { ...editingSlots };
-        flatIndices.forEach(item => {
-            const key = `${item.account.id}_${item.assignment.slot_number}`;
-            newEditing[key] = true;
-        });
-        setEditingSlots(newEditing);
-    };
-
     const handleBulkMove = () => {
         if (selectedAssignmentIds.size === 1) {
             const targetId = Array.from(selectedAssignmentIds)[0];
@@ -659,24 +640,37 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
-    const handleBulkSave = async () => {
-        const editingKeys = Object.keys(editingSlots).filter(key => editingSlots[key]);
-        if (editingKeys.length === 0) return;
-        
-        if (!confirm(`${editingKeys.length}개의 항목을 저장하시겠습니까?`)) return;
-        
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const handleDeleteAssignment = async (id: string, isPermanent = false) => {
+        if (!confirm(isPermanent ? "영구 삭제하시겠습니까? 데이터가 완전히 사라집니다." : "정말 삭제하시겠습니까?")) return;
         try {
-            await Promise.all(
-                editingKeys.map(key => {
-                    const [accountId, slotIdx] = key.split('_');
-                    return handleSaveRow(accountId, parseInt(slotIdx));
-                })
-            );
-            alert('일괄 저장이 완료되었습니다.');
-        } catch (error) {
-            console.error(error);
-            alert('일괄 저장 중 오류가 발생했습니다.');
-        }
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${id}${isPermanent ? '?permanent=true' : ''}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+            fetchAccounts(); alert('삭제되었습니다.');
+        } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
+    };
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const handleRestoreAssignment = async (id: string) => {
+        if (!confirm("복구하시겠습니까? (이전에 사용하던 슬롯으로 복구됩니다)")) return;
+        try {
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${id}/restore`, { method: 'POST' });
+            if (!res.ok) throw new Error('Restore failed');
+            fetchAccounts(); alert('복구되었습니다.');
+        } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
+    };
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+
+
+
+    const toggleSelectAll = (filteredFlat: { id: string }[]) => {
+        if (selectedAssignmentIds.size === filteredFlat.length) setSelectedAssignmentIds(new Set());
+        else setSelectedAssignmentIds(new Set(filteredFlat.map(item => item.id)));
+    };
+
+    const handleToggleSelection = (id: string) => {
+        setSelectedAssignmentIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
     };
 
     const handleBulkDeactivate = async () => {
@@ -735,25 +729,51 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         return pass;
     };
 
-    const cancelEdit = (accountId: string, slotIdx: number) => {
-        setEditingSlots(prev => { const next = { ...prev }; delete next[`${accountId}_${slotIdx}`]; return next; });
-        fetchAccounts();
+
+    const openQuickEditModal = (accountId: string, slotIdx: number, val: GridValue, assignmentId: string) => {
+        setQuickEditAssignmentId(assignmentId);
+        setQuickEditValues({ ...val });
+        setIsQuickEditModalOpen(true);
     };
 
-    const openEditAssignModal = (accountId: string, slotIdx: number) => {
-        const key = `${accountId}_${slotIdx}`;
-        const data = gridValues[key]; if (!data) return;
-        const acc = accounts.find(a => a.id === accountId);
-        setEditAssignKey(key);
-        setEditAssignData({ ...data, assignment_number: acc ? `${acc.login_id}-${slotIdx + 1}` : '' });
-        setIsEditAssignModalOpen(true);
+    const handleSaveQuickEdit = async () => {
+        if (!quickEditValues || !quickEditAssignmentId) return;
+        try {
+            const res = await apiFetch(`/api/admin/legacy-tidal/${quickEditAssignmentId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(quickEditValues)
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert(`수정 실패: ${data?.error || '알 수 없는 오류'}`);
+                return;
+            }
+            setIsQuickEditModalOpen(false);
+            fetchAccounts();
+        } catch {
+            alert('수정 실패: 네트워크 오류');
+        }
     };
 
-    const handleUpdateEditAssign = async () => {
-        if (!editAssignKey || !editAssignData) return;
-        const [accountId, sIdxStr] = editAssignKey.split('_');
-        await handleSaveRow(accountId, parseInt(sIdxStr), editAssignData);
-        setIsEditAssignModalOpen(false);
+    const handleToggleActive = async (assignment: Assignment) => {
+        const isCurrentlyActive = assignment.is_active !== false;
+        if (!confirm(isCurrentlyActive ? "배정을 종료하시겠습니까?" : "배정을 복구하시겠습니까?")) return;
+        try {
+            const res = await apiFetch(`/api/admin/legacy-tidal/${assignment.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: !isCurrentlyActive })
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert(`상태 변경 실패: ${data?.error || '알 수 없는 오류'}`);
+                return;
+            }
+            fetchAccounts();
+        } catch {
+            alert('상태 변경 실패: 네트워크 오류');
+        }
     };
 
     const openMemoModal = (accountId: string, slotIdx: number, currentMemo: string, assignmentId: string) => {
@@ -854,25 +874,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             {/* Management Actions */}
                             {selectedAssignmentIds.size > 0 && (
                                 <div className="flex items-center gap-1">
-                                    {Object.keys(editingSlots).some(key => editingSlots[key]) ? (
-                                        <Button 
-                                            variant="default" 
-                                            size="sm" 
-                                            className="h-8 bg-green-600 hover:bg-green-700"
-                                            onClick={handleBulkSave}
-                                        >
-                                            일괄 저장
-                                        </Button>
-                                    ) : (
-                                        <Button 
-                                            variant="default" 
-                                            size="sm" 
-                                            className="h-8 bg-blue-600 hover:bg-blue-700"
-                                            onClick={handleBulkEdit}
-                                        >
-                                            정보 수정 ({selectedAssignmentIds.size})
-                                        </Button>
-                                    )}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="outline" size="sm" className="h-8">
@@ -976,7 +977,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const sIdx = assignment.slot_number;
                                         const key = `${acc.id}_${sIdx}`;
                                         const val = gridValues[key] || {};
-                                        const isEditing = editingSlots[key];
                                         const today = new Date(); today.setHours(0, 0, 0, 0);
                                         const isExpired = assignment.end_date ? parseISO(assignment.end_date) < today : false;
                                         const isEmpty = assignment.id.startsWith('empty_');
@@ -987,56 +987,70 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     <input type="checkbox" checked={selectedAssignmentIds.has(assignment.id)} onChange={() => handleToggleSelection(assignment.id)} />
                                                 </td>
                                                 <td className="text-center text-xs py-1 border-r border-gray-100 font-bold whitespace-nowrap px-1" style={{ width: columnWidths.login_id }}>
-                                                    <div className="flex items-center justify-center gap-1">
+                                                    <div className="flex items-center justify-between gap-1 px-1">
                                                         <span className={isEmpty ? "text-green-600" : "text-gray-900"}>{acc.login_id}-{assignment.slot_number + 1}</span>
-                                                        {sIdx === 0 && (acc.order_accounts?.length || 0) === 0 && (
-                                                            <button type="button" onClick={e => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}>
-                                                                <Trash2 size={12} className="text-red-400 hover:text-red-600" />
-                                                            </button>
-                                                        )}
+                                                        <Popover>
+                                                            <PopoverTrigger asChild>
+                                                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600">
+                                                                    <Settings size={12} />
+                                                                </Button>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent className="w-32 p-1" align="start">
+                                                                <div className="flex flex-col gap-1">
+                                                                    {!isEmpty && (
+                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-blue-600 font-bold" onClick={() => openQuickEditModal(acc.id, sIdx, val, assignment.id)}>
+                                                                            <Pencil size={12} /> 정보수정
+                                                                        </Button>
+                                                                    )}
+                                                                    {!isEmpty && (
+                                                                        <Button size="sm" variant="ghost" className={`h-8 justify-start gap-2 text-xs ${isDeactivated ? 'text-blue-600' : 'text-orange-600'}`} onClick={() => handleToggleActive(assignment)}>
+                                                                            <PowerOff size={12} /> {!isDeactivated ? '종료' : '복구'}
+                                                                        </Button>
+                                                                    )}
+                                                                    {isEmpty && (
+                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-green-600 font-bold" onClick={() => openAssignModal(acc, sIdx)}>
+                                                                            <UserPlus size={12} /> 배정하기
+                                                                        </Button>
+                                                                    )}
+                                                                    {!isEmpty && !assignment.is_deleted && (
+                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => openMoveModal(assignment)}>
+                                                                            <ArrowRightLeft size={12} /> 이동
+                                                                        </Button>
+                                                                    )}
+                                                                    {sIdx === 0 && (acc.order_accounts?.length || 0) === 0 && (
+                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-red-600" onClick={() => handleDeleteMasterAccount(acc)}>
+                                                                            <Trash2 size={12} /> 그룹삭제
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            </PopoverContent>
+                                                        </Popover>
                                                     </div>
                                                 </td>
-                                                {isEditing ? (
-                                                    <>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.tidal_id }}><Input className="h-7 text-xs bg-white px-1" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} /></td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.buyer_name }}><Input className="h-7 text-xs bg-white px-1" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} /></td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.buyer_email }}><Input className="h-7 text-xs bg-white px-1" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} /></td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.buyer_phone }}><Input className="h-7 text-xs bg-white px-1" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} /></td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.start_date }}><Input type="date" className="h-7 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} /></td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.end_date }}><Input type="date" className="h-7 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} /></td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.period }}><Input type="number" className="h-7 text-xs bg-white px-1" placeholder="개월" value={val.period_months || ''} onChange={e => updateGridValue(acc.id, sIdx, 'period_months', parseInt(e.target.value) || 0)} /></td>
-                                                        <td className="p-1 border-r" style={{ width: columnWidths.amount }}><Input type="number" className="h-7 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} /></td>
-                                                    </>
-                                                ) : isEmpty ? (
-                                                    <><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.tidal_id }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_name }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_email }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.buyer_phone }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.start_date }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.end_date }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.period }} /><td className="px-1 py-1.5 border-r" style={{ width: columnWidths.amount }} /></>
-                                                ) : (
-                                                    <>
-                                                        <td 
-                                                            className={`px-1 py-1.5 border-r truncate max-w-[110px] relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
-                                                            title={assignment.tidal_id || undefined} 
-                                                            style={{ width: columnWidths.tidal_id }}
-                                                            onClick={(e) => {
-                                                                if (assignment.type === 'master') {
-                                                                    handleMasterIdClick(e, assignment.tidal_id);
-                                                                }
-                                                            }}
-                                                        >
-                                                            {assignment.tidal_id || '-'}
-                                                            {assignment.type === 'master' && copiedId === assignment.tidal_id && (
-                                                                <span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-1 py-1.5 border-r truncate max-w-[70px]" title={assignment.buyer_name || undefined} style={{ width: columnWidths.buyer_name }}>
-                                                            {assignment.buyer_name || '-'}
-                                                        </td>
-                                                        <td className="px-1 py-1.5 border-r truncate max-w-[110px]" title={assignment.buyer_email || undefined} style={{ width: columnWidths.buyer_email }}>{assignment.buyer_email || '-'}</td>
-                                                        <td className="px-1 py-1.5 border-r truncate max-w-[95px]" title={assignment.buyer_phone || undefined} style={{ width: columnWidths.buyer_phone }}>{assignment.buyer_phone || '-'}</td>
-                                                        <td className="px-1 py-1.5 text-center border-r font-mono" style={{ width: columnWidths.start_date }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
-                                                        <td className="px-1 py-1.5 text-center border-r font-mono" style={{ width: columnWidths.end_date }}><span className={isExpired ? "text-red-600 font-bold" : ""}>{assignment.end_date ? format(parseISO(assignment.end_date), 'yy-MM-dd') : '-'}</span></td>
-                                                        <td className="px-1 py-1.5 text-center border-r font-mono" style={{ width: columnWidths.period }}>{item.period}</td>
-                                                        <td className="px-1 py-1.5 text-right border-r font-mono">{val.amount ? val.amount.toLocaleString() : '-'}</td>
-                                                    </>
-                                                )}
+                                                <td 
+                                                    className={`px-1 py-1.5 border-r truncate max-w-[110px] relative group ${assignment.type === 'master' ? 'bg-purple-100/50 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
+                                                    title={assignment.tidal_id || undefined} 
+                                                    style={{ width: columnWidths.tidal_id }}
+                                                    onClick={(e) => {
+                                                        if (assignment.type === 'master') {
+                                                            handleMasterIdClick(e, assignment.tidal_id);
+                                                        }
+                                                    }}
+                                                >
+                                                    {assignment.tidal_id || '-'}
+                                                    {assignment.type === 'master' && copiedId === assignment.tidal_id && (
+                                                        <span className="absolute -top-1 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce">Copied!</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-1 py-1.5 border-r truncate max-w-[70px]" title={assignment.buyer_name || undefined} style={{ width: columnWidths.buyer_name }}>
+                                                    {assignment.buyer_name || '-'}
+                                                </td>
+                                                <td className="px-1 py-1.5 border-r truncate max-w-[110px]" title={assignment.buyer_email || undefined} style={{ width: columnWidths.buyer_email }}>{assignment.buyer_email || '-'}</td>
+                                                <td className="px-1 py-1.5 border-r truncate max-w-[95px]" title={assignment.buyer_phone || undefined} style={{ width: columnWidths.buyer_phone }}>{assignment.buyer_phone || '-'}</td>
+                                                <td className="px-1 py-1.5 text-center border-r font-mono" style={{ width: columnWidths.start_date }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
+                                                <td className="px-1 py-1.5 text-center border-r font-mono" style={{ width: columnWidths.end_date }}><span className={isExpired ? "text-red-600 font-bold" : ""}>{assignment.end_date ? format(parseISO(assignment.end_date), 'yy-MM-dd') : '-'}</span></td>
+                                                <td className="px-1 py-1.5 text-center border-r font-mono" style={{ width: columnWidths.period }}>{item.period}</td>
+                                                <td className="px-1 py-1.5 text-right border-r font-mono">{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                 <td className="px-1 py-1.5 border-r" style={{ width: columnWidths.memo }}>
                                                     {!isEmpty && (
                                                         <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
@@ -1131,31 +1145,31 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         <div className="col-span-1 text-gray-500 font-mono text-[11px] cursor-pointer" onClick={() => toggleRow(acc.id)}>{duration}</div>
                                         <div className="col-span-1 text-right text-gray-500 font-mono text-[11px] pr-2 cursor-pointer" onClick={() => toggleRow(acc.id)}>-</div>
                                         <div className="col-span-1 text-gray-500 text-[10px] text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>{acc.memo}</div>
-                                        <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>
-                                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${(acc.order_accounts?.length || 0) >= 6 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{acc.order_accounts?.length || 0}/6</span>
+                                        <div className="col-span-1 text-center font-bold text-blue-600 cursor-pointer" onClick={() => toggleRow(acc.id)}>{acc.used_slots}/{acc.max_slots}</div>
+                                        <div className="col-span-1 flex justify-center gap-1">
+                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => { setEditingAccount(acc); setIsEditModalOpen(true); }}><Pencil size={14} /></Button>
                                         </div>
-                                        <div className="col-span-1 text-center flex justify-center gap-1">
-                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="그룹 수정" onClick={e => { e.stopPropagation(); setEditingAccount(acc); setIsEditModalOpen(true); }}><Pencil size={14} /></Button>
-                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-red-600" title="그룹 삭제" onClick={e => { e.stopPropagation(); handleDeleteMasterAccount(acc); }}><Trash2 size={14} /></Button>
+                                        <div className="col-span-1 flex justify-center">
+                                            <Button size="sm" variant="ghost" className="h-7 px-2 text-gray-400 hover:text-blue-600 font-medium" onClick={() => toggleRow(acc.id)}>
+                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                            </Button>
                                         </div>
-                                        <div className="col-span-1 text-center cursor-pointer" onClick={() => toggleRow(acc.id)}>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
                                     </div>
                                     {isExpanded && (
                                         <div className="bg-white border-t p-2 overflow-x-auto">
                                             <table className="w-full text-xs min-w-[840px]">
                                                 <thead>
                                                     <tr className="text-gray-400 border-b">
-                                                        <th className="py-1 text-center w-16">번호</th>
-                                                        <th className="py-1 text-left w-32">Tidal ID</th>
-                                                        <th className="py-1 text-left w-20">이름</th>
-                                                        <th className="py-1 text-left w-28">이메일</th>
-                                                        <th className="py-1 text-left w-28">전화번호</th>
-                                                        <th className="py-1 text-left w-24">가입일</th>
-                                                        <th className="py-1 text-left w-24">종료일</th>
-                                                        <th className="py-1 text-center w-16">개월</th>
-                                             <label htmlFor=""></label>           <th className="py-1 text-right w-20 pr-2">계약금액</th>
-                                                        <th className="py-1 text-left w-32">메모</th>
-                                                        <th className="py-1 text-center w-20">관리</th>
+                                                        <th className="text-center py-2 w-10">관리</th>
+                                                        <th className="text-left py-2 px-2">Tidal ID</th>
+                                                        <th className="text-left py-2 px-2">고객명</th>
+                                                        <th className="text-left py-2 px-2">이메일</th>
+                                                        <th className="text-left py-2 px-2">전화번호</th>
+                                                        <th className="text-center py-2">시작일</th>
+                                                        <th className="text-center py-2">종료일</th>
+                                                        <th className="text-center py-2">개월</th>
+                                                        <th className="text-right py-2 px-2">금액</th>
+                                                        <th className="text-left py-2 px-2">메모</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1163,7 +1177,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         const sIdx = assignment.slot_number;
                                                         const key = `${acc.id}_${sIdx}`;
                                                         const val = gridValues[key] || {};
-                                                        const isEditing = editingSlots[key];
                                                         let period = '-'; let isExpired = false;
                                                         if (val.start_date && val.end_date) {
                                                             try {
@@ -1178,39 +1191,43 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         const isDeactivated = assignment.is_active === false;
                                                         return (
                                                             <tr key={assignment.id} className={`border-b last:border-0 h-8 hover:bg-gray-50 ${isDeactivated ? 'bg-red-100 text-red-500' : (isExpired ? 'bg-red-50/20' : (isEmpty ? 'bg-green-100/50 text-green-700' : ''))}`}>
-                                                                <td className="text-center text-[10px] font-bold"><span className={isEmpty ? "text-green-600" : "text-gray-900"}>{acc.login_id}-{assignment.slot_number + 1}</span></td>
-                                                                {isEditing ? (
-                                                                    <>
-                                                                        <td className="px-1"><Input className="h-6 text-xs bg-white" placeholder="Tidal ID" value={val.tidal_id || ''} onChange={e => updateGridValue(acc.id, sIdx, 'tidal_id', e.target.value)} /></td>
-                                                                        <td className="px-1"><Input className="h-6 text-xs bg-white" placeholder="이름" value={val.buyer_name || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_name', e.target.value)} /></td>
-                                                                        <td className="px-1"><Input className="h-6 text-xs bg-white" placeholder="Email" value={val.buyer_email || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_email', e.target.value)} /></td>
-                                                                        <td className="px-1"><Input className="h-6 text-xs bg-white" placeholder="전화번호" value={val.buyer_phone || ''} onChange={e => updateGridValue(acc.id, sIdx, 'buyer_phone', e.target.value)} /></td>
-                                                                        <td className="px-1"><Input type="date" className="h-6 text-xs bg-white px-1" value={val.start_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'start_date', e.target.value)} /></td>
-                                                                        <td className="px-1"><Input type="date" className="h-6 text-xs bg-white px-1" value={val.end_date || ''} onChange={e => updateGridValue(acc.id, sIdx, 'end_date', e.target.value)} /></td>
-                                                                        <td className="px-1 w-16"><Input type="number" className="h-6 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} /></td>
-                                                                        <td className="px-1">
-                                                                            <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
-                                                                                <MessageSquareText size={12} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
-                                                                                <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo ? (val.memo.split('\n')[0].substring(0, 10) + (val.memo.split('\n')[0].length > 10 ? '..' : '')) : ''}</span>
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="px-1">
-                                                                            <div className="flex justify-center gap-1 items-center">
-                                                                                <Button size="sm" variant="default" className="h-7 w-7 p-0 bg-blue-600" title="저장" onClick={() => handleSaveRow(acc.id, assignment.slot_number)}><Save size={14} /></Button>
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500" title="취소" onClick={() => cancelEdit(acc.id, assignment.slot_number)}>X</Button>
-                                                                            </div>
-                                                                        </td>
-                                                                    </>
-                                                                ) : isEmpty ? (
-                                                                    <>
-                                                                        <td /><td /><td /><td /><td /><td /><td /><td /><td />
-                                                                        <td className="px-2">
-                                                                            <div className="flex justify-center gap-1 items-center">
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="직접 입력" onClick={() => openEditAssignModal(acc.id, assignment.slot_number)}><Pencil size={14} /></Button>
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-green-600" title="주문 배정" onClick={() => openAssignModal(acc, assignment.slot_number)}><UserPlus size={14} /></Button>
-                                                                            </div>
-                                                                        </td>
-                                                                    </>
+                                                                <td className="text-center font-bold">
+                                                                    <div className="flex justify-center items-center">
+                                                                        <Popover>
+                                                                            <PopoverTrigger asChild>
+                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600">
+                                                                                    <Settings size={14} />
+                                                                                </Button>
+                                                                            </PopoverTrigger>
+                                                                            <PopoverContent className="w-32 p-1" align="start">
+                                                                                <div className="flex flex-col gap-1">
+                                                                                    {!isEmpty && (
+                                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-blue-600 font-bold" onClick={() => openQuickEditModal(acc.id, sIdx, val, assignment.id)}>
+                                                                                            <Pencil size={12} /> 정보수정
+                                                                                        </Button>
+                                                                                    )}
+                                                                                    {!isEmpty && (
+                                                                                        <Button size="sm" variant="ghost" className={`h-8 justify-start gap-2 text-xs ${isDeactivated ? 'text-blue-600' : 'text-orange-600'}`} onClick={() => handleToggleActive(assignment)}>
+                                                                                            <PowerOff size={12} /> {!isDeactivated ? '종료' : '복구'}
+                                                                                        </Button>
+                                                                                    )}
+                                                                                    {isEmpty && (
+                                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-green-600 font-bold" onClick={() => openAssignModal(acc, sIdx)}>
+                                                                                            <UserPlus size={12} /> 배정하기
+                                                                                        </Button>
+                                                                                    )}
+                                                                                    {!isEmpty && !assignment.is_deleted && (
+                                                                                        <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs" onClick={() => openMoveModal(assignment)}>
+                                                                                            <ArrowRightLeft size={12} /> 이동
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </PopoverContent>
+                                                                        </Popover>
+                                                                    </div>
+                                                                </td>
+                                                                {isEmpty ? (
+                                                                    <td colSpan={9} className="px-2 text-center text-gray-400 italic bg-green-50/20">비어있음</td>
                                                                 ) : (
                                                                     <>
                                                                         <td 
@@ -1232,19 +1249,14 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                         </td>
                                                                         <td className="px-2 text-gray-700 truncate max-w-[120px]">{val.buyer_email || '-'}</td>
                                                                         <td className="px-2 text-gray-700 truncate max-w-[100px]">{val.buyer_phone || '-'}</td>
-                                                                        <td className="px-2 text-gray-500 font-mono">{val.start_date || '-'}</td>
-                                                                        <td className="px-2 font-mono"><span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>{val.end_date || '-'}{isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}</span></td>
+                                                                        <td className="px-2 text-center text-gray-500 font-mono">{val.start_date || '-'}</td>
+                                                                        <td className="px-2 text-center font-mono"><span className={isExpired ? "text-red-500 font-bold" : "text-gray-500"}>{val.end_date || '-'}{isExpired && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded">만료</span>}</span></td>
                                                                         <td className="text-center text-gray-500 font-mono">{period}</td>
                                                                         <td className="text-right text-gray-700 font-mono px-2">{val.amount ? val.amount.toLocaleString() : '-'}</td>
                                                                         <td className="px-2">
                                                                             <div className="flex items-center gap-1 overflow-hidden" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
                                                                                 <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer ${val.memo ? 'text-blue-500 fill-blue-50' : 'text-gray-300 hover:text-gray-500'}`} />
                                                                                 <span className="text-[10px] text-gray-500 truncate cursor-pointer">{val.memo?.split('\n')[0] || ''}</span>
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="px-2">
-                                                                            <div className="flex justify-center gap-1 items-center">
-                                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditAssignModal(acc.id, assignment.slot_number)}><Pencil size={14} /></Button>
                                                                             </div>
                                                                         </td>
                                                                     </>
@@ -1387,7 +1399,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 <div className="space-y-2">
                                     <h4 className="text-sm font-bold text-red-600">실패 목록 ({importResults.failed.length})</h4>
                                     <div className="max-h-40 overflow-y-auto border rounded divide-y text-xs">
-                                        {importResults.failed.map((f, i) => <div key={i} className="p-2 flex justify-between"><span className="font-medium">{f.id}</span><span className="text-red-500">{f.reason}</span></div>)}
+                                        {importResults.failed.map((f: { id: string; reason: string }, i: number) => <div key={i} className="p-2 flex justify-between"><span className="font-medium">{f.id}</span><span className="text-red-500">{f.reason}</span></div>)}
                                     </div>
                                 </div>
                             )}
@@ -1415,58 +1427,71 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isEditAssignModalOpen} onOpenChange={setIsEditAssignModalOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader><DialogTitle>정보수정 / {editAssignData?.assignment_number}</DialogTitle></DialogHeader>
-                    {editAssignData && (
-                        <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
-                            <div className="flex gap-4">
-                                <div className="w-[30%] space-y-1"><Label className="text-xs text-gray-500">이름</Label><Input value={editAssignData.buyer_name || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })} className="h-9" /></div>
-                                <div className="flex-1 space-y-1"><Label className="text-xs text-gray-500">Tidal ID</Label><Input value={editAssignData.tidal_id || ''} onChange={e => setEditAssignData({ ...editAssignData, tidal_id: e.target.value })} className="h-9" /></div>
+            <Dialog open={isQuickEditModalOpen} onOpenChange={setIsQuickEditModalOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Pencil className="w-4 h-4 text-blue-600" />
+                            정보 수정 (고객 정보)
+                        </DialogTitle>
+                    </DialogHeader>
+                    {quickEditValues && (
+                        <div className="grid gap-4 py-4">
+                            <div className="flex gap-2">
+                                <div className="w-[30%] space-y-1">
+                                    <Label className="text-[10px] text-gray-500">이름</Label>
+                                    <Input value={quickEditValues.buyer_name || ''} onChange={e => setQuickEditValues({ ...quickEditValues, buyer_name: e.target.value })} className="h-9" />
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <Label className="text-[10px] text-gray-500">Tidal ID</Label>
+                                    <Input value={quickEditValues.tidal_id || ''} onChange={e => setQuickEditValues({ ...quickEditValues, tidal_id: e.target.value })} className="h-9" />
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label className="text-xs text-gray-500">전화번호</Label><Input value={editAssignData.buyer_phone || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_phone: e.target.value })} className="h-9" /></div>
-                                <div className="space-y-1"><Label className="text-xs text-gray-500">이메일</Label><Input value={editAssignData.buyer_email || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_email: e.target.value })} className="h-9" /></div>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] text-gray-500">전화번호</Label>
+                                    <Input value={quickEditValues.buyer_phone || ''} onChange={e => setQuickEditValues({ ...quickEditValues, buyer_phone: e.target.value })} className="h-9" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] text-gray-500">이메일</Label>
+                                    <Input value={quickEditValues.buyer_email || ''} onChange={e => setQuickEditValues({ ...quickEditValues, buyer_email: e.target.value })} className="h-9" />
+                                </div>
                             </div>
                             <div className="flex gap-2">
                                 <div className="flex-1 space-y-1">
                                     <Label className="text-[10px] text-gray-500">시작일</Label>
-                                    <Input type="date" value={editAssignData.start_date || ''} onChange={e => {
-                                        const ns = e.target.value; let ne = editAssignData.end_date;
-                                        if (ns && editAssignData.period_months) { try { ne = addDays(parseISO(ns), editAssignData.period_months * 30).toISOString().split('T')[0]; } catch { } }
-                                        setEditAssignData({ ...editAssignData, start_date: ns, end_date: ne });
+                                    <Input type="date" value={quickEditValues.start_date || ''} onChange={e => {
+                                        const ns = e.target.value; let ne = quickEditValues.end_date;
+                                        if (ns && quickEditValues.period_months) { try { ne = addDays(parseISO(ns), quickEditValues.period_months * 30).toISOString().split('T')[0]; } catch { } }
+                                        setQuickEditValues({ ...quickEditValues, start_date: ns, end_date: ne });
                                     }} className="h-9 text-xs px-1" />
                                 </div>
                                 <div className="flex-1 space-y-1">
                                     <Label className="text-[10px] text-gray-500">종료일</Label>
-                                    <Input type="date" value={editAssignData.end_date || ''} onChange={e => {
-                                        const ne = e.target.value; let nm = editAssignData.period_months;
-                                        if (editAssignData.start_date && ne) { try { nm = Math.max(0, Math.floor(differenceInDays(parseISO(ne), parseISO(editAssignData.start_date)) / 30)); } catch { } }
-                                        setEditAssignData({ ...editAssignData, end_date: ne, period_months: nm });
+                                    <Input type="date" value={quickEditValues.end_date || ''} onChange={e => {
+                                        const ne = e.target.value; let nm = quickEditValues.period_months;
+                                        if (quickEditValues.start_date && ne) { try { nm = Math.max(0, Math.floor(differenceInDays(parseISO(ne), parseISO(quickEditValues.start_date)) / 30)); } catch { } }
+                                        setQuickEditValues({ ...quickEditValues, end_date: ne, period_months: nm });
                                     }} className="h-9 text-xs px-1" />
                                 </div>
                                 <div className="w-12 space-y-1">
                                     <Label className="text-[10px] text-gray-500">개월</Label>
-                                    <Input type="number" value={editAssignData.period_months || ''} onChange={e => {
-                                        const m = parseInt(e.target.value) || 0; let ne = editAssignData.end_date;
-                                        if (editAssignData.start_date && m >= 0) { try { ne = addDays(parseISO(editAssignData.start_date), m * 30).toISOString().split('T')[0]; } catch { } }
-                                        setEditAssignData({ ...editAssignData, period_months: m, end_date: ne });
+                                    <Input type="number" value={quickEditValues.period_months || ''} onChange={e => {
+                                        const m = parseInt(e.target.value) || 0; let ne = quickEditValues.end_date;
+                                        if (quickEditValues.start_date && m >= 0) { try { ne = addDays(parseISO(quickEditValues.start_date), m * 30).toISOString().split('T')[0]; } catch { } }
+                                        setQuickEditValues({ ...quickEditValues, period_months: m, end_date: ne });
                                     }} className="h-9 text-xs px-1" />
-                                </div>
-                                <div className="w-24 space-y-1">
-                                    <Label className="text-[10px] text-gray-500">계약금액(원)</Label>
-                                    <Input type="text" value={editAssignData.amount ? editAssignData.amount.toLocaleString() : ''} onChange={e => setEditAssignData({ ...editAssignData, amount: parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0 })} className="h-9 text-xs px-1" />
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-xs text-gray-500">메모</Label>
-                                <textarea rows={3} className="w-full p-2 text-sm border rounded-md focus:ring-1 focus:ring-blue-500 outline-none" value={editAssignData.memo || ''} onChange={e => setEditAssignData({ ...editAssignData, memo: e.target.value })} />
+                                <Label className="text-[10px] text-gray-500">메모</Label>
+                                <textarea rows={3} className="w-full p-2 text-sm border rounded-md focus:ring-1 focus:ring-blue-500 outline-none" value={quickEditValues.memo || ''} onChange={e => setQuickEditValues({ ...quickEditValues, memo: e.target.value })} />
                             </div>
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditAssignModalOpen(false)}>취소</Button>
-                        <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">저장하기</Button>
+                        <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)}>취소</Button>
+                        <Button onClick={handleSaveQuickEdit} className="bg-blue-600 hover:bg-blue-700">수정하기</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
