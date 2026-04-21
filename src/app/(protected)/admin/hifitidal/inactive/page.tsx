@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import { apiFetch } from '@/lib/api';
 
 interface AssignmentHistory {
+    deleted_at?: string;
     id: string;
     slot_number: number;
     tidal_id: string;
@@ -23,6 +24,7 @@ interface AssignmentHistory {
     assigned_at?: string;
     is_active: boolean;
     isEmpty?: boolean;
+    master_id?: string;
     accounts?: {
         id: string;
         login_id: string;
@@ -60,6 +62,19 @@ function HifiTidalInactiveAccountsContent() {
             const accRes = await apiFetch('/api/admin/accounts?product=HifiTidal', { cache: 'no-store' });
             if (!accRes.ok) throw new Error('Failed to fetch accounts');
             const accountsData = await accRes.json();
+    
+            // Identify Master IDs
+            const masterMap: Record<string, string> = {};
+            accountsData.forEach((acc: any) => {
+                const master = acc.order_accounts?.find((oa: any) => oa.type === 'master' || oa.slot_number === 0);
+                if (master) masterMap[acc.id] = master.tidal_id || '-';
+            });
+    
+            inactiveData.forEach((ina: AssignmentHistory) => {
+                const accId = ina.accounts?.id;
+                if (accId) ina.master_id = masterMap[accId] || '-';
+                if (!ina.master_id) ina.master_id = '-';
+            });
 
             // 3. Identify empty slots
             const emptySlots: AssignmentHistory[] = [];
@@ -96,8 +111,8 @@ function HifiTidalInactiveAccountsContent() {
                 if (a.isEmpty && !b.isEmpty) return -1;
                 if (!a.isEmpty && b.isEmpty) return 1;
 
-                const dateA = a.assigned_at ? new Date(a.assigned_at).getTime() : 0;
-                const dateB = b.assigned_at ? new Date(b.assigned_at).getTime() : 0;
+                const dateA = a.deleted_at ? new Date(a.deleted_at).getTime() : 0;
+                const dateB = b.deleted_at ? new Date(b.deleted_at).getTime() : 0;
                 return dateB - dateA;
             });
 
@@ -131,13 +146,14 @@ function HifiTidalInactiveAccountsContent() {
             return {
                 'No.': idx + 1,
                 '배정번호': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
+                'Master ID': a.master_id || '-',
                 '상태': isEmpty ? '빈 슬롯' : '지난 내역',
                 'Tidal ID': a.tidal_id,
                 '구매자명': isEmpty ? '-' : (a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-'),
                 '연락처': isEmpty ? '-' : (a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'),
                 '시작일': a.start_date || '-',
                 '종료일': a.end_date || '-',
-                '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-'
+                '삭제일시': a.deleted_at ? new Date(a.deleted_at).toLocaleString() : '-'
             };
         });
 
@@ -174,18 +190,19 @@ function HifiTidalInactiveAccountsContent() {
                             <tr className="bg-gray-100 border-b">
                                 <th className="p-3 text-center w-12">No</th>
                                 <th className="p-3 text-center">배정번호</th>
+                                <th className="p-3 text-left">Master ID</th>
                                 <th className="p-3 text-left">Tidal ID</th>
                                 <th className="p-3 text-left">구매자</th>
                                 <th className="p-3 text-left">연락처</th>
                                 <th className="p-3 text-center">기간</th>
-                                <th className="p-3 text-center">배정일시</th>
+                                <th className="p-3 text-center">삭제일시</th>
                                 <th className="p-3 text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody>
                             {assignments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="p-8 text-center text-gray-500">
+                                    <td colSpan={10} className="p-8 text-center text-gray-500">
                                         지난 내역이 없습니다.
                                     </td>
                                 </tr>
@@ -198,6 +215,9 @@ function HifiTidalInactiveAccountsContent() {
                                             <td className="p-2 text-center font-bold">
                                                 {a.accounts?.login_id || '-'}-{a.slot_number + 1}
                                             </td>
+                                            <td className="p-2 font-mono text-[10px] opacity-70">
+                                                {a.master_id || '-'}
+                                            </td>
                                             <td className="p-2">{a.tidal_id}</td>
                                             <td className="p-2 font-bold">
                                                 {isEmpty ? '빈 슬롯' : (a.buyer_name || a.orders?.buyer_name || a.orders?.profiles?.name || '-')}
@@ -207,7 +227,7 @@ function HifiTidalInactiveAccountsContent() {
                                                 {isEmpty ? '-' : `${a.start_date} ~ ${a.end_date}`}
                                             </td>
                                             <td className="p-2 text-center text-[10px] opacity-70">
-                                                {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
+                                                {isEmpty ? '-' : (a.deleted_at ? new Date(a.deleted_at).toLocaleDateString() : '-')}
                                             </td>
                                             <td className="p-2 text-center">
                                                 {isEmpty ? (
