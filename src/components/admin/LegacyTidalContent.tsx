@@ -171,7 +171,7 @@ export function LegacyTidalContent({
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         checkbox: 30, login_id: 64, edit: 35, memo: 80, tidal_id: 110,
         tidal_password: 100, buyer_name: 70, buyer_email: 110, buyer_phone: 95,
-        order_number: 100, start_date: 75, end_date: 75, period: 40, amount: 70
+        order_number: 100, start_date: 75, end_date: 75, updated_at: 75, period: 60, amount: 70
     });
     const [, setResizingCol] = useState<string | null>(null);
 
@@ -305,6 +305,13 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     } as Assignment;
                 }
                 const assignment = assignmentObj;
+
+                // 계약개월 미리 계산 (필터링 및 표시용)
+                let periodNum = assignment.period_months || 0;
+                if (!periodNum && assignment.start_date && assignment.end_date) {
+                    try { periodNum = Math.floor(differenceInDays(parseISO(assignment.end_date), parseISO(assignment.start_date)) / 30); } catch { }
+                }
+
                 const query = searchQuery.toLowerCase().trim();
                 if (query) {
                     const bn = (assignment.buyer_name || '').toLowerCase();
@@ -313,8 +320,13 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     const bp = (assignment.buyer_phone || '').toLowerCase();
                     if (!bn.includes(query) && !be.includes(query) && !ti.includes(query) && !bp.includes(query)) continue;
                 }
+                
                 if (showExpiredOnly) {
                     if (!assignment.end_date) continue;
+                    
+                    // 계약개월 1개월 미만 제외 (추가 요청 사항)
+                    if (periodNum < 1) continue;
+
                     const today = new Date(); today.setHours(0, 0, 0, 0);
                     const diff = Math.ceil((parseISO(assignment.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                     if (diff > expiredDays) continue;
@@ -324,10 +336,6 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 if (assignment.is_deleted === true) continue;
                 if (assignment.is_active === false) continue;
 
-                let periodNum = assignment.period_months || 0;
-                if (!periodNum && assignment.start_date && assignment.end_date) {
-                    try { periodNum = Math.floor(differenceInDays(parseISO(assignment.end_date), parseISO(assignment.start_date)) / 30); } catch { }
-                }
                 flattened.push({ id: assignment.id, assignment, account: acc, period: periodNum, originalAccIndex: accIdx });
             }
         });
@@ -336,14 +344,43 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     const filteredAccounts = accounts.filter(acc => {
         const query = searchQuery.toLowerCase().trim();
-        if (!query) return true;
-        if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) return true;
-        return acc.order_accounts?.some(oa => {
-            const ti = (oa.tidal_id || '').toLowerCase();
-            const bn = (oa.buyer_name || '').toLowerCase();
-            const bp = (oa.buyer_phone || '').toLowerCase();
-            return ti.includes(query) || bn.includes(query) || bp.includes(query);
-        });
+        let queryMatches = !query; // 검색어가 없으면 기본 true
+
+        if (query) {
+            if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) {
+                queryMatches = true;
+            } else if (acc.order_accounts?.some(oa => {
+                const ti = (oa.tidal_id || '').toLowerCase();
+                const bn = (oa.buyer_name || '').toLowerCase();
+                const bp = (oa.buyer_phone || '').toLowerCase();
+                return ti.includes(query) || bn.includes(query) || bp.includes(query);
+            })) {
+                queryMatches = true;
+            }
+        }
+
+        if (!queryMatches) return false;
+
+        // 잔여일 조회 필터 (계약개월 1개월 미만 제외 포함)
+        if (showExpiredOnly) {
+            const hasExpiringSlot = acc.order_accounts?.some(oa => {
+                if (!oa.end_date || oa.is_deleted || !oa.is_active) return false;
+                
+                // 계약개월 체크
+                let pMonths = oa.period_months || 0;
+                if (!pMonths && oa.start_date && oa.end_date) {
+                    try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
+                }
+                if (pMonths < 1) return false;
+
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const diff = Math.ceil((parseISO(oa.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                return diff <= expiredDays;
+            });
+            if (!hasExpiringSlot) return false;
+        }
+
+        return true;
     });
 
     const sortedAccounts = [...filteredAccounts].sort((a, b) => {
@@ -783,7 +820,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             <table className="w-full text-xs min-w-[1000px]">
                                 <thead>
                                     <tr className="bg-slate-50 border-b text-slate-500 uppercase font-bold tracking-tight">
-                                        <th className="text-center py-3 border-r border-slate-100" style={{ width: columnWidths.checkbox }}>
+                                        <th className="text-center py-3 border-r border-slate-100 whitespace-nowrap" style={{ width: columnWidths.checkbox }}>
                                             <input 
                                                 type="checkbox" 
                                                 className="rounded border-slate-300 pointer-events-auto"
@@ -805,7 +842,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             { id: 'amount', label: '계약금액', sortable: true },
                                             { id: 'memo', label: '메모', sortable: false },
                                         ].map(col => (
-                                            <th key={col.id} className="relative px-2 py-3 text-center border-r border-slate-100 cursor-pointer hover:bg-slate-100 group transition-colors" style={{ width: columnWidths[col.id] }}>
+                                            <th key={col.id} className="relative px-2 py-3 text-center border-r border-slate-100 cursor-pointer hover:bg-slate-100 group transition-colors whitespace-nowrap" style={{ width: columnWidths[col.id] }}>
                                                 <div className="flex items-center justify-center gap-1.5" onClick={() => col.sortable && handleSort(col.id)}>
                                                     {col.label} 
                                                     {sortConfig?.key === col.id && (
@@ -856,7 +893,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             
                                             return (
                                                 <tr key={assignment.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDeactivated ? 'bg-red-50 text-red-500' : (isExpired ? 'bg-red-50/30' : (isEmpty ? 'bg-emerald-50/50 text-emerald-700' : ''))} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
-                                                    <td className="text-center py-2 border-r border-slate-100">
+                                                    <td className="text-center py-2 border-r border-slate-100 whitespace-nowrap">
                                                         <input 
                                                             type="checkbox" 
                                                             className="rounded border-slate-300"
@@ -864,10 +901,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             onChange={() => handleToggleSelection(assignment.id)} 
                                                         />
                                                     </td>
-                                                    <td className="text-center font-bold px-2 border-r border-slate-100 text-slate-700">
+                                                    <td className="text-center font-bold px-2 border-r border-slate-100 text-slate-700 whitespace-nowrap">
                                                         {acc.login_id}-{assignment.slot_number + 1}
                                                     </td>
-                                                    <td className="text-center border-r border-slate-100">
+                                                    <td className="text-center border-r border-slate-100 whitespace-nowrap">
                                                         <Popover>
                                                             <PopoverTrigger asChild>
                                                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-white border hover:border-blue-200">
@@ -915,7 +952,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                         </Popover>
                                                     </td>
                                                     <td 
-                                                        className={`px-2 py-2 border-r border-slate-100 truncate ${assignment.type === 'master' ? 'bg-violet-50 text-violet-700 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
+                                                        className={`px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate ${assignment.type === 'master' ? 'bg-violet-50 text-violet-700 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
                                                         title={assignment.tidal_id || undefined}
                                                         onClick={(e) => assignment.type === 'master' && handleMasterIdClick(e, assignment.tidal_id)}
                                                     >
@@ -926,25 +963,25 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 truncate max-w-[80px]">{assignment.buyer_name || '-'}</td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 truncate max-w-[120px]">{assignment.buyer_email || '-'}</td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 truncate text-slate-500 font-mono">{assignment.buyer_phone || '-'}</td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 text-center text-slate-500 font-mono">{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 text-center font-mono">
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate max-w-[80px]">{assignment.buyer_name || '-'}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate max-w-[120px]">{assignment.buyer_email || '-'}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate text-slate-500 font-mono">{assignment.buyer_phone || '-'}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center text-slate-500 font-mono">{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center font-mono">
                                                         <span className={isExpired ? "text-red-500 font-bold" : "text-slate-700"}>
                                                             {assignment.end_date ? format(parseISO(assignment.end_date), 'yy-MM-dd') : '-'}
                                                         </span>
                                                     </td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 text-center text-slate-500 font-mono">
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center text-slate-500 font-mono">
                                                         {assignment.updated_at ? format(parseISO(assignment.updated_at), 'yy-MM-dd') : (assignment.assigned_at ? format(parseISO(assignment.assigned_at), 'yy-MM-dd') : '-')}
                                                     </td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 text-center text-slate-700 font-medium">{item.period}개월</td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 text-right text-slate-700 font-mono font-medium">{val.amount ? val.amount.toLocaleString() : '-'}</td>
-                                                    <td className="px-2 py-2 border-slate-100">
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center text-slate-700 font-medium">{item.period}개월</td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-right text-slate-700 font-mono font-medium">{val.amount ? val.amount.toLocaleString() : '-'}</td>
+                                                    <td className="px-2 py-2 border-slate-100 whitespace-nowrap">
                                                         {!isEmpty && (
                                                             <div className="flex items-center gap-1.5 overflow-hidden group/memo" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
                                                                 <MessageSquareText size={14} className={`flex-shrink-0 cursor-pointer transition-colors ${val.memo ? 'text-blue-500' : 'text-slate-300 group-hover/memo:text-slate-500'}`} />
-                                                                <span className="text-[10px] text-slate-400 truncate cursor-pointer group-hover/memo:text-slate-600">
+                                                                <span className="text-[10px] text-slate-400 truncate cursor-pointer group-hover/memo:text-slate-600 whitespace-nowrap">
                                                                     {val.memo ? val.memo.split('\n')[0] : ''}
                                                                 </span>
                                                             </div>
@@ -966,18 +1003,18 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 ) : (
                     /* ===== LIST VIEW ===== */
                     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div className="grid grid-cols-14 gap-2 p-3 bg-slate-50 font-bold border-b text-slate-500 text-[11px] uppercase tracking-wider">
-                            <div className="col-span-1 cursor-pointer hover:text-slate-800 flex items-center gap-1" onClick={() => handleSort('login_id')}>GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
-                            <div className="col-span-2">결제계좌</div>
-                            <div className="col-span-1 text-center font-bold">결제일</div>
-                            <div className="col-span-2 text-left">마스터계정</div>
-                            <div className="col-span-2 text-left cursor-pointer hover:text-slate-800 flex items-center gap-1" onClick={() => handleSort('end_date')}>종료예정일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
-                            <div className="col-span-1 text-left">계약 개월</div>
-                            <div className="col-span-1 text-right pr-2">계약금액</div>
-                            <div className="col-span-1 text-left">메모</div>
-                            <div className="col-span-1 text-center cursor-pointer hover:text-slate-800 flex items-center justify-center gap-1" onClick={() => handleSort('used_slots')}>슬롯 {sortConfig?.key === 'used_slots' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
-                            <div className="col-span-1 text-center">관리</div>
-                            <div className="col-span-1 text-center">펼치기</div>
+                        <div className="grid grid-cols-14 gap-2 p-3 bg-slate-50 font-bold border-b text-slate-500 text-[11px] uppercase tracking-wider whitespace-nowrap">
+                            <div className="col-span-1 cursor-pointer hover:text-slate-800 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('login_id')}>GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
+                            <div className="col-span-2 whitespace-nowrap">결제계좌</div>
+                            <div className="col-span-1 text-center font-bold whitespace-nowrap">결제일</div>
+                            <div className="col-span-2 text-left whitespace-nowrap">마스터계정</div>
+                            <div className="col-span-2 text-left cursor-pointer hover:text-slate-800 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('end_date')}>종료예정일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
+                            <div className="col-span-1 text-left whitespace-nowrap">계약 개월</div>
+                            <div className="col-span-1 text-right pr-2 whitespace-nowrap">계약금액</div>
+                            <div className="col-span-1 text-left whitespace-nowrap">메모</div>
+                            <div className="col-span-1 text-center cursor-pointer hover:text-slate-800 flex items-center justify-center gap-1 whitespace-nowrap" onClick={() => handleSort('used_slots')}>슬롯 {sortConfig?.key === 'used_slots' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
+                            <div className="col-span-1 text-center whitespace-nowrap">관리</div>
+                            <div className="col-span-1 text-center whitespace-nowrap">펼치기</div>
                         </div>
                         <div className="divide-y divide-slate-100">
                             {sortedAccounts.map(acc => {
@@ -1003,12 +1040,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
                                 return (
                                     <div key={acc.id} id={`account-${acc.id}`} className="group/row">
-                                        <div className="grid grid-cols-14 gap-2 p-3 items-center text-xs hover:bg-slate-50 transition-colors">
-                                            <div className="col-span-1 text-slate-900 font-bold truncate cursor-pointer" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
-                                            <div className="col-span-2 truncate cursor-pointer" onClick={() => toggleRow(acc.id)}><span className="text-blue-600 font-semibold">{acc.payment_email}</span></div>
-                                            <div className="col-span-1 text-center text-slate-500 font-mono" onClick={() => toggleRow(acc.id)}>{acc.payment_day}일</div>
+                                        <div className="grid grid-cols-14 gap-2 p-3 items-center text-xs hover:bg-slate-50 transition-colors whitespace-nowrap">
+                                            <div className="col-span-1 text-slate-900 font-bold truncate cursor-pointer whitespace-nowrap" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
+                                            <div className="col-span-2 truncate cursor-pointer whitespace-nowrap" onClick={() => toggleRow(acc.id)}><span className="text-blue-600 font-semibold">{acc.payment_email}</span></div>
+                                            <div className="col-span-1 text-center text-slate-500 font-mono whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{acc.payment_day}일</div>
                                             <div 
-                                                className="col-span-2 text-slate-700 truncate cursor-pointer hover:text-blue-600 relative overflow-visible" 
+                                                className="col-span-2 text-slate-700 truncate cursor-pointer hover:text-blue-600 relative overflow-visible whitespace-nowrap" 
                                                 title={tidalId} 
                                                 onClick={(e) => handleMasterIdClick(e, tidalId)}
                                             >
@@ -1017,11 +1054,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                     <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">ID 복사됨!</span>
                                                 )}
                                             </div>
-                                            <div className={`col-span-2 font-mono ${isWarning ? 'text-red-500 font-bold' : 'text-slate-600'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>
-                                            <div className="col-span-1 text-slate-500 font-mono" onClick={() => toggleRow(acc.id)}>{duration}</div>
-                                            <div className="col-span-1 text-right text-slate-500 font-mono pr-2" onClick={() => toggleRow(acc.id)}>-</div>
-                                            <div className="col-span-1 text-slate-400 text-[10px] truncate" title={acc.memo} onClick={() => toggleRow(acc.id)}>{acc.memo}</div>
-                                            <div className="col-span-1 text-center font-bold text-blue-600" onClick={() => toggleRow(acc.id)}>{acc.used_slots}/{acc.max_slots}</div>
+                                            <div className={`col-span-2 font-mono whitespace-nowrap ${isWarning ? 'text-red-500 font-bold' : 'text-slate-600'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>
+                                            <div className="col-span-1 text-slate-500 font-mono whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{duration}</div>
+                                            <div className="col-span-1 text-right text-slate-500 font-mono pr-2 whitespace-nowrap" onClick={() => toggleRow(acc.id)}>-</div>
+                                            <div className="col-span-1 text-slate-400 text-[10px] truncate whitespace-nowrap" title={acc.memo} onClick={() => toggleRow(acc.id)}>{acc.memo}</div>
+                                            <div className="col-span-1 text-center font-bold text-blue-600 whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{acc.used_slots}/{acc.max_slots}</div>
                                             <div className="col-span-1 flex justify-center">
                                                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-blue-50 text-blue-600" onClick={() => { setEditingAccount(acc); setIsEditModalOpen(true); }}><Pencil size={14} /></Button>
                                             </div>
@@ -1035,23 +1072,23 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             <div className="bg-slate-50/50 p-4 border-t border-b border-slate-100">
                                                 <table className="w-full text-xs">
                                                     <thead>
-                                                        <tr className="text-slate-400 font-bold border-b border-slate-200">
-                                                            <th className="text-center py-2 w-12">수정</th>
-                                                            <th className="text-left py-2 px-2">Tidal ID</th>
-                                                            <th className="text-left py-2 px-2">고객명</th>
-                                                            <th className="text-left py-2 px-2 w-48">이메일</th>
-                                                            <th className="text-left py-2 px-2">전화번호</th>
-                                                            <th className="text-center py-2">시작일</th>
-                                                            <th className="text-center py-2">종료일</th>
-                                                            <th className="text-center py-2">변경일</th>
-                                                            <th className="text-center py-2">계약 개월</th>
-                                                            <th className="text-right py-2 px-2">금액</th>
-                                                            <th className="text-left py-2 px-2">메모</th>
+                                                        <tr className="text-slate-400 font-bold border-b border-slate-200 whitespace-nowrap">
+                                                            <th className="text-center py-2 w-12 whitespace-nowrap">수정</th>
+                                                            <th className="text-left py-2 px-2 whitespace-nowrap">Tidal ID</th>
+                                                            <th className="text-left py-2 px-2 whitespace-nowrap">고객명</th>
+                                                            <th className="text-left py-2 px-2 w-48 whitespace-nowrap">이메일</th>
+                                                            <th className="text-left py-2 px-2 whitespace-nowrap">전화번호</th>
+                                                            <th className="text-center py-2 whitespace-nowrap">시작일</th>
+                                                            <th className="text-center py-2 whitespace-nowrap">종료일</th>
+                                                            <th className="text-center py-2 whitespace-nowrap">변경일</th>
+                                                            <th className="text-center py-2 whitespace-nowrap">계약 개월</th>
+                                                            <th className="text-right py-2 px-2 whitespace-nowrap">금액</th>
+                                                            <th className="text-left py-2 px-2 whitespace-nowrap">메모</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {(() => {
-                                                            const slots: Assignment[] = [];
+                                                            let slots: Assignment[] = [];
                                                             for (let i=0; i<acc.max_slots; i++) {
                                                                 const found = acc.order_accounts?.find(oa => oa.slot_number === i);
                                                                 if (found) slots.push(found);
@@ -1065,6 +1102,25 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                     } as Assignment);
                                                                 }
                                                             }
+
+                                                            // 잔여일 조회 필터링 (계약개월 1개월 미만 제외 포함)
+                                                            if (showExpiredOnly) {
+                                                                slots = slots.filter(oa => {
+                                                                    if (!oa.end_date || oa.is_deleted || !oa.is_active) return false;
+                                                                    
+                                                                    // 계약개월 체크
+                                                                    let pMonths = oa.period_months || 0;
+                                                                    if (!pMonths && oa.start_date && oa.end_date) {
+                                                                        try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
+                                                                    }
+                                                                    if (pMonths < 1) return false;
+
+                                                                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                                                                    const diff = Math.ceil((parseISO(oa.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                                                    return diff <= expiredDays;
+                                                                });
+                                                            }
+
                                                             return slots.sort((a,b) => (a.slot_number||0)-(b.slot_number||0)).map(assignment => {
                                                                 const isEmpty = assignment.id.startsWith('empty_');
                                                                 const isDeactivated = assignment.is_active === false;
@@ -1080,7 +1136,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
                                                                 return (
                                                                     <tr key={assignment.id} className={`border-b last:border-0 border-slate-100 h-10 ${isDeactivated ? 'bg-red-50 text-red-500' : (isEmpty ? 'bg-emerald-50/20 text-emerald-600' : 'bg-white')}`}>
-                                                                        <td className="text-center">
+                                                                        <td className="text-center whitespace-nowrap">
                                                                             <Popover>
                                                                                 <PopoverTrigger asChild>
                                                                                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-slate-100">
@@ -1118,22 +1174,22 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                             </Popover>
                                                                         </td>
                                                                         {isEmpty ? (
-                                                                            <td colSpan={9} className="px-2 text-center text-slate-400 italic">빈 슬롯</td>
+                                                                            <td colSpan={9} className="px-2 text-center text-slate-400 italic whitespace-nowrap">빈 슬롯</td>
                                                                         ) : (
                                                                             <>
-                                                                                <td className="px-2 truncate">{val.tidal_id || '-'}</td>
-                                                                                <td className="px-2 truncate max-w-[80px]">{val.buyer_name || '-'}</td>
-                                                                                <td className="px-2 truncate max-w-[150px]">{val.buyer_email || '-'}</td>
-                                                                                <td className="px-2 font-mono">{val.buyer_phone || '-'}</td>
-                                                                                <td className="px-2 text-center font-mono">{val.start_date || '-'}</td>
-                                                                                <td className="px-2 text-center font-mono">{val.end_date || '-'}</td>
-                                                                                <td className="px-2 text-center font-mono">{val.updated_at ? val.updated_at.substring(0,10) : (val.assigned_at ? val.assigned_at.substring(0,10) : '-')}</td>
-                                                                                <td className="text-center font-medium">{period}</td>
-                                                                                <td className="text-right font-mono px-2">{val.amount?.toLocaleString() || '-'}</td>
-                                                                                <td className="px-2">
-                                                                                    <div className="flex items-center gap-1 cursor-pointer" onClick={() => openMemoModal(acc.id, assignment.slot_number, val.memo || '', assignment.id)}>
+                                                                                <td className="px-2 truncate whitespace-nowrap">{val.tidal_id || '-'}</td>
+                                                                                <td className="px-2 truncate max-w-[80px] whitespace-nowrap">{val.buyer_name || '-'}</td>
+                                                                                <td className="px-2 truncate max-w-[150px] whitespace-nowrap">{val.buyer_email || '-'}</td>
+                                                                                <td className="px-2 font-mono whitespace-nowrap">{val.buyer_phone || '-'}</td>
+                                                                                <td className="px-2 text-center font-mono whitespace-nowrap">{val.start_date || '-'}</td>
+                                                                                <td className="px-2 text-center font-mono whitespace-nowrap">{val.end_date || '-'}</td>
+                                                                                <td className="px-2 text-center font-mono whitespace-nowrap">{val.updated_at ? val.updated_at.substring(0,10) : (val.assigned_at ? val.assigned_at.substring(0,10) : '-')}</td>
+                                                                                <td className="text-center font-medium whitespace-nowrap">{period}</td>
+                                                                                <td className="text-right font-mono px-2 whitespace-nowrap">{val.amount?.toLocaleString() || '-'}</td>
+                                                                                <td className="px-2 whitespace-nowrap">
+                                                                                    <div className="flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => openMemoModal(acc.id, assignment.slot_number, val.memo || '', assignment.id)}>
                                                                                         <MessageSquareText size={14} className={val.memo ? 'text-blue-500' : 'text-slate-300'} />
-                                                                                        <span className="truncate text-[10px] text-slate-400 max-w-[60px]">{val.memo?.split('\n')[0]}</span>
+                                                                                        <span className="truncate text-[10px] text-slate-400 max-w-[60px] whitespace-nowrap">{val.memo?.split('\n')[0]}</span>
                                                                                     </div>
                                                                                 </td>
                                                                             </>
