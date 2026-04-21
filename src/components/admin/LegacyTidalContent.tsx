@@ -324,8 +324,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 if (showExpiredOnly) {
                     if (!assignment.end_date) continue;
                     
-                    // 계약개월 1개월 미만 제외 (추가 요청 사항)
-                    if (periodNum < 1) continue;
+                    // 계약개월 1개월 이하 제외 (추가 요청 사항)
+                    if (periodNum <= 1) continue;
 
                     const today = new Date(); today.setHours(0, 0, 0, 0);
                     const diff = Math.ceil((parseISO(assignment.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -366,12 +366,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             const hasExpiringSlot = acc.order_accounts?.some(oa => {
                 if (!oa.end_date || oa.is_deleted || !oa.is_active) return false;
                 
-                // 계약개월 체크
-                let pMonths = oa.period_months || 0;
-                if (!pMonths && oa.start_date && oa.end_date) {
-                    try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
-                }
-                if (pMonths < 1) return false;
+                // 계약개월 1개월 이하 체크
+                if (pMonths <= 1) return false;
 
                 const today = new Date(); today.setHours(0, 0, 0, 0);
                 const diff = Math.ceil((parseISO(oa.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -1108,12 +1104,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                 slots = slots.filter(oa => {
                                                                     if (!oa.end_date || oa.is_deleted || !oa.is_active) return false;
                                                                     
-                                                                    // 계약개월 체크
+                                                                    // 계약개월 1개월 이하 제외
                                                                     let pMonths = oa.period_months || 0;
                                                                     if (!pMonths && oa.start_date && oa.end_date) {
                                                                         try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
                                                                     }
-                                                                    if (pMonths < 1) return false;
+                                                                    if (pMonths <= 1) return false;
 
                                                                     const today = new Date(); today.setHours(0, 0, 0, 0);
                                                                     const diff = Math.ceil((parseISO(oa.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
