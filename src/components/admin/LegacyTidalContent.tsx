@@ -312,6 +312,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     try { periodNum = Math.floor(differenceInDays(parseISO(assignment.end_date), parseISO(assignment.start_date)) / 30); } catch { }
                 }
 
+                // 1개월 계약 건 제외 (사용자 요청)
+                if (periodNum > 0 && periodNum <= 1) continue;
+
                 const query = searchQuery.toLowerCase().trim();
                 if (query) {
                     const bn = (assignment.buyer_name || '').toLowerCase();
@@ -324,9 +327,6 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 if (showExpiredOnly) {
                     if (!assignment.end_date) continue;
                     
-                    // 계약개월 1개월 이하 제외 (추가 요청 사항)
-                    if (periodNum <= 1) continue;
-
                     const today = new Date(); today.setHours(0, 0, 0, 0);
                     const diff = Math.ceil((parseISO(assignment.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                     if (diff > expiredDays) continue;
@@ -350,6 +350,13 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) {
                 queryMatches = true;
             } else if (acc.order_accounts?.some(oa => {
+                // 1개월 계약 건은 검색에서도 제외
+                let pMonths = oa.period_months || 0;
+                if (!pMonths && oa.start_date && oa.end_date) {
+                    try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
+                }
+                if (pMonths > 0 && pMonths <= 1) return false;
+
                 const ti = (oa.tidal_id || '').toLowerCase();
                 const bn = (oa.buyer_name || '').toLowerCase();
                 const bp = (oa.buyer_phone || '').toLowerCase();
@@ -371,7 +378,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 if (!pMonths && oa.start_date && oa.end_date) {
                     try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
                 }
-                if (pMonths <= 1) return false;
+                if (pMonths > 0 && pMonths <= 1) return false;
 
                 const today = new Date(); today.setHours(0, 0, 0, 0);
                 const diff = Math.ceil((parseISO(oa.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -1103,18 +1110,21 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                 }
                                                             }
 
-                                                            // 잔여일 조회 필터링 (계약개월 1개월 미만 제외 포함)
+                                                            // 1개월 계약 건 필터링 (항상 적용)
+                                                            slots = slots.filter(oa => {
+                                                                let pMonths = oa.period_months || 0;
+                                                                if (!pMonths && oa.start_date && oa.end_date) {
+                                                                    try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
+                                                                }
+                                                                if (pMonths > 0 && pMonths <= 1) return false;
+                                                                return true;
+                                                            });
+
+                                                            // 잔여일 조회 필터링
                                                             if (showExpiredOnly) {
                                                                 slots = slots.filter(oa => {
                                                                     if (!oa.end_date || oa.is_deleted || !oa.is_active) return false;
                                                                     
-                                                                    // 계약개월 1개월 이하 제외
-                                                                    let pMonths = oa.period_months || 0;
-                                                                    if (!pMonths && oa.start_date && oa.end_date) {
-                                                                        try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
-                                                                    }
-                                                                    if (pMonths <= 1) return false;
-
                                                                     const today = new Date(); today.setHours(0, 0, 0, 0);
                                                                     const diff = Math.ceil((parseISO(oa.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                                                                     return diff <= expiredDays;
