@@ -312,11 +312,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     const fetchAccounts = React.useCallback(async () => {
         try {
             const params = new URLSearchParams({ product: 'HifiTidal' });
-            if (showInactive) {
-                params.append('showDeleted', 'true');
-            } else {
-                params.append('showInactive', 'true');
-            }
+            params.append('showInactive', 'true');
             const res = await apiFetch(`/api/admin/legacy-tidal?${params.toString()}`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`Failed to fetch (${res.status})`);
             const data = await res.json();
@@ -402,13 +398,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     const diff = Math.ceil((parseISO(assignment.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                     if (diff > expiredDays) continue;
                 }
-                if (!showInactive && assignment.is_deleted === true) continue;
-                if (showInactive && assignment.is_deleted !== true) continue;
+                if (assignment.is_deleted === true) continue;
                 let periodNum = assignment.period_months || 0;
                 if (!periodNum && assignment.start_date && assignment.end_date) {
                     try { periodNum = Math.floor(differenceInDays(parseISO(assignment.end_date), parseISO(assignment.start_date)) / 30); } catch { }
                 }
-                if ((showExpiredOnly || showInactive) && periodNum === 1) continue;
+                if (showExpiredOnly && periodNum === 1) continue;
                 if (periodNum < 1) continue;
                 flattened.push({ id: assignment.id, assignment, account: acc, period: periodNum, originalAccIndex: accIdx });
             }
@@ -1107,8 +1102,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 sortedAssignments = sortedAssignments.filter(a => a.end_date && parseISO(a.end_date) < today);
                                 if (sortedAssignments.length === 0) return null;
                             }
-                            if (showInactive) { sortedAssignments = sortedAssignments.filter(oa => oa.is_active === false); if (sortedAssignments.length === 0) return null; }
-                            else { sortedAssignments = sortedAssignments.filter(oa => oa.is_active !== false); }
+                            sortedAssignments = sortedAssignments.filter(oa => oa.is_active !== false);
 
                             const masterSlot = acc.order_accounts?.find(oa => oa.type === 'master');
                             const tidalId = masterSlot?.tidal_id || '-';
