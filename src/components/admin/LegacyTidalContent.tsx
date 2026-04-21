@@ -431,13 +431,44 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
     };
 
-    const handleToggleActive = async (assignment: Assignment) => {
-        if (!confirm('배정 상태를 변경하시겠습니까?')) return;
+    const handleToggleActive = async (assignment: Assignment, accountId?: string) => {
+        // Optimistic update
+        const accId = accountId || accounts.find(acc => acc.order_accounts?.some(oa => oa.id === assignment.id))?.id;
+        
+        let revertAccounts = accounts;
+        let revertGrid = gridValues;
+
+        if (accId) {
+            setGridValues(prev => ({
+                ...prev,
+                [`${accId}_${assignment.slot_number}`]: {
+                    ...prev[`${accId}_${assignment.slot_number}`],
+                    is_active: !(assignment.is_active ?? true),
+                }
+            }));
+            
+            setAccounts(prev => prev.map(acc => {
+                if (acc.id === accId) {
+                    return {
+                        ...acc,
+                        order_accounts: acc.order_accounts?.map(oa => oa.id === assignment.id ? { ...oa, is_active: !(assignment.is_active ?? true) } : oa)
+                    };
+                }
+                return acc;
+            }));
+        }
+
         try {
             const res = await fetchFn(`/api/admin/legacy-tidal/assignment/${assignment.id}/toggle-active`, { method: 'POST' });
             if (!res.ok) throw new Error('Toggle failed');
-            fetchAccounts();
-        } catch { alert('상태 변경 실패'); }
+            fetchAccounts(); // silently verify
+        } catch { 
+            alert('상태 변경 실패');
+            if (accId) {
+                setAccounts(revertAccounts);
+                setGridValues(revertGrid);
+            }
+        }
     };
 
     const exportToExcel = () => {
@@ -769,6 +800,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             { id: 'buyer_phone', label: '전화번호', sortable: false },
                                             { id: 'start_date', label: '시작일', sortable: true },
                                             { id: 'end_date', label: '종료일', sortable: true },
+                                            { id: 'updated_at', label: '변경일', sortable: true },
                                             { id: 'period', label: '계약 개월', sortable: true },
                                             { id: 'amount', label: '계약금액', sortable: true },
                                             { id: 'memo', label: '메모', sortable: false },
@@ -794,7 +826,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                 switch (sortConfig.key) {
                                                     case 'start_date': aVal = a.assignment.start_date || '0000'; bVal = b.assignment.start_date || '0000'; break;
                                                     case 'end_date': aVal = a.assignment.end_date || '9999'; bVal = b.assignment.end_date || '9999'; break;
-                                                    case 'period': aVal = a.period; bVal = b.period; break;
+                                                    case 'updated_at': aVal = a.assignment.updated_at || a.assignment.assigned_at || '0000'; bVal = b.assignment.updated_at || b.assignment.assigned_at || '0000'; break;
+                                                    case 'period': aVal = a.period || 0; bVal = b.period || 0; break;
                                                     case 'login_id': aVal = a.account.login_id; bVal = b.account.login_id; break;
                                                     case 'buyer_email': aVal = a.assignment.buyer_email || ''; bVal = b.assignment.buyer_email || ''; break;
                                                     case 'amount': aVal = a.assignment.amount || 0; bVal = b.assignment.amount || 0; break;
@@ -849,9 +882,18 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                         </Button>
                                                                     )}
                                                                     {!isEmpty && (
-                                                                        <Button size="sm" variant="ghost" className={`h-8 justify-start gap-2 text-xs ${isDeactivated ? 'text-blue-600' : 'text-orange-600 font-bold'}`} onClick={() => handleToggleActive(assignment)}>
-                                                                            <PowerOff size={12} /> {!isDeactivated ? '종료' : '복구'}
-                                                                        </Button>
+                                                                        <div 
+                                                                            className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 cursor-pointer rounded"
+                                                                            onClick={(e) => { e.preventDefault(); handleToggleActive(assignment, acc.id); }}
+                                                                        >
+                                                                            <span className={`text-[11px] font-bold flex items-center gap-1 ${!isDeactivated ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                                                                <PowerOff size={10} />
+                                                                                {!isDeactivated ? '활성중' : '비활성'}
+                                                                            </span>
+                                                                            <div className={`relative inline-flex h-3 w-6 items-center rounded-full transition-colors ${!isDeactivated ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                                                                <span className={`inline-block h-2 w-2 transform rounded-full bg-white transition-transform ${!isDeactivated ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                                                            </div>
+                                                                        </div>
                                                                     )}
                                                                     {isEmpty && (
                                                                         <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-emerald-600 font-bold" onClick={() => openAssignModal(acc, sIdx)}>
@@ -892,6 +934,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                         <span className={isExpired ? "text-red-500 font-bold" : "text-slate-700"}>
                                                             {assignment.end_date ? format(parseISO(assignment.end_date), 'yy-MM-dd') : '-'}
                                                         </span>
+                                                    </td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 text-center text-slate-500 font-mono">
+                                                        {assignment.updated_at ? format(parseISO(assignment.updated_at), 'yy-MM-dd') : (assignment.assigned_at ? format(parseISO(assignment.assigned_at), 'yy-MM-dd') : '-')}
                                                     </td>
                                                     <td className="px-2 py-2 border-r border-slate-100 text-center text-slate-700 font-medium">{item.period}개월</td>
                                                     <td className="px-2 py-2 border-r border-slate-100 text-right text-slate-700 font-mono font-medium">{val.amount ? val.amount.toLocaleString() : '-'}</td>
@@ -998,6 +1043,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             <th className="text-left py-2 px-2">전화번호</th>
                                                             <th className="text-center py-2">시작일</th>
                                                             <th className="text-center py-2">종료일</th>
+                                                            <th className="text-center py-2">변경일</th>
                                                             <th className="text-center py-2">계약 개월</th>
                                                             <th className="text-right py-2 px-2">금액</th>
                                                             <th className="text-left py-2 px-2">메모</th>
@@ -1049,9 +1095,18 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                                             </Button>
                                                                                         )}
                                                                                         {!isEmpty && (
-                                                                                            <Button size="sm" variant="ghost" className={`h-8 justify-start gap-2 text-xs ${isDeactivated ? 'text-blue-600' : 'text-orange-600 font-bold'}`} onClick={() => handleToggleActive(assignment)}>
-                                                                                                <PowerOff size={12} /> {!isDeactivated ? '종료' : '복구'}
-                                                                                            </Button>
+                                                                                            <div 
+                                                                                                className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 cursor-pointer rounded"
+                                                                                                onClick={(e) => { e.preventDefault(); handleToggleActive(assignment, acc.id); }}
+                                                                                            >
+                                                                                                <span className={`text-[11px] font-bold flex items-center gap-1 ${!isDeactivated ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                                                                                    <PowerOff size={10} />
+                                                                                                    {!isDeactivated ? '활성중' : '비활성'}
+                                                                                                </span>
+                                                                                                <div className={`relative inline-flex h-3 w-6 items-center rounded-full transition-colors ${!isDeactivated ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                                                                                    <span className={`inline-block h-2 w-2 transform rounded-full bg-white transition-transform ${!isDeactivated ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                                                                                </div>
+                                                                                            </div>
                                                                                         )}
                                                                                         {isEmpty && (
                                                                                             <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-emerald-600 font-bold" onClick={() => openAssignModal(acc, assignment.slot_number)}>
@@ -1072,6 +1127,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                                 <td className="px-2 font-mono">{val.buyer_phone || '-'}</td>
                                                                                 <td className="px-2 text-center font-mono">{val.start_date || '-'}</td>
                                                                                 <td className="px-2 text-center font-mono">{val.end_date || '-'}</td>
+                                                                                <td className="px-2 text-center font-mono">{val.updated_at ? val.updated_at.substring(0,10) : (val.assigned_at ? val.assigned_at.substring(0,10) : '-')}</td>
                                                                                 <td className="text-center font-medium">{period}</td>
                                                                                 <td className="text-right font-mono px-2">{val.amount?.toLocaleString() || '-'}</td>
                                                                                 <td className="px-2">

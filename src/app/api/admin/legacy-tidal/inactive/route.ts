@@ -22,6 +22,32 @@ export async function GET(req: NextRequest) {
 
         if (error) throw error;
 
+        // Populate master_id robustly from all assignments (regardless of active/deleted)
+        const accountIds = Array.from(new Set(data.map(d => d.account_id).filter(Boolean)));
+        
+        if (accountIds.length > 0) {
+            const { data: masters, error: masterError } = await supabaseAdmin
+                .from('legacy_tidal_assignments')
+                .select('account_id, tidal_id')
+                .in('account_id', accountIds as string[])
+                .eq('slot_number', 0);
+                
+            if (!masterError && masters) {
+                const masterMap: Record<string, string> = {};
+                masters.forEach(m => {
+                    if (m.tidal_id && m.tidal_id !== '-') {
+                        masterMap[m.account_id] = m.tidal_id;
+                    }
+                });
+                
+                data.forEach(d => {
+                    if (d.account_id && masterMap[d.account_id]) {
+                        d.master_id = masterMap[d.account_id];
+                    }
+                });
+            }
+        }
+
         return NextResponse.json(data);
     } catch (error) {
         const e = error as Error;
