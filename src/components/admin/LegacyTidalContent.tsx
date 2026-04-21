@@ -367,6 +367,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 if (!oa.end_date || oa.is_deleted || !oa.is_active) return false;
                 
                 // 계약개월 1개월 이하 체크
+                let pMonths = oa.period_months || 0;
+                if (!pMonths && oa.start_date && oa.end_date) {
+                    try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
+                }
                 if (pMonths <= 1) return false;
 
                 const today = new Date(); today.setHours(0, 0, 0, 0);
