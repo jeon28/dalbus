@@ -322,13 +322,13 @@ function LegacyTidalInactiveContent() {
                 '이메일': isEmpty ? '-' : (a.buyer_email || '-'),
                 '시작일': a.start_date || '-',
                 '종료일': a.end_date || '-',
-                '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-',
+                '배정일': a.assigned_at ? format(new Date(a.assigned_at), 'MM/dd HH:mm') : '-',
                 '메모': a.memo || ''
             };
             if (!showDeleted) {
                 data['Master ID'] = a.master_id || '-';
             } else {
-                data['삭제일'] = a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-';
+                data['삭제일'] = a.updated_at ? format(new Date(a.updated_at), 'MM/dd HH:mm') : '-';
             }
             return data;
         });
@@ -429,11 +429,11 @@ function LegacyTidalInactiveContent() {
                                                 {isEmpty ? '-' : `${(a.start_date || '').split('-').slice(1).join('/')} ~ ${(a.end_date || '').split('-').slice(1).join('/')}`}
                                             </td>
                                             <td className="p-1 text-center text-[9px] opacity-70">
-                                                {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
+                                                {isEmpty ? '-' : (a.assigned_at ? format(new Date(a.assigned_at), 'MM/dd HH:mm') : '-')}
                                             </td>
                                             {showDeleted && (
                                                 <td className="p-1 text-center text-[9px] text-red-600 font-semibold italic">
-                                                    {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-'}
+                                                    {a.updated_at ? format(new Date(a.updated_at), 'MM/dd HH:mm') : '-'}
                                                 </td>
                                             )}
                                             {showDeleted && (

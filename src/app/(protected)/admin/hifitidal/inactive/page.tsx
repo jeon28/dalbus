@@ -153,7 +153,7 @@ function HifiTidalInactiveAccountsContent() {
                 '연락처': isEmpty ? '-' : (a.buyer_phone || a.orders?.buyer_phone || a.orders?.profiles?.phone || '-'),
                 '시작일': a.start_date || '-',
                 '종료일': a.end_date || '-',
-                '삭제일시': a.deleted_at ? new Date(a.deleted_at).toLocaleString() : '-'
+                '삭제일시': a.deleted_at ? format(new Date(a.deleted_at), 'MM/dd HH:mm') : '-'
             };
         });
 
@@ -227,7 +227,7 @@ function HifiTidalInactiveAccountsContent() {
                                                 {isEmpty ? '-' : `${a.start_date} ~ ${a.end_date}`}
                                             </td>
                                             <td className="p-2 text-center text-[10px] opacity-70">
-                                                {isEmpty ? '-' : (a.deleted_at ? new Date(a.deleted_at).toLocaleDateString() : '-')}
+                                                {isEmpty ? '-' : (a.deleted_at ? format(new Date(a.deleted_at), 'MM/dd HH:mm') : '-')}
                                             </td>
                                             <td className="p-2 text-center">
                                                 {isEmpty ? (
