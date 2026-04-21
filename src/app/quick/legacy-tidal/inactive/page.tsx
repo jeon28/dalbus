@@ -1,6 +1,3 @@
-﻿import { PasswordGate } from '@/components/admin/PasswordGate';
-import { useState, useEffect } from 'react';
-
 "use client";
 
 import React, { useEffect, useState, Suspense } from 'react';
@@ -11,9 +8,10 @@ import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import styles from '../../admin.module.css';
+import styles from '@/app/(protected)/admin/admin.module.css';
 import * as XLSX from 'xlsx';
 import { quickFetch } from '@/lib/quickFetch';
+import { PasswordGate } from '@/components/admin/PasswordGate';
 
 interface LegacyTidalHistory {
     id: string;
@@ -141,7 +139,7 @@ function LegacyTidalInactiveContent() {
                             id: `empty-${acc.id}-${i}`,
                             slot_number: i,
                             tidal_id: '-',
-                            buyer_name: '鍮??щ’',
+                            buyer_name: '빈 슬롯',
                             is_active: false,
                             isEmpty: true,
                             master_id: masterMap[acc.id] || '-',
@@ -173,7 +171,7 @@ function LegacyTidalInactiveContent() {
             setRecords(combined);
         } catch (error) {
             console.error(error);
-            alert('?곗씠??濡쒕뵫 ?ㅽ뙣');
+            alert('데이터 로딩 실패');
         } finally {
             setIsLoading(false);
         }
@@ -181,8 +179,8 @@ function LegacyTidalInactiveContent() {
 
     const handleDelete = async (id: string) => {
         const confirmMsg = showDeleted 
-            ? '?대떦 湲곕줉???곴뎄?곸쑝濡???젣?섏떆寃좎뒿?덇퉴?\n???묒뾽? ?섎룎由????놁쑝硫??꾩쟾????젣?⑸땲??'
-            : '?대떦 湲곕줉????젣 ?곗씠???댁???濡??대룞?섏떆寃좎뒿?덇퉴?';
+            ? '해당 기록을 영구적으로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 완전히 삭제됩니다.'
+            : '해당 기록을 삭제 데이터 내역으로 이동하시겠습니까?';
         
         if (!confirm(confirmMsg)) return;
 
@@ -195,27 +193,27 @@ function LegacyTidalInactiveContent() {
                 method: 'DELETE',
             });
             if (!res.ok) throw new Error('Delete failed');
-            alert(showDeleted ? '?곴뎄 ??젣?섏뿀?듬땲??' : '??젣 ?곗씠?곕줈 ?대룞?섏뿀?듬땲??');
+            alert(showDeleted ? '영구 삭제되었습니다.' : '삭제 데이터로 이동되었습니다.');
             fetchInactiveRecords();
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '??젣 ?ㅽ뙣';
-            alert('??젣 ?ㅽ뙣: ' + message);
+            const message = error instanceof Error ? error.message : '삭제 실패';
+            alert('삭제 실패: ' + message);
         }
     };
 
     const handleRestore = async (id: string) => {
-        if (!confirm('?대떦 湲곕줉??鍮꾪솢???댁뿭?쇰줈 蹂듦뎄?섏떆寃좎뒿?덇퉴?')) return;
+        if (!confirm('해당 기록을 비활성 내역으로 복구하시겠습니까?')) return;
         try {
             const res = await quickFetch(`/api/quick/legacy-tidal/assignment/${id}`, {
                 method: 'PUT',
                 body: JSON.stringify({ is_deleted: false, is_active: false })
             });
             if (!res.ok) throw new Error('Restore failed');
-            alert('蹂듦뎄?섏뿀?듬땲??');
+            alert('복구되었습니다.');
             fetchInactiveRecords();
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '蹂듦뎄 ?ㅽ뙣';
-            alert('蹂듦뎄 ?ㅽ뙣: ' + message);
+            const message = error instanceof Error ? error.message : '복구 실패';
+            alert('복구 실패: ' + message);
         }
     };
 
@@ -266,11 +264,11 @@ function LegacyTidalInactiveContent() {
                     body: JSON.stringify(editAssignData)
                 });
                 if (!res.ok) throw new Error('Update failed');
-                alert('?섏젙?섏뿀?듬땲??');
+                alert('수정되었습니다.');
             } else {
                 // Create new
                 if (!editAssignData.buyer_name && !editAssignData.buyer_email) {
-                    alert('?대쫫 ?먮뒗 ID(?대찓??瑜??낅젰?댁＜?몄슂.');
+                    alert('이름 또는 ID(이메일)를 입력해주세요.');
                     return;
                 }
                 const res = await quickFetch(`/api/quick/legacy-tidal/assign/${activeEditAccountId}`, { 
@@ -279,12 +277,12 @@ function LegacyTidalInactiveContent() {
                     body: JSON.stringify({ ...editAssignData, slot_number: activeEditSlotIdx }) 
                 });
                 if (!res.ok) throw new Error('Create failed');
-                alert('諛곗젙?섏뿀?듬땲??');
+                alert('배정되었습니다.');
             }
             setIsEditAssignModalOpen(false);
             fetchInactiveRecords();
         } catch (e) {
-            alert('????ㅽ뙣: ' + (e instanceof Error ? e.message : String(e)));
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
         }
     };
 
@@ -305,9 +303,9 @@ function LegacyTidalInactiveContent() {
             if (!res.ok) throw new Error('Update failed');
             setIsMemoModalOpen(false);
             fetchInactiveRecords();
-            alert('硫붾え媛 ??λ릺?덉뒿?덈떎.');
+            alert('메모가 저장되었습니다.');
         } catch (e) {
-            alert('????ㅽ뙣: ' + (e instanceof Error ? e.message : String(e)));
+            alert('저장 실패: ' + (e instanceof Error ? e.message : String(e)));
         }
     };
 
@@ -316,29 +314,29 @@ function LegacyTidalInactiveContent() {
             const isEmpty = a.isEmpty === true;
             const data: Record<string, string | number> = {
                 'No.': idx + 1,
-                '諛곗젙踰덊샇': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
-                '?곹깭': isEmpty ? '鍮??щ’' : '吏???댁뿭',
+                '배정번호': `${a.accounts?.login_id || '-'}-${a.slot_number + 1}`,
+                '상태': isEmpty ? '빈 슬롯' : '지난 내역',
                 'Tidal ID': a.tidal_id,
-                '怨좉컼紐?: isEmpty ? '-' : (a.buyer_name || '-'),
-                '?곕씫泥?: isEmpty ? '-' : (a.buyer_phone || '-'),
-                '?대찓??: isEmpty ? '-' : (a.buyer_email || '-'),
-                '?쒖옉??: a.start_date || '-',
-                '醫낅즺??: a.end_date || '-',
-                '諛곗젙??: a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-',
-                '硫붾え': a.memo || ''
+                '고객명': isEmpty ? '-' : (a.buyer_name || '-'),
+                '연락처': isEmpty ? '-' : (a.buyer_phone || '-'),
+                '이메일': isEmpty ? '-' : (a.buyer_email || '-'),
+                '시작일': a.start_date || '-',
+                '종료일': a.end_date || '-',
+                '배정일': a.assigned_at ? new Date(a.assigned_at).toLocaleString() : '-',
+                '메모': a.memo || ''
             };
             if (!showDeleted) {
                 data['Master ID'] = a.master_id || '-';
             } else {
-                data['??젣??] = a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-';
+                data['삭제일'] = a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-';
             }
             return data;
         });
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
-        XLSX.utils.book_append_sheet(wb, ws, '吏???댁뿭');
-        XLSX.writeFile(wb, `湲곗〈Tidal_吏?쒕궡??${format(new Date(), 'yyyyMMdd')}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, '지난 내역');
+        XLSX.writeFile(wb, `기존Tidal_지난내역_${format(new Date(), 'yyyyMMdd')}.xlsx`);
     };
 
     if (isLoading) return <div className="p-8 text-center">Loading...</div>;
@@ -352,7 +350,7 @@ function LegacyTidalInactiveContent() {
                             <ArrowLeft size={18} />
                         </Button>
                         <h1 className={`${styles.title} text-sm sm:text-base line-clamp-1`}>
-                            {showDeleted ? '??젣 ?곗씠??(?댁???' : 'Tidal 吏???댁뿭 (鍮꾪솢??'}
+                            {showDeleted ? '삭제 데이터 (휴지통)' : 'Tidal 지난 내역 (비활성)'}
                         </h1>
                     </div>
                     <div className="flex gap-2 w-full md:w-auto justify-end">
@@ -363,10 +361,10 @@ function LegacyTidalInactiveContent() {
                             className="gap-1.5 h-8 text-xs flex-1 md:flex-none"
                         >
                             {showDeleted ? <History size={14} /> : <Trash2 size={14} />}
-                            <span>{showDeleted ? '?댁뿭 蹂닿린' : '??젣 ?댁뿭'}</span>
+                            <span>{showDeleted ? '내역 보기' : '삭제 내역'}</span>
                         </Button>
                         <Button onClick={exportToExcel} variant="outline" size="sm" className="gap-1.5 h-8 text-xs flex-1 md:flex-none">
-                            <Download size={14} /> <span>?묒?</span>
+                            <Download size={14} /> <span>엑셀</span>
                         </Button>
                     </div>
                 </div>
@@ -378,24 +376,24 @@ function LegacyTidalInactiveContent() {
                         <thead>
                             <tr className="bg-gray-50 border-b">
                                 <th className="p-2 sm:p-3 text-center w-10 sm:w-12">No</th>
-                                <th className="p-2 sm:p-3 text-center">諛곗젙踰덊샇</th>
+                                <th className="p-2 sm:p-3 text-center">배정번호</th>
                                 {!showDeleted && <th className="p-2 sm:p-3 text-left">Master ID</th>}
                                 <th className="p-2 sm:p-3 text-left">Tidal ID</th>
-                                <th className="p-2 sm:p-3 text-left">援щℓ??/th>
-                                <th className="p-2 sm:p-3 text-left">?곕씫泥?/th>
-                                <th className="p-2 sm:p-3 text-left">?대찓??/th>
-                                <th className="p-2 sm:p-3 text-center">湲곌컙</th>
-                                <th className="p-2 sm:p-3 text-center">諛곗젙?쇱떆</th>
-                                {showDeleted && <th className="p-2 sm:p-3 text-center">??젣?쇱떆</th>}
-                                {showDeleted && <th className="p-2 sm:p-3 text-left">硫붾え</th>}
-                                <th className="p-2 sm:p-3 text-center">愿由?/th>
+                                <th className="p-2 sm:p-3 text-left">구매자</th>
+                                <th className="p-2 sm:p-3 text-left">연락처</th>
+                                <th className="p-2 sm:p-3 text-left">이메일</th>
+                                <th className="p-2 sm:p-3 text-center">기간</th>
+                                <th className="p-2 sm:p-3 text-center">배정일시</th>
+                                {showDeleted && <th className="p-2 sm:p-3 text-center">삭제일시</th>}
+                                {showDeleted && <th className="p-2 sm:p-3 text-left">메모</th>}
+                                <th className="p-2 sm:p-3 text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody>
                             {records.length === 0 ? (
                                 <tr>
                                     <td colSpan={showDeleted ? 11 : 10} className="p-8 text-center text-gray-500">
-                                        吏???댁뿭???놁뒿?덈떎.
+                                        지난 내역이 없습니다.
                                     </td>
                                 </tr>
                             ) : (
@@ -423,7 +421,7 @@ function LegacyTidalInactiveContent() {
                                                 <span className="hover:underline hover:text-blue-600 transition-colors text-[10px]">{a.tidal_id}</span>
                                             </td>
                                             <td className="p-1 font-bold truncate">
-                                                {isEmpty ? '鍮??щ’' : (a.buyer_name || '-')}
+                                                {isEmpty ? '빈 슬롯' : (a.buyer_name || '-')}
                                             </td>
                                             <td className="p-1 truncate">{a.buyer_phone || '-'}</td>
                                             <td className="p-1 truncate">{a.buyer_email || '-'}</td>
@@ -455,7 +453,7 @@ function LegacyTidalInactiveContent() {
                                                         variant="ghost" 
                                                         className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-100/50" 
                                                         onClick={() => openEditModal(a.accounts?.id || '', a.slot_number, a)} 
-                                                        title="諛곗젙?섍린"
+                                                        title="배정하기"
                                                     >
                                                         <Pencil size={14} />
                                                     </Button>
@@ -463,13 +461,13 @@ function LegacyTidalInactiveContent() {
                                                     <div className="flex justify-center gap-1">
                                                         {showDeleted ? (
                                                             <>
-                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="?섏젙" onClick={() => openEditModal(a.account_id || a.accounts?.id || '', a.slot_number, a)}><Pencil size={12} /></Button>
-                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700" onClick={() => handleRestore(a.id)} title="蹂듦뎄">
+                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600" title="수정" onClick={() => openEditModal(a.account_id || a.accounts?.id || '', a.slot_number, a)}><Pencil size={12} /></Button>
+                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700" onClick={() => handleRestore(a.id)} title="복구">
                                                                     <RotateCcw size={14} />
                                                                 </Button>
                                                             </>
                                                         ) : null}
-                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(a.id)} title={showDeleted ? "?곴뎄 ??젣" : "??젣 ?댁뿭?쇰줈 ?대룞"}>
+                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(a.id)} title={showDeleted ? "영구 삭제" : "삭제 내역으로 이동"}>
                                                             <Trash2 size={14} />
                                                         </Button>
                                                     </div>
@@ -486,20 +484,20 @@ function LegacyTidalInactiveContent() {
 
             <Dialog open={isEditAssignModalOpen} onOpenChange={setIsEditAssignModalOpen}>
                 <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader><DialogTitle>?뺣낫?섏젙 / {editAssignData?.assignment_number}</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>정보수정 / {editAssignData?.assignment_number}</DialogTitle></DialogHeader>
                     {editAssignData && (
                         <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] px-1">
                             <div className="flex gap-4">
-                                <div className="w-[30%] space-y-1"><Label className="text-xs text-gray-500">?대쫫</Label><Input value={editAssignData.buyer_name || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })} className="h-9" /></div>
+                                <div className="w-[30%] space-y-1"><Label className="text-xs text-gray-500">이름</Label><Input value={editAssignData.buyer_name || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_name: e.target.value })} className="h-9" /></div>
                                 <div className="flex-1 space-y-1"><Label className="text-xs text-gray-500">Tidal ID</Label><Input value={editAssignData.tidal_id || ''} onChange={e => setEditAssignData({ ...editAssignData, tidal_id: e.target.value })} className="h-9" /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label className="text-xs text-gray-500">?꾪솕踰덊샇</Label><Input value={editAssignData.buyer_phone || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_phone: e.target.value })} className="h-9" /></div>
-                                <div className="space-y-1"><Label className="text-xs text-gray-500">?대찓??/Label><Input value={editAssignData.buyer_email || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_email: e.target.value })} className="h-9" /></div>
+                                <div className="space-y-1"><Label className="text-xs text-gray-500">전화번호</Label><Input value={editAssignData.buyer_phone || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_phone: e.target.value })} className="h-9" /></div>
+                                <div className="space-y-1"><Label className="text-xs text-gray-500">이메일</Label><Input value={editAssignData.buyer_email || ''} onChange={e => setEditAssignData({ ...editAssignData, buyer_email: e.target.value })} className="h-9" /></div>
                             </div>
                             <div className="flex gap-2">
                                 <div className="flex-1 space-y-1">
-                                    <Label className="text-[10px] text-gray-500">?쒖옉??/Label>
+                                    <Label className="text-[10px] text-gray-500">시작일</Label>
                                     <Input type="date" value={editAssignData.start_date || ''} onChange={e => {
                                         const ns = e.target.value; let ne = editAssignData.end_date;
                                         if (ns && editAssignData.period_months) { try { ne = addDays(parseISO(ns), editAssignData.period_months * 30).toISOString().split('T')[0]; } catch { } }
@@ -507,7 +505,7 @@ function LegacyTidalInactiveContent() {
                                     }} className="h-9 text-xs px-1" />
                                 </div>
                                 <div className="flex-1 space-y-1">
-                                    <Label className="text-[10px] text-gray-500">醫낅즺??/Label>
+                                    <Label className="text-[10px] text-gray-500">종료일</Label>
                                     <Input type="date" value={editAssignData.end_date || ''} onChange={e => {
                                         const ne = e.target.value; let nm = editAssignData.period_months;
                                         if (editAssignData.start_date && ne) { try { nm = Math.max(0, Math.floor(differenceInDays(parseISO(ne), parseISO(editAssignData.start_date)) / 30)); } catch { } }
@@ -515,7 +513,7 @@ function LegacyTidalInactiveContent() {
                                     }} className="h-9 text-xs px-1" />
                                 </div>
                                 <div className="w-12 space-y-1">
-                                    <Label className="text-[10px] text-gray-500">媛쒖썡</Label>
+                                    <Label className="text-[10px] text-gray-500">개월</Label>
                                     <Input type="number" value={editAssignData.period_months || ''} onChange={e => {
                                         const m = parseInt(e.target.value) || 0; let ne = editAssignData.end_date;
                                         if (editAssignData.start_date && m >= 0) { try { ne = addDays(parseISO(editAssignData.start_date), m * 30).toISOString().split('T')[0]; } catch { } }
@@ -523,19 +521,19 @@ function LegacyTidalInactiveContent() {
                                     }} className="h-9 text-xs px-1" />
                                 </div>
                                 <div className="w-24 space-y-1">
-                                    <Label className="text-[10px] text-gray-500">怨꾩빟湲덉븸(??</Label>
+                                    <Label className="text-[10px] text-gray-500">계약금액(원)</Label>
                                     <Input type="text" value={editAssignData.amount ? editAssignData.amount.toLocaleString() : ''} onChange={e => setEditAssignData({ ...editAssignData, amount: parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0 })} className="h-9 text-xs px-1" />
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <Label className="text-xs text-gray-500">硫붾え</Label>
+                                <Label className="text-xs text-gray-500">메모</Label>
                                 <textarea rows={3} className="w-full p-2 text-sm border rounded-md focus:ring-1 focus:ring-blue-500 outline-none" value={editAssignData.memo || ''} onChange={e => setEditAssignData({ ...editAssignData, memo: e.target.value })} />
                             </div>
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditAssignModalOpen(false)}>痍⑥냼</Button>
-                        <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">??ν븯湲?/Button>
+                        <Button variant="outline" onClick={() => setIsEditAssignModalOpen(false)}>취소</Button>
+                        <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">저장하기</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -554,7 +552,7 @@ function LegacyTidalInactiveContent() {
                             onClick={() => setTidalLoginEmail(null)}
                             className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10"
                         >
-                            ??
+                            닫기
                         </button>
 
                         {/* Tidal Logo */}
@@ -591,7 +589,7 @@ function LegacyTidalInactiveContent() {
                                     }}
                                     className="flex items-center justify-center w-8 h-8 rounded-lg transition-all"
                                     style={{ background: copied ? '#22c55e' : '#e04040' }}
-                                    title="?대┰蹂대뱶??蹂듭궗"
+                                    title="클립보드에 복사"
                                 >
                                     {copied ? (
                                         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -629,7 +627,7 @@ function LegacyTidalInactiveContent() {
                         {/* Copied Toast */}
                         {copied && (
                             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs px-4 py-2 rounded-full shadow-lg animate-bounce">
-                                ???대┰蹂대뱶??蹂듭궗??
+                                클립보드에 복사됨
                             </div>
                         )}
                     </div>
@@ -638,13 +636,13 @@ function LegacyTidalInactiveContent() {
 
             <Dialog open={isMemoModalOpen} onOpenChange={setIsMemoModalOpen}>
                 <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader><DialogTitle>硫붾え ?몄쭛</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>메모 편집</DialogTitle></DialogHeader>
                     <div className="py-4">
-                        <textarea className="w-full min-h-[100px] p-3 border rounded-md text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="硫붾え瑜??낅젰?섏꽭??.." value={currentMemoInput} onChange={e => setCurrentMemoInput(e.target.value)} />
+                        <textarea className="w-full min-h-[100px] p-3 border rounded-md text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="메모를 입력하세요..." value={currentMemoInput} onChange={e => setCurrentMemoInput(e.target.value)} />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsMemoModalOpen(false)}>痍⑥냼</Button>
-                        <Button onClick={handleSaveMemo}>???/Button>
+                        <Button variant="outline" onClick={() => setIsMemoModalOpen(false)}>취소</Button>
+                        <Button onClick={handleSaveMemo}>저장</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -671,4 +669,3 @@ function LegacyTidalInactivePage() {
         </Suspense>
     );
 }
-

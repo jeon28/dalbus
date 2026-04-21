@@ -435,8 +435,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         // Optimistic update
         const accId = accountId || accounts.find(acc => acc.order_accounts?.some(oa => oa.id === assignment.id))?.id;
         
-        let revertAccounts = accounts;
-        let revertGrid = gridValues;
+        const revertAccounts = accounts;
+        const revertGrid = gridValues;
 
         if (accId) {
             setGridValues(prev => ({

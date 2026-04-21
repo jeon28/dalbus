@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trash2, Download, Pencil } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format } from 'date-fns';
-import styles from '../../admin.module.css';
+import styles from '@/app/(protected)/admin/admin.module.css';
 import * as XLSX from 'xlsx';
 import { apiFetch } from '@/lib/api';
 
@@ -65,8 +65,8 @@ function HifiTidalInactiveAccountsContent() {
     
             // Identify Master IDs
             const masterMap: Record<string, string> = {};
-            accountsData.forEach((acc: any) => {
-                const master = acc.order_accounts?.find((oa: any) => oa.type === 'master' || oa.slot_number === 0);
+            accountsData.forEach((acc: { id: string; order_accounts?: { type?: string; slot_number?: number; tidal_id?: string; }[] }) => {
+                const master = acc.order_accounts?.find((oa: { type?: string; slot_number?: number; tidal_id?: string; }) => oa.type === 'master' || oa.slot_number === 0);
                 if (master) masterMap[acc.id] = master.tidal_id || '-';
             });
     
