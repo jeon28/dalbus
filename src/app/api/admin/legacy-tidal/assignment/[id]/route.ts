@@ -35,37 +35,68 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             memo: _memo
         } = body;
 
+        // 1. Fetch current assignment data
+        const { data: current, error: fetchError } = await supabaseAdmin
+            .from(assignmentTable)
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !current) {
+            throw new Error('Assignment not found');
+        }
+
         const updates: Record<string, string | number | boolean | null> = {};
-        if (tidal_password !== undefined) updates.tidal_password = tidal_password;
-        if (tidal_id !== undefined) updates.tidal_id = tidal_id ? tidal_id.toLowerCase().trim() : null;
-        if (body.order_number !== undefined) updates.order_number = body.order_number;
-        if (type !== undefined) updates.type = type;
-        if (buyer_name !== undefined) updates.buyer_name = buyer_name;
-        if (buyer_phone !== undefined) updates.buyer_phone = normalizePhone(buyer_phone);
-        if (buyer_email !== undefined) updates.buyer_email = buyer_email;
-        if (start_date !== undefined) updates.start_date = start_date;
-        if (end_date !== undefined) updates.end_date = end_date;
-        if (is_active !== undefined) updates.is_active = is_active;
-        if (body.is_deleted !== undefined) updates.is_deleted = body.is_deleted;
-        if (amount !== undefined && amount !== null) updates.amount = Number(amount);
-        if (period_months !== undefined && period_months !== null) updates.period_months = Number(period_months);
-        if (_memo !== undefined) updates.memo = _memo;
+        
+        // Helper to check if value changed and add to updates
+        const addIfChanged = (key: string, newValue: any) => {
+            if (newValue === undefined) return;
+            
+            let val = newValue;
+            if (key === 'tidal_id') val = val ? val.toLowerCase().trim() : null;
+            if (key === 'buyer_phone') val = normalizePhone(val);
+            if (key === 'amount' || key === 'period_months') val = val !== null ? Number(val) : null;
+
+            if (current[key] !== val) {
+                updates[key] = val;
+            }
+        };
+
+        addIfChanged('tidal_password', tidal_password);
+        addIfChanged('tidal_id', tidal_id);
+        addIfChanged('order_number', body.order_number);
+        addIfChanged('type', type);
+        addIfChanged('buyer_name', buyer_name);
+        addIfChanged('buyer_phone', buyer_phone);
+        addIfChanged('buyer_email', buyer_email);
+        addIfChanged('start_date', start_date);
+        addIfChanged('end_date', end_date);
+        addIfChanged('is_active', is_active);
+        addIfChanged('is_deleted', body.is_deleted);
+        addIfChanged('amount', amount);
+        addIfChanged('period_months', period_months);
+        addIfChanged('memo', _memo);
 
         if (Object.keys(updates).length > 0) {
-            const { data: updatedData, error: updateError } = await supabaseAdmin
+            const { error: updateError } = await supabaseAdmin
                 .from(assignmentTable)
                 .update(updates)
-                .eq('id', id)
-                .select('account_id')
-                .single();
+                .eq('id', id);
 
             if (updateError) throw updateError;
 
-            // Re-index slots if type, is_active, or is_deleted changed
-            const shouldReindex = type !== undefined || is_active !== undefined || body.is_deleted !== undefined;
-            if (shouldReindex && updatedData) {
-                await reindexSlots(updatedData.account_id, assignmentTable, accountTable);
-                await syncUsedSlots(updatedData.account_id, accountTable, assignmentTable);
+            // Re-index slots if type, is_active, or is_deleted actually changed
+            const structuralChanged = 
+                updates.type !== undefined || 
+                updates.is_active !== undefined || 
+                updates.is_deleted !== undefined;
+
+            if (structuralChanged) {
+                await reindexSlots(current.account_id, assignmentTable, accountTable);
+                // syncUsedSlots is already called inside reindexSlots
+            } else if (updates.is_active !== undefined) {
+                // If only is_active changed but not others, reindexSlots calls syncUsedSlots anyway.
+                // But we already covered is_active in structuralChanged.
             }
         }
 
@@ -110,7 +141,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         // 3. Re-index and Sync
         await reindexSlots(assignment.account_id, assignmentTable, accountTable);
-        await syncUsedSlots(assignment.account_id, accountTable, assignmentTable);
 
         return NextResponse.json({ success: true });
     } catch (error) {

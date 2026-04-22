@@ -43,7 +43,6 @@ export async function POST(
 
         // 3. Re-index and Sync (to ensure slot ordering and counts are correct)
         await reindexSlots(current.account_id, assignmentTable, accountTable);
-        await syncUsedSlots(current.account_id, accountTable, assignmentTable);
 
         return NextResponse.json({ success: true, is_active: nextStatus });
     } catch (error) {

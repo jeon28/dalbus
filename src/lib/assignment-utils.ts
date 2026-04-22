@@ -30,26 +30,26 @@ export async function reindexSlots(
         return (a.slot_number ?? 0) - (b.slot_number ?? 0);
     });
 
-    // 3. Pass 1: Temporarily move to high indices to avoid unique constraint 23505
-    for (const s of sorted) {
-        await supabaseAdmin
-            .from(assignmentTable)
-            .update({ slot_number: (s.slot_number ?? 0) + 1000 })
-            .eq('id', s.id);
-    }
-
-    // 4. Pass 2: Final sequential re-indexing starting from 0
+    // 3. Final sequential re-indexing starting from 0
+    // Only update if slot_number or type actually changed to avoid unnecessary DB triggers (updated_at)
     for (let i = 0; i < sorted.length; i++) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const updates: any = { slot_number: i };
-        // Ensure only the first slot remains 'master' if somehow multiple masters exist
-        if (i > 0 && sorted[i].type === 'master') {
-            updates.type = 'user';
+        const slot = sorted[i];
+        const newSlotNumber = i;
+        const newType = (i > 0 && slot.type === 'master') ? 'user' : slot.type;
+
+        // Check if anything actually changed
+        const needsUpdate = slot.slot_number !== newSlotNumber || slot.type !== newType;
+
+        if (needsUpdate) {
+            const updates: any = {};
+            if (slot.slot_number !== newSlotNumber) updates.slot_number = newSlotNumber;
+            if (slot.type !== newType) updates.type = newType;
+
+            await supabaseAdmin
+                .from(assignmentTable)
+                .update(updates)
+                .eq('id', slot.id);
         }
-        await supabaseAdmin
-            .from(assignmentTable)
-            .update(updates)
-            .eq('id', sorted[i].id);
     }
 
     // 5. Sync used_slots to the account
