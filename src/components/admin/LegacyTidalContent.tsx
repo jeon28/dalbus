@@ -699,7 +699,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     };
 
     return (
-        <main className="p-4 bg-[#f8fafc] min-h-screen max-w-[800px] mx-auto">
+        <main className="p-4 bg-[#f8fafc] min-h-screen max-w-[1200px] mx-auto">
             <header className="bg-white border rounded-xl shadow-sm mb-4 p-3">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-3">
                     <div className="flex items-center gap-4 w-full md:w-auto">
