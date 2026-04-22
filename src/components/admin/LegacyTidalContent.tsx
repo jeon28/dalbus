@@ -1385,9 +1385,23 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">개월</Label>
                                     <Input type="number" value={quickEditValues.period_months || ''} onChange={e => {
-                                        const m = parseInt(e.target.value) || 0; let ne = quickEditValues.end_date;
-                                        if (quickEditValues.start_date && m >= 0) { try { ne = addDays(parseISO(quickEditValues.start_date), m * 30).toISOString().split('T')[0]; } catch {} }
-                                        setQuickEditValues({ ...quickEditValues, period_months: m, end_date: ne });
+                                        const nextM = parseInt(e.target.value) || 0;
+                                        const prevM = quickEditValues.period_months || 0;
+                                        const deltaM = nextM - prevM;
+                                        
+                                        let ne = quickEditValues.end_date;
+                                        if (ne && deltaM !== 0) {
+                                            // 기존 종료일이 있는 경우, 종료일 기준 델타로 계산 (수동 조정된 날짜 보존)
+                                            try {
+                                                ne = addDays(parseISO(ne), deltaM * 30).toISOString().split('T')[0];
+                                            } catch {}
+                                        } else if (quickEditValues.start_date) {
+                                            // 종료일이 없는 경우는 기존처럼 시작일 기준
+                                            try {
+                                                ne = addDays(parseISO(quickEditValues.start_date), nextM * 30).toISOString().split('T')[0];
+                                            } catch {}
+                                        }
+                                        setQuickEditValues({ ...quickEditValues, period_months: nextM, end_date: ne });
                                     }} className="h-10" />
                                 </div>
                             </div>
