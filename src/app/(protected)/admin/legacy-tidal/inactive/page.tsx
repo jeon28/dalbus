@@ -383,7 +383,6 @@ function LegacyTidalInactiveContent() {
                                 <th className="p-2 sm:p-3 text-left">이메일</th>
                                 <th className="p-2 sm:p-3 text-center">기간</th>
                                 <th className="p-2 sm:p-3 text-center">배정일시</th>
-                                {showDeleted && <th className="p-2 sm:p-3 text-center">삭제일시</th>}
                                 {showDeleted && <th className="p-2 sm:p-3 text-left">메모</th>}
                                 <th className="p-2 sm:p-3 text-center">관리</th>
                             </tr>
@@ -428,13 +427,8 @@ function LegacyTidalInactiveContent() {
                                                 {isEmpty ? '-' : `${(a.start_date || '').split('-').slice(1).join('/')} ~ ${(a.end_date || '').split('-').slice(1).join('/')}`}
                                             </td>
                                             <td className="p-1 text-center text-[9px] opacity-70">
-                                                {isEmpty ? '-' : (a.assigned_at ? new Date(a.assigned_at).toLocaleDateString() : '-')}
+                                                {isEmpty ? '-' : (a.assigned_at ? format(new Date(a.assigned_at), 'MM/dd HH:mm') : '-')}
                                             </td>
-                                            {showDeleted && (
-                                                <td className="p-1 text-center text-[9px] text-red-600 font-semibold italic">
-                                                    {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-'}
-                                                </td>
-                                            )}
                                             {showDeleted && (
                                                 <td className="p-1">
                                                     {!isEmpty && (

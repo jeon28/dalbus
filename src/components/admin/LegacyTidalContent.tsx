@@ -1087,9 +1087,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             <th className="text-left py-2 px-2 whitespace-nowrap">전화번호</th>
                                                             <th className="text-center py-2 whitespace-nowrap">시작일</th>
                                                             <th className="text-center py-2 whitespace-nowrap">종료일</th>
-                                                            <th className="text-center py-2 whitespace-nowrap">변경일</th>
                                                             <th className="text-center py-2 whitespace-nowrap">계약 개월</th>
                                                             <th className="text-right py-2 px-2 whitespace-nowrap">금액</th>
+                                                            <th className="text-center py-2 whitespace-nowrap">변경일</th>
                                                             <th className="text-left py-2 px-2 whitespace-nowrap">메모</th>
                                                         </tr>
                                                     </thead>
@@ -1198,9 +1198,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                                 <td className="px-2 font-mono whitespace-nowrap">{val.buyer_phone || '-'}</td>
                                                                                 <td className="px-2 text-center font-mono whitespace-nowrap">{val.start_date || '-'}</td>
                                                                                 <td className="px-2 text-center font-mono whitespace-nowrap">{val.end_date || '-'}</td>
-                                                                                <td className="px-2 text-center font-mono whitespace-nowrap">{val.updated_at ? val.updated_at.substring(0,10) : (val.assigned_at ? val.assigned_at.substring(0,10) : '-')}</td>
                                                                                 <td className="text-center font-medium whitespace-nowrap">{period}</td>
                                                                                 <td className="text-right font-mono px-2 whitespace-nowrap">{val.amount?.toLocaleString() || '-'}</td>
+                                                                                <td className="px-2 text-center font-mono text-[10px] opacity-70 whitespace-nowrap">
+                                                                                    {val.updated_at ? format(parseISO(val.updated_at), 'MM/dd HH:mm') : (val.assigned_at ? format(parseISO(val.assigned_at), 'MM/dd HH:mm') : '-')}
+                                                                                </td>
                                                                                 <td className="px-2 whitespace-nowrap">
                                                                                     <div className="flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => openMemoModal(acc.id, assignment.slot_number, val.memo || '', assignment.id)}>
                                                                                         <MessageSquareText size={14} className={val.memo ? 'text-blue-500' : 'text-slate-300'} />
