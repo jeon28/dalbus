@@ -1370,14 +1370,14 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                     <Input value={quickEditValues.buyer_email || ''} onChange={e => setQuickEditValues({ ...quickEditValues, buyer_email: e.target.value })} className="h-10" />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-[1fr_1.3fr_0.6fr] gap-3">
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">시작일</Label>
                                     <Input type="date" value={quickEditValues.start_date || ''} onChange={e => {
                                         const ns = e.target.value; let ne = quickEditValues.end_date;
                                         if (ns && quickEditValues.period_months) { try { ne = addDays(parseISO(ns), quickEditValues.period_months * 30).toISOString().split('T')[0]; } catch {} }
                                         setQuickEditValues({ ...quickEditValues, start_date: ns, end_date: ne });
-                                    }} className="h-10 text-xs" />
+                                    }} className="h-10 text-[11px] px-2" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">종료일</Label>
@@ -1385,7 +1385,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         const ne = e.target.value; let nm = quickEditValues.period_months;
                                         if (quickEditValues.start_date && ne) { try { nm = Math.max(0, Math.floor(differenceInDays(parseISO(ne), parseISO(quickEditValues.start_date)) / 30)); } catch {} }
                                         setQuickEditValues({ ...quickEditValues, end_date: ne, period_months: nm });
-                                    }} className="h-10 text-xs" />
+                                    }} className="h-10 text-[11px] px-2" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">개월</Label>
