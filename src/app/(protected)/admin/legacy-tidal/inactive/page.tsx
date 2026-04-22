@@ -327,7 +327,7 @@ function LegacyTidalInactiveContent() {
             if (!showDeleted) {
                 data['Master ID'] = a.master_id || '-';
             } else {
-                data['삭제일'] = a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '-';
+                data['삭제일'] = a.updated_at ? format(new Date(a.updated_at), 'MM/dd HH:mm') : '-';
             }
             return data;
         });
@@ -382,7 +382,7 @@ function LegacyTidalInactiveContent() {
                                 <th className="p-2 sm:p-3 text-left">연락처</th>
                                 <th className="p-2 sm:p-3 text-left">이메일</th>
                                 <th className="p-2 sm:p-3 text-center">기간</th>
-                                <th className="p-2 sm:p-3 text-center">배정일시</th>
+                                <th className="p-2 sm:p-3 text-center">변경일</th>
                                 {showDeleted && <th className="p-2 sm:p-3 text-left">메모</th>}
                                 <th className="p-2 sm:p-3 text-center">관리</th>
                             </tr>

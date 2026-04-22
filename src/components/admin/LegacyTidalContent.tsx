@@ -169,9 +169,9 @@ export function LegacyTidalContent({
     const [quickEditValues, setQuickEditValues] = useState<GridValue | null>(null);
     
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-        checkbox: 30, login_id: 64, edit: 35, memo: 80, tidal_id: 110,
-        tidal_password: 100, buyer_name: 70, buyer_email: 110, buyer_phone: 95,
-        order_number: 100, start_date: 75, end_date: 75, updated_at: 75, period: 60, amount: 70
+        checkbox: 26, login_id: 56, edit: 30, memo: 60, tidal_id: 90,
+        tidal_password: 80, buyer_name: 55, buyer_email: 90, buyer_phone: 80,
+        order_number: 80, start_date: 65, end_date: 65, updated_at: 65, period: 48, amount: 58
     });
     const [, setResizingCol] = useState<string | null>(null);
 
@@ -699,11 +699,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     };
 
     return (
-        <main className="p-4 bg-[#f8fafc] min-h-screen">
-            <header className="bg-white border rounded-xl shadow-sm mb-6 p-4">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <main className="p-4 bg-[#f8fafc] min-h-screen max-w-[800px] mx-auto">
+            <header className="bg-white border rounded-xl shadow-sm mb-4 p-3">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-3">
                     <div className="flex items-center gap-4 w-full md:w-auto">
-                        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <h1 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                             <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">{titlePrefix}</span>
                             기존 Tidal 계정 관리
                         </h1>
@@ -713,8 +713,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         </Button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-                        <div className="relative flex items-center bg-gray-50 border rounded-lg px-3 focus-within:ring-2 focus-within:ring-blue-500 w-full md:w-48">
+                    <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end">
+                        <div className="relative flex items-center bg-gray-50 border rounded-lg px-2 focus-within:ring-2 focus-within:ring-blue-500 w-full md:w-40">
                             <Search size={14} className="text-gray-400" />
                             <Input 
                                 type="text" 
@@ -824,7 +824,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     /* ===== GRID VIEW ===== */
                     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-xs min-w-[1000px]">
+                            <table className="w-full text-[11px] min-w-[780px]">
                                 <thead>
                                     <tr className="bg-slate-50 border-b text-slate-500 uppercase font-bold tracking-tight">
                                         <th className="text-center py-3 border-r border-slate-100 whitespace-nowrap" style={{ width: columnWidths.checkbox }}>
@@ -844,9 +844,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             { id: 'buyer_phone', label: '전화번호', sortable: false },
                                             { id: 'start_date', label: '시작일', sortable: true },
                                             { id: 'end_date', label: '종료일', sortable: true },
-                                            { id: 'updated_at', label: '변경일', sortable: true },
                                             { id: 'period', label: '계약 개월', sortable: true },
                                             { id: 'amount', label: '계약금액', sortable: true },
+                                            { id: 'updated_at', label: '변경일', sortable: true },
                                             { id: 'memo', label: '메모', sortable: false },
                                         ].map(col => (
                                             <th key={col.id} className="relative px-2 py-3 text-center border-r border-slate-100 cursor-pointer hover:bg-slate-100 group transition-colors whitespace-nowrap" style={{ width: columnWidths[col.id] }}>
@@ -979,11 +979,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             {assignment.end_date ? format(parseISO(assignment.end_date), 'yy-MM-dd') : '-'}
                                                         </span>
                                                     </td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center text-slate-500 font-mono">
-                                                        {assignment.updated_at ? format(parseISO(assignment.updated_at), 'yy-MM-dd') : (assignment.assigned_at ? format(parseISO(assignment.assigned_at), 'yy-MM-dd') : '-')}
-                                                    </td>
                                                     <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center text-slate-700 font-medium">{item.period}개월</td>
                                                     <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-right text-slate-700 font-mono font-medium">{val.amount ? val.amount.toLocaleString() : '-'}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center text-slate-500 font-mono">
+                                                        {assignment.updated_at ? format(parseISO(assignment.updated_at), 'MM/dd HH:mm') : (assignment.assigned_at ? format(parseISO(assignment.assigned_at), 'MM/dd HH:mm') : '-')}
+                                                    </td>
                                                     <td className="px-2 py-2 border-slate-100 whitespace-nowrap">
                                                         {!isEmpty && (
                                                             <div className="flex items-center gap-1.5 overflow-hidden group/memo" onClick={e => { e.stopPropagation(); openMemoModal(acc.id, sIdx, val.memo || '', assignment.id); }}>
@@ -1010,18 +1010,18 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 ) : (
                     /* ===== LIST VIEW ===== */
                     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div className="grid grid-cols-14 gap-2 p-3 bg-slate-50 font-bold border-b text-slate-500 text-[11px] uppercase tracking-wider whitespace-nowrap">
+                        <div className="grid grid-cols-13 gap-1.5 p-2.5 bg-slate-50 font-bold border-b text-slate-500 text-[10px] uppercase tracking-wider whitespace-nowrap">
                             <div className="col-span-1 cursor-pointer hover:text-slate-800 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('login_id')}>GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
                             <div className="col-span-2 whitespace-nowrap">결제계좌</div>
                             <div className="col-span-1 text-center font-bold whitespace-nowrap">결제일</div>
                             <div className="col-span-2 text-left whitespace-nowrap">마스터계정</div>
-                            <div className="col-span-2 text-left cursor-pointer hover:text-slate-800 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('end_date')}>종료예정일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
-                            <div className="col-span-1 text-left whitespace-nowrap">계약 개월</div>
-                            <div className="col-span-1 text-right pr-2 whitespace-nowrap">계약금액</div>
+                            <div className="col-span-1 text-left cursor-pointer hover:text-slate-800 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('end_date')}>종료일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
+                            <div className="col-span-1 text-center whitespace-nowrap">개월</div>
+                            <div className="col-span-1 text-right pr-1 whitespace-nowrap">금액</div>
                             <div className="col-span-1 text-left whitespace-nowrap">메모</div>
                             <div className="col-span-1 text-center cursor-pointer hover:text-slate-800 flex items-center justify-center gap-1 whitespace-nowrap" onClick={() => handleSort('used_slots')}>슬롯 {sortConfig?.key === 'used_slots' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
                             <div className="col-span-1 text-center whitespace-nowrap">관리</div>
-                            <div className="col-span-1 text-center whitespace-nowrap">펼치기</div>
+                            <div className="col-span-1 text-center whitespace-nowrap">펼침</div>
                         </div>
                         <div className="divide-y divide-slate-100">
                             {sortedAccounts.map(acc => {
@@ -1047,7 +1047,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
                                 return (
                                     <div key={acc.id} id={`account-${acc.id}`} className="group/row">
-                                        <div className="grid grid-cols-14 gap-2 p-3 items-center text-xs hover:bg-slate-50 transition-colors whitespace-nowrap">
+                                        <div className="grid grid-cols-13 gap-1.5 p-2.5 items-center text-[11px] hover:bg-slate-50 transition-colors whitespace-nowrap">
                                             <div className="col-span-1 text-slate-900 font-bold truncate cursor-pointer whitespace-nowrap" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
                                             <div className="col-span-2 truncate cursor-pointer whitespace-nowrap" onClick={() => toggleRow(acc.id)}><span className="text-blue-600 font-semibold">{acc.payment_email}</span></div>
                                             <div className="col-span-1 text-center text-slate-500 font-mono whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{acc.payment_day}일</div>
@@ -1061,17 +1061,17 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                     <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">ID 복사됨!</span>
                                                 )}
                                             </div>
-                                            <div className={`col-span-2 font-mono whitespace-nowrap ${isWarning ? 'text-red-500 font-bold' : 'text-slate-600'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>
-                                            <div className="col-span-1 text-slate-500 font-mono whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{duration}</div>
-                                            <div className="col-span-1 text-right text-slate-500 font-mono pr-2 whitespace-nowrap" onClick={() => toggleRow(acc.id)}>-</div>
+                                            <div className={`col-span-1 font-mono whitespace-nowrap ${isWarning ? 'text-red-500 font-bold' : 'text-slate-600'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>
+                                            <div className="col-span-1 text-center text-slate-500 font-mono whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{duration}</div>
+                                            <div className="col-span-1 text-right text-slate-500 font-mono pr-1 whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{masterSlot?.amount ? masterSlot.amount.toLocaleString() : '-'}</div>
                                             <div className="col-span-1 text-slate-400 text-[10px] truncate whitespace-nowrap" title={acc.memo} onClick={() => toggleRow(acc.id)}>{acc.memo}</div>
                                             <div className="col-span-1 text-center font-bold text-blue-600 whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{acc.used_slots}/{acc.max_slots}</div>
                                             <div className="col-span-1 flex justify-center">
-                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-blue-50 text-blue-600" onClick={() => { setEditingAccount(acc); setIsEditModalOpen(true); }}><Pencil size={14} /></Button>
+                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-blue-50 text-blue-600" onClick={() => { setEditingAccount(acc); setIsEditModalOpen(true); }}><Pencil size={13} /></Button>
                                             </div>
                                             <div className="col-span-1 flex justify-center">
-                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => toggleRow(acc.id)}>
-                                                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => toggleRow(acc.id)}>
+                                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                                 </Button>
                                             </div>
                                         </div>

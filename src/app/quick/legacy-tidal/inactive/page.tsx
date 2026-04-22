@@ -383,7 +383,7 @@ function LegacyTidalInactiveContent() {
                                 <th className="p-2 sm:p-3 text-left">연락처</th>
                                 <th className="p-2 sm:p-3 text-left">이메일</th>
                                 <th className="p-2 sm:p-3 text-center">기간</th>
-                                <th className="p-2 sm:p-3 text-center">배정일시</th>
+                                <th className="p-2 sm:p-3 text-center">변경일</th>
                                 {showDeleted && <th className="p-2 sm:p-3 text-left">메모</th>}
                                 <th className="p-2 sm:p-3 text-center">관리</th>
                             </tr>
