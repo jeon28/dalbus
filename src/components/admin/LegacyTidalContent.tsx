@@ -1161,6 +1161,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                                             </Button>
                                                                                         )}
                                                                                         {!isEmpty && (
+                                                                                            <Button size="sm" variant="ghost" className="h-8 justify-start gap-2 text-xs text-slate-600 font-bold" onClick={() => openMoveModal(assignment)}>
+                                                                                                <ArrowRightLeft size={12} /> 배정변경
+                                                                                            </Button>
+                                                                                        )}
+                                                                                        {!isEmpty && (
                                                                                             <div 
                                                                                                 className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 cursor-pointer rounded"
                                                                                                 onClick={(e) => { e.preventDefault(); handleToggleActive(assignment, acc.id); }}
