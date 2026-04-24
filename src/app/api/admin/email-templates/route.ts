@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { key, name, subject, content, placeholders } = body;
+        const { key, name, subject, content, placeholders, design } = body;
 
         if (!key || !name || !subject || !content) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
         const { data, error } = await supabaseAdmin
             .from('email_templates')
-            .insert([{ key, name, subject, content, placeholders }])
+            .insert([{ key, name, subject, content, placeholders, design }])
             .select()
             .single();
 

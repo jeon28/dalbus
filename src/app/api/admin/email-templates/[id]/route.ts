@@ -30,11 +30,11 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { key, name, subject, content, placeholders } = body;
+        const { key, name, subject, content, placeholders, design } = body;
 
         const { data, error } = await supabaseAdmin
             .from('email_templates')
-            .update({ key, name, subject, content, placeholders })
+            .update({ key, name, subject, content, placeholders, design })
             .eq('id', id)
             .select()
             .single();

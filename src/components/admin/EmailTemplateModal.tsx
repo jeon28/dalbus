@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from '@/lib/api';
-import { Loader2, Send, Save, Variable, Eye } from 'lucide-react';
+import { Loader2, Send, Save, Variable, Eye, Layout } from 'lucide-react';
+import EmailEditor, { EditorRef } from 'react-email-editor';
 
 interface Placeholder {
     key: string;
@@ -26,6 +27,7 @@ interface EmailTemplate {
     name: string;
     subject: string;
     content: string;
+    design?: any;
     placeholders: Placeholder[];
 }
 
@@ -60,6 +62,8 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
     const [saving, setSaving] = useState(false);
     const [testSending, setTestSending] = useState(false);
     const [previewHtml, setPreviewHtml] = useState('');
+    const [editorReady, setEditorReady] = useState(false);
+    const emailEditorRef = React.useRef<EditorRef>(null);
 
     useEffect(() => {
         if (template) {
@@ -99,8 +103,19 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
     }, [formData.content]);
 
     const handleSave = async () => {
+        if (!emailEditorRef.current?.editor) return;
+
         setSaving(true);
         try {
+            // Unlayer에서 HTML과 Design(JSON)을 추출
+            const exportedData = await new Promise<any>((resolve) => {
+                emailEditorRef.current?.editor?.exportHtml((data) => {
+                    resolve(data);
+                });
+            });
+
+            const { design, html } = exportedData;
+
             const endpoint = template?.id 
                 ? `/api/admin/email-templates/${template.id}` 
                 : '/api/admin/email-templates';
@@ -108,7 +123,11 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
 
             const res = await apiFetch(endpoint, {
                 method,
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    ...formData,
+                    content: html,
+                    design: design
+                })
             });
 
             if (!res.ok) throw new Error('Failed to save');
@@ -149,24 +168,26 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
         }
     };
 
+    const onEditorLoad = () => {
+        setEditorReady(true);
+        if (template?.design) {
+            emailEditorRef.current?.editor?.loadDesign(template.design);
+        }
+    };
+
+    // 템플릿이 변경될 때 (에디터가 이미 로드된 경우) 디자인 로드
+    useEffect(() => {
+        if (editorReady && template?.design) {
+            emailEditorRef.current?.editor?.loadDesign(template.design);
+        }
+    }, [template, editorReady]);
+
     const insertPlaceholder = (key: string) => {
-        const textarea = document.getElementById('template-content') as HTMLTextAreaElement;
-        if (!textarea) return;
-
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const text = textarea.value;
-        const before = text.substring(0, start);
-        const after = text.substring(end);
-        const newContent = before + `{${key}}` + after;
-
-        setFormData({ ...formData, content: newContent });
-        
-        // 커서 위치 조정
-        setTimeout(() => {
-            textarea.focus();
-            textarea.setSelectionRange(start + key.length + 2, start + key.length + 2);
-        }, 0);
+        // Unlayer 에디터 내부에 치환자 삽입은 에디터 자체 기능을 사용하는 것이 좋지만,
+        // 여기서는 간단히 텍스트로 복사 안내를 하거나 클립보드에 복사해주는 방식으로 변경할 수 있습니다.
+        // 현재는 Unlayer 연동으로 인해 직접적인 Textarea 삽입은 불가능합니다.
+        navigator.clipboard.writeText(`{${key}}`);
+        alert(`{${key}} 가 클립보드에 복사되었습니다. 에디터 본문에 붙여넣기(Ctrl+V) 하세요.`);
     };
 
     return (
@@ -239,48 +260,62 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
                             </div>
                         </div>
 
-                        <div className="space-y-1.5 flex-1 flex flex-col">
-                            <label className="text-xs font-bold text-slate-500 uppercase">본문 내용 (HTML 가능)</label>
-                            <Textarea 
-                                id="template-content"
-                                placeholder="<html>...</html>" 
-                                value={formData.content}
-                                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                                className="flex-1 min-h-[300px] bg-white border-slate-200 font-mono text-[13px] leading-relaxed resize-none focus:ring-blue-500 shadow-inner"
-                            />
+                        <div className="space-y-1.5 flex-1 flex flex-col min-h-[600px] bg-white rounded-xl border border-slate-200 overflow-hidden shadow-inner">
+                            <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                                    <Layout className="w-3 h-3" />
+                                    드래그 앤 드롭 에디터
+                                </label>
+                                {!editorReady && <div className="flex items-center gap-2 text-[10px] text-slate-400"><Loader2 className="w-3 h-3 animate-spin" /> 로딩 중...</div>}
+                            </div>
+                            <div className="flex-1 relative">
+                                <EmailEditor
+                                    ref={emailEditorRef}
+                                    onLoad={onEditorLoad}
+                                    options={{
+                                        locale: 'ko-KR',
+                                        appearance: {
+                                            theme: 'light',
+                                        },
+                                        mergeTags: DEFAULT_PLACEHOLDERS.reduce((acc, p) => ({
+                                            ...acc,
+                                            [p.key]: { name: p.label, value: `{${p.key}}` }
+                                        }), {})
+                                    }}
+                                    style={{
+                                        minHeight: '600px',
+                                        width: '100%'
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* 미리보기 영역 */}
-                    <div className="w-full md:w-[450px] bg-[#fdfdfd] flex flex-col">
+                    {/* 미리보기 영역 제거 또는 간소화 (에디터 자체가 프리뷰를 제공하므로) */}
+                    <div className="hidden md:flex w-full md:w-[350px] bg-[#fdfdfd] flex-col border-l border-slate-200">
                         <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
                             <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <Eye className="w-4 h-4 text-blue-500" />
-                                실시간 미리보기
+                                <Variable className="w-4 h-4 text-blue-500" />
+                                치환자 목록
                             </h3>
-                            <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Sample Data Applied</span>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 flex flex-col">
-                            <div className="bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden flex-1">
-                                <div className="bg-slate-50 border-b border-slate-100 p-4">
-                                    <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Subject</div>
-                                    <div className="text-sm font-medium text-slate-800">
-                                        {formData.subject || '(제목 없음)'}
-                                    </div>
-                                </div>
-                                <div className="p-4 overflow-x-auto min-h-full">
-                                    {formData.content ? (
-                                        <div 
-                                            dangerouslySetInnerHTML={{ __html: previewHtml }} 
-                                            className="text-sm preview-container"
-                                        />
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center h-64 text-slate-300">
-                                            <Eye className="w-12 h-12 mb-2 opacity-20" />
-                                            <p className="text-xs">내용을 입력하면 여기에 미리보기가 나타납니다.</p>
-                                        </div>
-                                    )}
-                                </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            <p className="text-[11px] text-slate-500 leading-relaxed bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                아래 버튼을 클릭하여 치환자 코드를 복사한 후, 에디터의 텍스트 블록에 붙여넣으세요.
+                            </p>
+                            <div className="grid grid-cols-1 gap-2">
+                                {DEFAULT_PLACEHOLDERS.map(p => (
+                                    <Button 
+                                        key={p.key} 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="justify-start h-9 text-xs bg-white hover:bg-blue-50 hover:text-blue-600 border-slate-200 group"
+                                        onClick={() => insertPlaceholder(p.key)}
+                                    >
+                                        <code className="bg-slate-100 px-1.5 py-0.5 rounded mr-2 text-[10px] group-hover:bg-blue-100 transition-colors">{`{${p.key}}`}</code>
+                                        <span className="flex-1 text-left">{p.label}</span>
+                                    </Button>
+                                ))}
                             </div>
                         </div>
                     </div>

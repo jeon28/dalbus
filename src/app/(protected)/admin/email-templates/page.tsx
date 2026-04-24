@@ -28,6 +28,7 @@ interface EmailTemplate {
     name: string;
     subject: string;
     content: string;
+    design?: any;
     placeholders: Placeholder[];
     updated_at: string;
 }
