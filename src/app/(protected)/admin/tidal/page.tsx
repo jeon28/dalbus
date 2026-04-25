@@ -689,13 +689,35 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
             if (field === 'start_date' || field === 'period_months') {
                 const startStr = next.start_date;
-                const months = parseInt(String(next.period_months)) || 0;
-                if (startStr && months >= 0) {
-                    try {
-                        const start = parseISO(startStr);
-                        const end = addDays(start, months * 30);
-                        next.end_date = end.toISOString().split('T')[0];
-                    } catch { }
+                const nextMonths = parseInt(String(next.period_months)) || 0;
+                const prevMonths = parseInt(String(current.period_months)) || 0;
+                const deltaMonths = nextMonths - prevMonths;
+
+                if (field === 'start_date') {
+                    // 시작일이 변경된 경우 정책에 따라 정배수로 초기화
+                    if (startStr && nextMonths >= 0) {
+                        try {
+                            const start = parseISO(startStr);
+                            const end = addDays(start, nextMonths * 30);
+                            next.end_date = end.toISOString().split('T')[0];
+                        } catch { }
+                    }
+                } else if (field === 'period_months') {
+                    // 개월 수가 변경된 경우 현재 종료일 기준으로 연장 (수동 조정된 오차 보존)
+                    if (next.end_date && deltaMonths !== 0) {
+                        try {
+                            const currentEnd = parseISO(next.end_date);
+                            const newEnd = addDays(currentEnd, deltaMonths * 30);
+                            next.end_date = newEnd.toISOString().split('T')[0];
+                        } catch { }
+                    } else if (startStr && nextMonths >= 0) {
+                        // 종료일이 없는 경우는 시작일 기준
+                        try {
+                            const start = parseISO(startStr);
+                            const end = addDays(start, nextMonths * 30);
+                            next.end_date = end.toISOString().split('T')[0];
+                        } catch { }
+                    }
                 }
             } else if (field === 'end_date') {
                 const startStr = next.start_date;
@@ -2433,7 +2455,26 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     type="number"
                                     className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white text-center px-1"
                                     value={quickEditValues?.period_months || 0} 
-                                    onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, period_months: parseInt(e.target.value) || 0 } : null)}
+                                    onChange={(e) => {
+                                        const nextM = parseInt(e.target.value) || 0;
+                                        const prevM = quickEditValues?.period_months || 0;
+                                        const deltaM = nextM - prevM;
+
+                                        setQuickEditValues(prev => {
+                                            if (!prev) return null;
+                                            let ne = prev.end_date;
+                                            if (ne && deltaM !== 0) {
+                                                try {
+                                                    ne = addDays(parseISO(ne), deltaM * 30).toISOString().split('T')[0];
+                                                } catch { }
+                                            } else if (prev.start_date) {
+                                                try {
+                                                    ne = addDays(parseISO(prev.start_date), nextM * 30).toISOString().split('T')[0];
+                                                } catch { }
+                                            }
+                                            return { ...prev, period_months: nextM, end_date: ne };
+                                        });
+                                    }}
                                 />
                             </div>
                             <div className="col-span-2 space-y-1">

@@ -1118,7 +1118,7 @@ export default function OrderHistoryPage() {
                                                     onChange={(e) => {
                                                         const val = parseInt(e.target.value) || 0;
                                                         setExtDuration(val);
-                                                        const baseDate = previousAssignment.end_date;
+                                                        const baseDate = previousAssignment.end_date || previousAssignment.start_date;
                                                         if (baseDate) {
                                                             try {
                                                                 const newEnd = format(addDays(parseISO(baseDate), val * 30), 'yyyy-MM-dd');
