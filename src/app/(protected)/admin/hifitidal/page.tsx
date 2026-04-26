@@ -168,7 +168,8 @@ function HifiTidalAccountsContent() {
     // Quick Edit Feature State
     const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
     const [quickEditValues, setQuickEditValues] = useState<GridValue | null>(null);
-    const [quickEditAccountId, setQuickEditAccountId] = useState('');
+    const [initialQuickEditValues, setInitialQuickEditValues] = useState<GridValue | null>(null);
+    const [quickEditAccountId, setQuickEditAccountId] = useState<string | null>(null);
     const [quickEditSlotIdx, setQuickEditSlotIdx] = useState<number | null>(null);
     const [quickEditAssignmentId, setQuickEditAssignmentId] = useState('');
     
@@ -625,32 +626,33 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             }
 
             if (field === 'start_date' || field === 'period_months') {
-                const startStr = next.start_date;
                 const nextMonths = parseInt(String(next.period_months)) || 0;
-                const prevMonths = parseInt(String(current.period_months)) || 0;
-                const deltaMonths = nextMonths - prevMonths;
 
                 if (field === 'start_date') {
                     // 시작일이 변경된 경우 정책에 따라 정배수로 초기화
-                    if (startStr && nextMonths >= 0) {
+                    if (next.start_date && nextMonths >= 0) {
                         try {
-                            const start = parseISO(startStr);
+                            const start = parseISO(next.start_date);
                             const end = addDays(start, nextMonths * 30);
                             next.end_date = end.toISOString().split('T')[0];
                         } catch { }
                     }
                 } else if (field === 'period_months') {
-                    // 개월 수가 변경된 경우 현재 종료일 기준으로 연장 (수동 조정된 오차 보존)
-                    if (next.end_date && deltaMonths !== 0) {
+                    // [개선안] 기준점 고정 방식: 최초 데이터(accounts state)를 기준으로 계산하여 누적 오차 방지
+                    const acc = accounts.find(a => a.id === accountId);
+                    const original = acc?.order_accounts?.find(oa => oa.slot_number === slotIdx);
+                    const initialEndDate = original?.end_date;
+                    const initialMonths = original?.period_months || 0;
+
+                    if (initialEndDate) {
                         try {
-                            const currentEnd = parseISO(next.end_date);
-                            const newEnd = addDays(currentEnd, deltaMonths * 30);
+                            const newEnd = addDays(parseISO(initialEndDate), (nextMonths - initialMonths) * 30);
                             next.end_date = newEnd.toISOString().split('T')[0];
                         } catch { }
-                    } else if (startStr && nextMonths >= 0) {
-                        // 종료일이 없는 경우는 시작일 기준
+                    } else if (next.start_date) {
+                        // 최초 종료일이 없는 경우는 시작일 기준
                         try {
-                            const start = parseISO(startStr);
+                            const start = parseISO(next.start_date);
                             const end = addDays(start, nextMonths * 30);
                             next.end_date = end.toISOString().split('T')[0];
                         } catch { }
@@ -1108,6 +1110,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         setQuickEditSlotIdx(slotIdx);
         setQuickEditAssignmentId(assignmentId);
         setQuickEditValues({ ...values });
+        setInitialQuickEditValues({ ...values }); // 기준점 고정 방식: 최초 데이터 저장
         setIsQuickEditModalOpen(true);
     };
 
@@ -2354,15 +2357,16 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     value={quickEditValues?.period_months || 0} 
                                     onChange={(e) => {
                                         const nextM = parseInt(e.target.value) || 0;
-                                        const prevM = quickEditValues?.period_months || 0;
-                                        const deltaM = nextM - prevM;
+                                        const initialM = initialQuickEditValues?.period_months || 0;
+                                        const initialEnd = initialQuickEditValues?.end_date;
 
                                         setQuickEditValues(prev => {
                                             if (!prev) return null;
                                             let ne = prev.end_date;
-                                            if (ne && deltaM !== 0) {
+                                            if (initialEnd) {
                                                 try {
-                                                    ne = addDays(parseISO(ne), deltaM * 30).toISOString().split('T')[0];
+                                                    // [개선안] 항상 최초 종료일(initialEnd)을 기준으로 계산
+                                                    ne = addDays(parseISO(initialEnd), (nextM - initialM) * 30).toISOString().split('T')[0];
                                                 } catch { }
                                             } else if (prev.start_date) {
                                                 try {

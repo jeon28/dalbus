@@ -167,6 +167,7 @@ export function LegacyTidalContent({
     const [expiredDays, setExpiredDays] = useState(7);
     const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
     const [quickEditValues, setQuickEditValues] = useState<GridValue | null>(null);
+    const [initialQuickEditValues, setInitialQuickEditValues] = useState<GridValue | null>(null);
     
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         checkbox: 26, login_id: 56, edit: 30, memo: 60, tidal_id: 90,
@@ -669,6 +670,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     const openQuickEditModal = (accountId: string, slotIdx: number, val: GridValue, assignmentId: string) => {
         setQuickEditValues({ ...val, assignment_id: assignmentId });
+        setInitialQuickEditValues({ ...val, assignment_id: assignmentId });
         setMemoTargetAccountId(accountId);
         setMemoTargetSlotIdx(slotIdx);
         setIsQuickEditModalOpen(true);
@@ -1393,17 +1395,16 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                     <Label className="text-xs text-slate-500 font-semibold">개월</Label>
                                     <Input type="number" value={quickEditValues.period_months || ''} onChange={e => {
                                         const nextM = parseInt(e.target.value) || 0;
-                                        const prevM = quickEditValues.period_months || 0;
-                                        const deltaM = nextM - prevM;
+                                        const initialM = initialQuickEditValues?.period_months || 0;
+                                        const initialEnd = initialQuickEditValues?.end_date;
                                         
                                         let ne = quickEditValues.end_date;
-                                        if (ne && deltaM !== 0) {
-                                            // 기존 종료일이 있는 경우, 종료일 기준 델타로 계산 (수동 조정된 날짜 보존)
+                                        if (initialEnd) {
                                             try {
-                                                ne = addDays(parseISO(ne), deltaM * 30).toISOString().split('T')[0];
+                                                // [개선안] 최초 종료일 기준 고정 계산
+                                                ne = addDays(parseISO(initialEnd), (nextM - initialM) * 30).toISOString().split('T')[0];
                                             } catch {}
                                         } else if (quickEditValues.start_date) {
-                                            // 종료일이 없는 경우는 기존처럼 시작일 기준
                                             try {
                                                 ne = addDays(parseISO(quickEditValues.start_date), nextM * 30).toISOString().split('T')[0];
                                             } catch {}
