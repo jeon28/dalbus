@@ -493,7 +493,7 @@ function LegacyTidalInactiveContent() {
                                     <Label className="text-[10px] text-gray-500">시작일</Label>
                                     <Input type="date" value={editAssignData.start_date || ''} onChange={e => {
                                         const ns = e.target.value; let ne = editAssignData.end_date;
-                                        if (ns && editAssignData.period_months) { try { ne = addDays(parseISO(ns), editAssignData.period_months * 30).toISOString().split('T')[0]; } catch { } }
+                                        if (ns && editAssignData.period_months) { try { ne = format(addDays(parseISO(ns), editAssignData.period_months * 30), 'yyyy-MM-dd'); } catch { } }
                                         setEditAssignData({ ...editAssignData, start_date: ns, end_date: ne });
                                     }} className="h-9 text-xs px-1" />
                                 </div>
@@ -509,7 +509,7 @@ function LegacyTidalInactiveContent() {
                                     <Label className="text-[10px] text-gray-500">개월</Label>
                                     <Input type="number" value={editAssignData.period_months || ''} onChange={e => {
                                         const m = parseInt(e.target.value) || 0; let ne = editAssignData.end_date;
-                                        if (editAssignData.start_date && m >= 0) { try { ne = addDays(parseISO(editAssignData.start_date), m * 30).toISOString().split('T')[0]; } catch { } }
+                                        if (editAssignData.start_date && m >= 0) { try { ne = format(addDays(parseISO(editAssignData.start_date), m * 30), 'yyyy-MM-dd'); } catch { } }
                                         setEditAssignData({ ...editAssignData, period_months: m, end_date: ne });
                                     }} className="h-9 text-xs px-1" />
                                 </div>

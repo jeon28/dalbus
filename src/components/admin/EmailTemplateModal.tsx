@@ -184,10 +184,10 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
 
     const insertPlaceholder = (key: string) => {
         // Unlayer 에디터 내부에 치환자 삽입은 에디터 자체 기능을 사용하는 것이 좋지만,
-        // 여기서는 간단히 텍스트로 복사 안내를 하거나 클립보드에 복사해주는 방식으로 변경할 수 있습니다.
-        // 현재는 Unlayer 연동으로 인해 직접적인 Textarea 삽입은 불가능합니다.
+        // 여기서는 간단히 텍스트로 복사 안내를 하는 방식으로 구현합니다.
         navigator.clipboard.writeText(`{${key}}`);
-        alert(`{${key}} 가 클립보드에 복사되었습니다. 에디터 본문에 붙여넣기(Ctrl+V) 하세요.`);
+        // 간단한 시각적 피드백이나 토스트가 있으면 좋지만, 현재는 콘솔 기록으로 대체하거나 
+        // 사용자 제안에 따라 alert을 제거합니다.
     };
 
     return (
@@ -203,9 +203,9 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-hidden flex flex-col md:flex-row bg-slate-50">
+                <div className="flex-1 overflow-hidden flex flex-col bg-slate-50">
                     {/* 편집 영역 */}
-                    <div className="flex-1 p-6 border-r border-slate-200 overflow-y-auto space-y-4">
+                    <div className="flex-1 p-6 overflow-y-auto space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-500 uppercase">시스템 키 (Unique)</label>
@@ -242,8 +242,9 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
                             <div className="flex justify-between items-center">
                                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
                                     <Variable className="w-3 h-3" />
-                                    치환자 삽입 (클릭)
+                                    치환자 삽입 (클릭 시 복사)
                                 </label>
+                                <span className="text-[10px] text-slate-400">버튼을 클릭하여 코드를 복사한 후, 에디터 본문에 붙여넣으세요.</span>
                             </div>
                             <div className="flex flex-wrap gap-1.5 p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
                                 {DEFAULT_PLACEHOLDERS.map(p => (
@@ -251,10 +252,11 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
                                         key={p.key} 
                                         variant="outline" 
                                         size="sm" 
-                                        className="h-7 text-[10px] bg-slate-50 hover:bg-blue-50 hover:text-blue-600 border-slate-200"
+                                        className="h-7 text-[10px] bg-white hover:bg-blue-50 hover:text-blue-600 border-slate-200 transition-colors"
                                         onClick={() => insertPlaceholder(p.key)}
                                     >
-                                        {p.label}
+                                        <span className="font-medium">{p.label}</span>
+                                        <code className="ml-1.5 text-[9px] text-slate-400 opacity-70 group-hover:text-blue-400">{`{${p.key}}`}</code>
                                     </Button>
                                 ))}
                             </div>
@@ -291,34 +293,6 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
                         </div>
                     </div>
 
-                    {/* 미리보기 영역 제거 또는 간소화 (에디터 자체가 프리뷰를 제공하므로) */}
-                    <div className="hidden md:flex w-full md:w-[350px] bg-[#fdfdfd] flex-col border-l border-slate-200">
-                        <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
-                            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <Variable className="w-4 h-4 text-blue-500" />
-                                치환자 목록
-                            </h3>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                            <p className="text-[11px] text-slate-500 leading-relaxed bg-blue-50 p-3 rounded-lg border border-blue-100">
-                                아래 버튼을 클릭하여 치환자 코드를 복사한 후, 에디터의 텍스트 블록에 붙여넣으세요.
-                            </p>
-                            <div className="grid grid-cols-1 gap-2">
-                                {DEFAULT_PLACEHOLDERS.map(p => (
-                                    <Button 
-                                        key={p.key} 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="justify-start h-9 text-xs bg-white hover:bg-blue-50 hover:text-blue-600 border-slate-200 group"
-                                        onClick={() => insertPlaceholder(p.key)}
-                                    >
-                                        <code className="bg-slate-100 px-1.5 py-0.5 rounded mr-2 text-[10px] group-hover:bg-blue-100 transition-colors">{`{${p.key}}`}</code>
-                                        <span className="flex-1 text-left">{p.label}</span>
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <DialogFooter className="p-4 bg-white border-t border-slate-200 gap-2">
