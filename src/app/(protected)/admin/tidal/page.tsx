@@ -702,20 +702,20 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         try {
                             const start = parseISO(next.start_date);
                             const end = addDays(start, nextMonths * 30);
-                            next.end_date = end.toISOString().split('T')[0];
+                            next.end_date = format(end, 'yyyy-MM-dd');
                         } catch { }
                     }
                 } else if (field === 'period_months') {
                     if (initialEndDate) {
                         try {
                             const newEnd = addDays(parseISO(initialEndDate), (nextMonths - initialMonths) * 30);
-                            next.end_date = newEnd.toISOString().split('T')[0];
+                            next.end_date = format(newEnd, 'yyyy-MM-dd');
                         } catch { }
                     } else if (next.start_date) {
                         try {
                             const start = parseISO(next.start_date);
                             const end = addDays(start, nextMonths * 30);
-                            next.end_date = end.toISOString().split('T')[0];
+                            next.end_date = format(end, 'yyyy-MM-dd');
                         } catch { }
                     }
                 }
@@ -2467,11 +2467,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             if (initialEnd) {
                                                 try {
                                                     // [개선안] 항상 최초 종료일(initialEnd)을 기준으로 계산
-                                                    ne = addDays(parseISO(initialEnd), (nextM - initialM) * 30).toISOString().split('T')[0];
+                                                    ne = format(addDays(parseISO(initialEnd), (nextM - initialM) * 30), 'yyyy-MM-dd');
                                                 } catch { }
                                             } else if (prev.start_date) {
                                                 try {
-                                                    ne = addDays(parseISO(prev.start_date), nextM * 30).toISOString().split('T')[0];
+                                                    ne = format(addDays(parseISO(prev.start_date), nextM * 30), 'yyyy-MM-dd');
                                                 } catch { }
                                             }
                                             return { ...prev, period_months: nextM, end_date: ne };

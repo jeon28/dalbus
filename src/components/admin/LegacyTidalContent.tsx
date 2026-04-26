@@ -1379,7 +1379,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                     <Label className="text-xs text-slate-500 font-semibold">시작일</Label>
                                     <Input type="date" value={quickEditValues.start_date || ''} onChange={e => {
                                         const ns = e.target.value; let ne = quickEditValues.end_date;
-                                        if (ns && quickEditValues.period_months) { try { ne = addDays(parseISO(ns), quickEditValues.period_months * 30).toISOString().split('T')[0]; } catch {} }
+                                        if (ns && quickEditValues.period_months) { try { ne = format(addDays(parseISO(ns), quickEditValues.period_months * 30), 'yyyy-MM-dd'); } catch {} }
                                         setQuickEditValues({ ...quickEditValues, start_date: ns, end_date: ne });
                                     }} className="h-10 text-[11px] px-2" />
                                 </div>
@@ -1402,11 +1402,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         if (initialEnd) {
                                             try {
                                                 // [개선안] 최초 종료일 기준 고정 계산
-                                                ne = addDays(parseISO(initialEnd), (nextM - initialM) * 30).toISOString().split('T')[0];
+                                                ne = format(addDays(parseISO(initialEnd), (nextM - initialM) * 30), 'yyyy-MM-dd');
                                             } catch {}
                                         } else if (quickEditValues.start_date) {
                                             try {
-                                                ne = addDays(parseISO(quickEditValues.start_date), nextM * 30).toISOString().split('T')[0];
+                                                ne = format(addDays(parseISO(quickEditValues.start_date), nextM * 30), 'yyyy-MM-dd');
                                             } catch {}
                                         }
                                         setQuickEditValues({ ...quickEditValues, period_months: nextM, end_date: ne });
