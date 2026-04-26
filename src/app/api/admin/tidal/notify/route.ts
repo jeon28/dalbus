@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
         }
 
-        const { recipients, messageTemplate } = await req.json();
+        const { recipients, messageTemplate, templateKey } = await req.json();
 
         if (!recipients || !recipients.length) {
             return NextResponse.json({ error: 'No recipients provided' }, { status: 400 });
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
                 tidalId,
                 endDate,
                 message: messageTemplate
-            });
+            }, templateKey);
 
             results.push({ email, ...sendResult });
         }

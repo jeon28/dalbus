@@ -158,6 +158,8 @@ export function LegacyTidalContent({
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
+    const [emailTemplates, setEmailTemplates] = useState<{key: string, name: string}[]>([]);
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState('EXPIRY_NOTICE');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
     const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
     const [currentMemoInput, setCurrentMemoInput] = useState('');
@@ -277,10 +279,21 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         } catch (error) { console.error(error); }
     }, [fetchFn]);
 
+    const fetchTemplates = useCallback(async () => {
+        try {
+            const res = await fetchFn('/api/admin/email-templates');
+            if (res.ok) {
+                const data = await res.json();
+                setEmailTemplates(data);
+            }
+        } catch (error) { console.error(error); }
+    }, [fetchFn]);
+
     useEffect(() => {
         fetchAccounts();
         fetchPendingOrders();
-    }, [fetchAccounts, fetchPendingOrders]);
+        fetchTemplates();
+    }, [fetchAccounts, fetchPendingOrders, fetchTemplates]);
 
     const getFlattenedAssignments = useCallback(() => {
         const flattened: { id: string; assignment: Assignment; account: Account; period: number; originalAccIndex: number }[] = [];
@@ -662,7 +675,15 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 .filter(item => selectedAssignmentIds.has(item.id))
                 .map(item => ({ email: item.assignment.buyer_email, buyerName: item.assignment.buyer_name, tidalId: item.assignment.tidal_id, endDate: item.assignment.end_date }))
                 .filter(r => !!r.email);
-            const res = await fetchFn('/api/admin/tidal/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipients, messageTemplate: notificationMessage }) });
+            const res = await fetchFn('/api/admin/tidal/notify', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ 
+                    recipients, 
+                    messageTemplate: notificationMessage,
+                    templateKey: selectedTemplateKey 
+                }) 
+            });
             if (res.ok) { alert('발송되었습니다.'); setIsNotifyModalOpen(false); setSelectedAssignmentIds(new Set()); }
             else alert('발송 실패');
         } catch { alert('오류 발생'); } finally { setIsSendingNotify(false); }
@@ -1494,12 +1515,26 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             {/* [MODAL: NOTIFY] */}
             <Dialog open={isNotifyModalOpen} onOpenChange={setIsNotifyModalOpen}>
                 <DialogContent className="sm:max-w-[550px]">
-                    <DialogHeader><DialogTitle>만료 안내 메일 발송</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>알림 메일 발송</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-500 uppercase">발송 템플릿 선택</Label>
+                            <Select value={selectedTemplateKey} onValueChange={setSelectedTemplateKey}>
+                                <SelectTrigger className="h-10 border-slate-200">
+                                    <SelectValue placeholder="템플릿 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {emailTemplates.map(t => (
+                                        <SelectItem key={t.key} value={t.key}>{t.name} ({t.key})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl text-orange-700 text-xs leading-relaxed">
                             <p className="font-bold mb-1 flex items-center gap-1"><Zap size={14}/> 발송 안내 ({selectedAssignmentIds.size}명)</p>
-                            <p className="opacity-80">선택된 회원들에게 연장 안내 메일을 발송합니다. 아래 치환 코드를 사용할 수 있습니다.</p>
-                            <p className="mt-2 font-mono bg-white/50 p-1 rounded inline-block text-[10px]">{'{buyer_name}'}, {'{tidal_id}'}, {'{end_date}'}</p>
+                            <p className="opacity-80">선택된 회원들에게 안내 메일을 발송합니다. 아래 치환 코드를 본문에 포함할 수 있습니다.</p>
+                            <p className="mt-2 font-mono bg-white/50 p-1 rounded inline-block text-[10px]">{'{buyer_name}'}, {'{tidal_id}'}, {'{end_date}'}, {'{message}'}</p>
                         </div>
                         <textarea 
                             className="w-full h-80 p-4 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none whitespace-pre-wrap transition-all shadow-sm" 

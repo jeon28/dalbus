@@ -246,12 +246,13 @@ interface ExpiryNotificationProps {
 
 export const sendExpiryNotification = async (
     targetEmail: string,
-    details: ExpiryNotificationProps
+    details: ExpiryNotificationProps,
+    templateKey: string = 'EXPIRY_NOTICE'
 ) => {
     const { buyerName, tidalId, endDate, message } = details;
 
     // DB 템플릿 시도
-    const dynamic = await getDynamicTemplate('EXPIRY_NOTICE', {
+    const dynamic = await getDynamicTemplate(templateKey, {
         buyer_name: buyerName,
         tidal_id: tidalId,
         end_date: endDate,
