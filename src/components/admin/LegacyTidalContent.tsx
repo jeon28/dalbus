@@ -1418,11 +1418,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         const nextM = parseInt(e.target.value) || 0;
                                         const initialM = initialQuickEditValues?.period_months || 0;
                                         const initialEnd = initialQuickEditValues?.end_date;
-                                        
+
                                         let ne = quickEditValues.end_date;
                                         if (initialEnd) {
                                             try {
-                                                // [개선안] 최초 종료일 기준 고정 계산
                                                 ne = format(addDays(parseISO(initialEnd), (nextM - initialM) * 30), 'yyyy-MM-dd');
                                             } catch {}
                                         } else if (quickEditValues.start_date) {
@@ -1433,6 +1432,25 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         setQuickEditValues({ ...quickEditValues, period_months: nextM, end_date: ne });
                                     }} className="h-10" />
                                 </div>
+                            </div>
+                            <div className="flex justify-end gap-1.5">
+                                {([3, 6, 12] as const).map(add => (
+                                    <Button key={add} type="button" size="sm" variant="outline"
+                                        className="h-7 px-2.5 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400"
+                                        onClick={() => {
+                                            const nextM = (quickEditValues.period_months || 0) + add;
+                                            const initialM = initialQuickEditValues?.period_months || 0;
+                                            const initialEnd = initialQuickEditValues?.end_date;
+                                            let ne = quickEditValues.end_date;
+                                            if (initialEnd) {
+                                                try { ne = format(addDays(parseISO(initialEnd), (nextM - initialM) * 30), 'yyyy-MM-dd'); } catch {}
+                                            } else if (quickEditValues.start_date) {
+                                                try { ne = format(addDays(parseISO(quickEditValues.start_date), nextM * 30), 'yyyy-MM-dd'); } catch {}
+                                            }
+                                            setQuickEditValues({ ...quickEditValues, period_months: nextM, end_date: ne });
+                                        }}
+                                    >+{add}개월</Button>
+                                ))}
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs text-slate-500 font-semibold">메모</Label>
