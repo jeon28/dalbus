@@ -64,6 +64,8 @@ function LegacyTidalInactiveContent() {
     const [activeEditSlotIdx, setActiveEditSlotIdx] = useState<number | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+    const [initialEditEndDate, setInitialEditEndDate] = useState<string>('');
+    const [initialEditMonths, setInitialEditMonths] = useState<number>(0);
 
     // Tidal Login Popup state
     const [tidalLoginEmail, setTidalLoginEmail] = useState<string | null>(null);
@@ -222,6 +224,12 @@ function LegacyTidalInactiveContent() {
         setActiveEditSlotIdx(slotIdx);
         if (assignment && !assignment.isEmpty) {
             setSelectedAssignmentId(assignment.id);
+            let pm = 0;
+            if (assignment.start_date && assignment.end_date) {
+                try { pm = Math.max(0, Math.floor(differenceInDays(parseISO(assignment.end_date), parseISO(assignment.start_date)) / 30)); } catch { }
+            }
+            setInitialEditEndDate(assignment.end_date || '');
+            setInitialEditMonths(pm);
             setEditAssignData({
                 assignment_number: `${assignment.accounts?.login_id || '-'}-${assignment.slot_number + 1}`,
                 buyer_name: assignment.buyer_name || '',
@@ -230,11 +238,13 @@ function LegacyTidalInactiveContent() {
                 tidal_id: assignment.tidal_id || '',
                 start_date: assignment.start_date || '',
                 end_date: assignment.end_date || '',
-                period_months: 0, // Will be calculated if needed
+                period_months: pm,
                 amount: 0,
                 memo: assignment.memo || '',
             });
         } else {
+            setInitialEditEndDate('');
+            setInitialEditMonths(0);
             setSelectedAssignmentId(null);
             setEditAssignData({
                 assignment_number: `${assignment?.accounts?.login_id || '-'}-${slotIdx + 1}`,
@@ -494,7 +504,7 @@ function LegacyTidalInactiveContent() {
                                     <Label className="text-[10px] text-gray-500">시작일</Label>
                                     <Input type="date" value={editAssignData.start_date || ''} onChange={e => {
                                         const ns = e.target.value; let ne = editAssignData.end_date;
-                                        if (ns && editAssignData.period_months) { try { ne = addDays(parseISO(ns), editAssignData.period_months * 30).toISOString().split('T')[0]; } catch { } }
+                                        if (ns && editAssignData.period_months) { try { ne = format(addDays(parseISO(ns), editAssignData.period_months * 30), 'yyyy-MM-dd'); } catch { } }
                                         setEditAssignData({ ...editAssignData, start_date: ns, end_date: ne });
                                     }} className="h-9 text-xs px-1" />
                                 </div>
@@ -510,7 +520,11 @@ function LegacyTidalInactiveContent() {
                                     <Label className="text-[10px] text-gray-500">개월</Label>
                                     <Input type="number" value={editAssignData.period_months || ''} onChange={e => {
                                         const m = parseInt(e.target.value) || 0; let ne = editAssignData.end_date;
-                                        if (editAssignData.start_date && m >= 0) { try { ne = addDays(parseISO(editAssignData.start_date), m * 30).toISOString().split('T')[0]; } catch { } }
+                                        if (initialEditEndDate) {
+                                            try { ne = format(addDays(parseISO(initialEditEndDate), (m - initialEditMonths) * 30), 'yyyy-MM-dd'); } catch { }
+                                        } else if (editAssignData.start_date && m >= 0) {
+                                            try { ne = format(addDays(parseISO(editAssignData.start_date), m * 30), 'yyyy-MM-dd'); } catch { }
+                                        }
                                         setEditAssignData({ ...editAssignData, period_months: m, end_date: ne });
                                     }} className="h-9 text-xs px-1" />
                                 </div>
