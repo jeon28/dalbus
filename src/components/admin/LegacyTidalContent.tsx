@@ -643,29 +643,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         setSelectedAssignmentIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
     };
 
-    const handleBulkMove = () => {
-        if (selectedAssignmentIds.size === 1) {
-            const targetId = Array.from(selectedAssignmentIds)[0];
-            const item = getFlattenedAssignments().find(i => i.assignment.id === targetId);
-            if (item) openMoveModal(item.assignment);
-        } else alert('이동은 한 번에 하나씩만 가능합니다.');
-    };
 
-    const handleBulkDeactivate = async () => {
-        if (!confirm('일괄 비활성/활성 하시겠습니까?')) return;
-        try {
-            await Promise.all(Array.from(selectedAssignmentIds).map(id => fetchFn(`/api/admin/legacy-tidal/assignment/${id}/toggle-active`, { method: 'POST' })));
-            fetchAccounts();
-        } catch { alert('일괄 처리 실패'); }
-    };
-
-    const handleBulkDelete = async () => {
-        if (!confirm('정말 삭제하시겠습니까?')) return;
-        try {
-            await Promise.all(Array.from(selectedAssignmentIds).map(id => fetchFn(`/api/admin/legacy-tidal/assignment/${id}`, { method: 'DELETE' })));
-            setSelectedAssignmentIds(new Set()); fetchAccounts();
-        } catch { alert('일괄 삭제 실패'); }
-    };
 
     const handleBulkNotify = async () => {
         if (selectedAssignmentIds.size === 0) return;
@@ -798,27 +776,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         </DropdownMenu>
 
                         <div className="flex items-center gap-2">
-                            {selectedAssignmentIds.size > 0 && (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-9 bg-blue-50 text-blue-700 border-blue-200">
-                                            선택 ({selectedAssignmentIds.size}) <ChevronDown size={14} className="ml-1" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                        <DropdownMenuItem onClick={handleBulkMove} className="gap-2">
-                                            <ArrowRightLeft size={14} /> 이동
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={handleBulkDeactivate} className="gap-2">
-                                            <PowerOff size={14} /> 활성/비활성
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={handleBulkDelete} className="text-red-600 gap-2 font-semibold">
-                                            <Trash2 size={14} /> 삭제
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            )}
+
 
                             {isGridView && (
                                 <Button 
