@@ -1431,7 +1431,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                     ? (() => { try { return format(parseISO(quickEditValues.end_date!), 'yyyy.MM.dd'); } catch { return quickEditValues.end_date!; } })()
                                     : '';
                                 const addedMonths = (quickEditValues?.period_months || 0) - (initialQuickEditValues?.period_months || 0);
-                                navigator.clipboard.writeText(`감사합니다 ${endDate} 까지 (${addedMonths} × 30일) 연장 입니다.`);
+                                navigator.clipboard.writeText(`감사합니다 ${endDate} 까지 ${addedMonths} 개월 연장 입니다.`);
                                 setExtendMsgCopied(true);
                                 setTimeout(() => setExtendMsgCopied(false), 2000);
                             }}
