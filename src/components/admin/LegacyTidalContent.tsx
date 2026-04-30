@@ -170,6 +170,7 @@ export function LegacyTidalContent({
     const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
     const [quickEditValues, setQuickEditValues] = useState<GridValue | null>(null);
     const [initialQuickEditValues, setInitialQuickEditValues] = useState<GridValue | null>(null);
+    const [extendMsgCopied, setExtendMsgCopied] = useState(false);
     
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
         checkbox: 26, login_id: 56, edit: 30, memo: 60, tidal_id: 90,
@@ -1463,9 +1464,25 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             </div>
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)} className="h-10">취소</Button>
-                        <Button onClick={handleSaveQuickEdit} className="h-10 bg-blue-600 hover:bg-blue-700">정보 업데이트</Button>
+                    <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <button
+                            type="button"
+                            className="text-xs text-blue-500 hover:text-blue-700 underline underline-offset-2 text-left transition-colors"
+                            onClick={() => {
+                                const endDate = quickEditValues?.end_date
+                                    ? (() => { try { return format(parseISO(quickEditValues.end_date!), 'yyyy.MM.dd'); } catch { return quickEditValues.end_date!; } })()
+                                    : '';
+                                navigator.clipboard.writeText(`감사합니다 ${endDate} 까지 연장" 입니다.`);
+                                setExtendMsgCopied(true);
+                                setTimeout(() => setExtendMsgCopied(false), 2000);
+                            }}
+                        >
+                            {extendMsgCopied ? '✓ 복사됨' : '연장 문자 복사'}
+                        </button>
+                        <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)} className="h-10">취소</Button>
+                            <Button onClick={handleSaveQuickEdit} className="h-10 bg-blue-600 hover:bg-blue-700">정보 업데이트</Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
