@@ -1418,11 +1418,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         const nextM = parseInt(e.target.value) || 0;
                                         const initialM = initialQuickEditValues?.period_months || 0;
                                         const initialEnd = initialQuickEditValues?.end_date;
-                                        
+
                                         let ne = quickEditValues.end_date;
                                         if (initialEnd) {
                                             try {
-                                                // [개선안] 최초 종료일 기준 고정 계산
                                                 ne = format(addDays(parseISO(initialEnd), (nextM - initialM) * 30), 'yyyy-MM-dd');
                                             } catch {}
                                         } else if (quickEditValues.start_date) {
@@ -1433,6 +1432,25 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         setQuickEditValues({ ...quickEditValues, period_months: nextM, end_date: ne });
                                     }} className="h-10" />
                                 </div>
+                            </div>
+                            <div className="flex justify-end gap-1.5">
+                                {([3, 6, 12] as const).map(add => (
+                                    <Button key={add} type="button" size="sm" variant="outline"
+                                        className="h-7 px-2.5 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400"
+                                        onClick={() => {
+                                            const nextM = (quickEditValues.period_months || 0) + add;
+                                            const initialM = initialQuickEditValues?.period_months || 0;
+                                            const initialEnd = initialQuickEditValues?.end_date;
+                                            let ne = quickEditValues.end_date;
+                                            if (initialEnd) {
+                                                try { ne = format(addDays(parseISO(initialEnd), (nextM - initialM) * 30), 'yyyy-MM-dd'); } catch {}
+                                            } else if (quickEditValues.start_date) {
+                                                try { ne = format(addDays(parseISO(quickEditValues.start_date), nextM * 30), 'yyyy-MM-dd'); } catch {}
+                                            }
+                                            setQuickEditValues({ ...quickEditValues, period_months: nextM, end_date: ne });
+                                        }}
+                                    >+{add}개월</Button>
+                                ))}
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs text-slate-500 font-semibold">메모</Label>
@@ -1445,9 +1463,26 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             </div>
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)} className="h-10">취소</Button>
-                        <Button onClick={handleSaveQuickEdit} className="h-10 bg-blue-600 hover:bg-blue-700">정보 업데이트</Button>
+                    <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <button
+                            type="button"
+                            className="text-xs text-blue-500 hover:text-blue-700 underline underline-offset-2 text-left transition-colors"
+                            onClick={() => {
+                                const endDate = quickEditValues?.end_date
+                                    ? (() => { try { return format(parseISO(quickEditValues.end_date!), 'yyyy.MM.dd'); } catch { return quickEditValues.end_date!; } })()
+                                    : '';
+                                const addedMonths = (quickEditValues?.period_months || 0) - (initialQuickEditValues?.period_months || 0);
+                                navigator.clipboard.writeText(`감사합니다 ${endDate} 까지 ${addedMonths}개월 (월 30일) 연장 입니다.`);
+                                setExtendMsgCopied(true);
+                                setTimeout(() => setExtendMsgCopied(false), 2000);
+                            }}
+                        >
+                            {extendMsgCopied ? '✓ 복사됨' : '연장 문자 복사'}
+                        </button>
+                        <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => setIsQuickEditModalOpen(false)} className="h-10">취소</Button>
+                            <Button onClick={handleSaveQuickEdit} className="h-10 bg-blue-600 hover:bg-blue-700">정보 업데이트</Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
