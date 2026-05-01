@@ -1,0 +1,202 @@
+.main {
+    padding-bottom: 80px;
+}
+
+.header {
+    height: var(--header-height);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    font-size: 1.4rem;
+    font-weight: 950;
+    letter-spacing: -0.5px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.headerLogo {
+    height: 28px;
+    width: auto;
+}
+
+.logo span {
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.loginLink {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--text-main);
+    letter-spacing: 1px;
+}
+
+.adminLink {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--primary);
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--primary);
+    text-transform: uppercase;
+}
+
+.userName {
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.hero {
+    padding-top: 60px;
+    padding-bottom: 50px;
+    text-align: center;
+}
+
+.hero h2 {
+    font-size: 2.8rem;
+    font-weight: 950;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    letter-spacing: -1px;
+}
+
+.hero h2 span {
+    color: var(--primary);
+}
+
+.hero p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+}
+
+.singleGrid {
+    display: flex;
+    justify-content: center;
+    padding-top: 20px;
+}
+
+.singleGrid .card {
+    width: 100%;
+    max-width: 340px;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--radius);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: #ffffff;
+    border: 1px solid var(--glass-border);
+    position: relative;
+    display: block;
+}
+
+.singleGrid .card:hover {
+    transform: translateY(-8px);
+    border-color: var(--primary);
+}
+
+.cardContent {
+    padding: 60px 20px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    background: linear-gradient(180deg, #fdfdfd 0%, #f4f4f4 100%);
+    text-align: center;
+}
+
+.tidalStoreLogo {
+    width: 90px;
+    height: auto;
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.05));
+    margin-bottom: 10px;
+}
+
+.serviceName {
+    font-size: 1.5rem;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #000;
+    margin: 0;
+}
+
+.tag {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 10;
+    font-size: 0.65rem;
+    font-weight: 900;
+    background: #000;
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.priceContainer {
+    padding: 20px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    background: #ffffff;
+    border-top: 1px solid var(--glass-border);
+}
+
+.subText {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.price {
+    font-size: 1.4rem;
+    font-weight: 950;
+    color: var(--primary);
+}
+
+.bottomNav {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    min-width: 250px;
+    height: 65px;
+    padding: 0 40px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 40px;
+    display: flex;
+    justify-content: space-between;
+    gap: 40px;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.navItem {
+    font-size: 1.6rem;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.navItem:hover {
+    transform: scale(1.2);
+    color: var(--primary);
+}
+
+@media (min-width: 768px) {
+    .singleGrid .card {
+        max-width: 380px;
+    }
+}

@@ -1,0 +1,391 @@
+.main {
+    padding-bottom: 50px;
+}
+
+.header {
+    min-height: var(--header-height);
+    display: flex;
+    align-items: center;
+    padding: 1rem 0;
+}
+
+.title {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+@media (min-width: 640px) {
+    .title {
+        font-size: 1.25rem;
+    }
+}
+
+.legacyTitle {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #f97316; /* Orange color for legacy */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.content {
+    padding-top: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+@media (min-width: 640px) {
+    .stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .stats {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+}
+
+.statCard {
+    padding: 15px;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.statCard span {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.statCard strong {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.tableWrapper {
+    overflow-x: auto;
+    margin-top: 15px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.table th {
+    text-align: left;
+    padding: 12px 10px;
+    border-bottom: 2px solid var(--secondary);
+    color: var(--text-muted);
+}
+
+.table td {
+    padding: 15px 10px;
+    border-bottom: 1px solid var(--secondary);
+}
+
+.status {
+    padding: 4px 8px;
+    background: var(--secondary);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.actionBtn {
+    background: var(--text-main);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+
+.inputGroup {
+    padding: 20px;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.inputGroup input {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: var(--secondary);
+}
+
+.saveBtn {
+    background: var(--primary);
+    color: white;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+.priceSection h3 {
+    font-size: 1rem;
+    margin-bottom: 15px;
+}
+
+.priceGrid {
+    padding: 20px;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.priceItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.priceItem label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.inputWrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inputWrapper input {
+    width: 100px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: var(--secondary);
+    text-align: right;
+    font-weight: 700;
+}
+
+.inputWrapper span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+@media (min-width: 768px) {
+    .stats {
+        gap: 20px;
+    }
+}
+
+.bankSection {
+    margin-top: 2rem;
+}
+
+.bankTable {
+    width: 100%;
+    min-width: 500px;
+    border-collapse: collapse;
+}
+
+.bankTable th {
+    text-align: left;
+    padding: 10px;
+    border-bottom: 2px solid #eee;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.bankTable td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #f5f5f5;
+    font-size: 0.85rem;
+}
+
+.settingsGrid {
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+@media (min-width: 768px) {
+    .settingsGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.settingsGrid>button {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+}
+
+.settingsItem {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settingsItem label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* Mobile Responsive Utils */
+.mobileOnly {
+    display: block !important;
+}
+
+.desktopOnly {
+    display: none !important;
+}
+
+.mobileOnly {
+    display: block;
+}
+
+.desktopOnly {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .mobileOnly {
+        display: none !important;
+    }
+
+    .desktopOnly {
+        display: block !important;
+    }
+}
+
+/* Order Card Styles (Mobile) */
+.orderCards {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.orderCard {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 15px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.orderCardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.orderId {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.orderDate {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.orderCardContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.productName {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.memberInfo {
+    font-size: 0.85rem;
+}
+
+.priceInfo {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.orderCardActions {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.actionBtnIcon {
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Header Responsiveness */
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .headerActions {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+.resizableTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.resizableTable th {
+    position: relative;
+    user-select: none;
+    background-color: var(--secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 5px;
+    background: rgba(0, 0, 0, 0.05);
+    cursor: col-resize;
+    z-index: 1;
+}
+
+.resizer:hover,
+.resizing {
+    background: var(--primary);
+    width: 2px;
+}
+
+.resizableTable td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -1,0 +1,637 @@
+# Changelog
+
+
+## [Unreleased] - 2026-04-09
+
+### 🎵 Tidal 자동팝업 (DAL-44)
+- **Master ID 더블클릭 지원**: 비활성 페이지에서 `Master ID` 컬럼도 더블클릭 시 Tidal 로그인 팝업이 표시되도록 개선했습니다.
+- **Tidal 정식 로그인 URL 적용**: 팝업 내 'Continue' 버튼 클릭 시 `login_hint`가 포함된 Tidal 정식 권한 부여 URL로 연결되어 이메일이 자동 입력된 상태로 로그인 화면이 열립니다.
+- **기존 링크 제거**: ID 컬럼에 걸려있던 불필요한 직결 링크를 제거하고 더블클릭 팝업으로 통합했습니다.
+
+### 🛠️ Legacy Tidal 비활성 페이지 고도화
+- **Master ID 컬럼 추가**: 비활성 목록 테이블에 `Tidal ID` 앞에 `Master ID` 컬럼을 추가하여 그룹 마스터 계정의 Tidal ID를 표시합니다.
+- **카드형 수정 모달**: 빈 슬롯의 연필(✏️) 버튼 클릭 시 이전처럼 페이지 이동 없이 동일 페이지에서 배정 정보를 입력할 수 있는 카드형 모달이 열립니다.
+- **빈 슬롯 중복 방지**: 비활성 내역이 이미 존재하는 슬롯에 `hasInactive` 체크를 추가하여 빈 슬롯이 중복 생성되지 않도록 수정했습니다.
+
+### 🔧 ESLint / TypeScript 빌드 안정화
+- **`no-explicit-any` 전량 수정**: `legacy-tidal/inactive`, `tidal/inactive`, `hifitidal/inactive` 페이지 및 서비스 파일(`legacyTidalService`, `tidalService`)에서 `any` 타입을 명시적 인터페이스로 교체했습니다.
+- **`EditAssignFormData` 인터페이스 신설**: 수정 모달의 폼 데이터 타입을 명확하게 정의했습니다.
+- **React Hook 의존성 경고 수정**: `exhaustive-deps` 관련 ESLint 경고를 해결했습니다.
+
+### 🗑️ 삭제 흐름 개선 – "삭제 → 휴지통 → 영구 삭제" 워크플로우
+- **비활성 페이지 삭제 로직 변경**: `/admin/tidal/inactive` 페이지의 삭제 버튼이 **소프트 삭제**(휴지통 이동)로 동작하도록 변경. 기존에는 바로 영구 삭제되던 것을 `is_deleted: true`로 마킹하는 방식으로 전환.
+- **삭제된 데이터 조회 API 신설**: `GET /api/admin/assignments/deleted` 엔드포인트 추가. `is_deleted: true`인 레코드만 반환하며, `product` 파라미터로 Tidal/HifiTidal 구분 가능.
+- **확인 메시지 개선**: 삭제 시 "해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)" 안내 팝업 표시.
+- **성공 알림 추가**: 소프트 삭제 완료 후 "삭제된 데이터 보기(휴지통)로 이동되었습니다." 알림 표시.
+
+### 🔐 소셜 로그인(SNS) 통합 (DAL-36)
+- **로그인/가입 UI 개선**: `/signup` 및 `/login` 페이지에 Google 및 Kakao 소셜 가입/로그인 버튼 추가.
+- **디자인 패턴 적용**: 버튼 Hover 애니메이션, 모던 SVG 아이콘, 기존 이메일 폼과 직관적으로 나뉘는 구분선(Divider) 레이아웃 적용 (`auth.module.css`).
+- **Supabase OAuth 연동**: `signInWithOAuth` 메서드를 통해 Google/Kakao 프로바이더 연동을 완료하고, `window.location.origin` 기반 로컬 및 운영 환경 동시 호환 리다이렉트 구현.
+
+## v1.7.0 - 2026-03-29
+
+### 🗂️ 기존 Tidal 계정 관리 (legacy_tidal_account) 분리 및 신규 구축
+
+#### 데이터베이스
+- **`legacy_tidal_account` 테이블 신설**: HifiTidal 계정을 주문 시스템(`order_accounts`)과 완전히 분리하여 독립 테이블로 관리합니다. `order_id` FK 없이 독립적으로 운영됩니다.
+- **마이그레이션 파일 추가**: `supabase/migrations/20260329_create_legacy_tidal_account.sql`
+
+#### API 라우트 신설
+- `GET/POST /api/admin/legacy-tidal-account` — 페이지네이션·검색·필터 지원 목록 조회
+- `PUT/DELETE /api/admin/legacy-tidal-account/[id]` — 슬롯 수정·비활성화·삭제, used_slots 자동 동기화
+- `GET /api/admin/legacy-tidal-account/inactive` — 비활성 내역 조회
+- `POST /api/admin/legacy-tidal-account/assign/[accountId]` — 슬롯 배정 (주문 시스템 연동 없음)
+
+#### HifiTidal 페이지 분리
+- **`/admin/hifitidal`**: 모든 쓰기 API를 `legacy-tidal-account` 라우트로 전환 (기존 `assignments` 라우트에서 분리)
+- **`/admin/hifitidal/inactive`**: 비활성 내역 API 경로 전환
+
+#### Excel Import 분기 처리
+- `isHifiTidal` 플래그로 `legacy_tidal_account` / `order_accounts` 분기 처리
+- HifiTidal 임포트 시 `order_id` 필드 제외, 독립 테이블에 Upsert
+
+#### Move API 범용화
+- `/api/admin/accounts/move` — `source_table` 파라미터 추가로 `order_accounts` / `legacy_tidal_account` 모두 지원
+
+#### 기존 Tidal 계정 관리 페이지 (`/admin/legacy-tidal`)
+- **Grid View / List View** 전환 지원 (hifitidal과 동일한 기능 수준)
+- 인라인 편집, 그룹 추가/수정/삭제, 슬롯 배정, 이동, 비활성화, 메모
+- 일괄 알림 발송 (이메일), Excel 가져오기/내보내기
+- **`/admin/legacy-tidal/inactive`**: 비활성 내역 페이지 (영구 삭제, Excel 내보내기)
+- 어드민 사이드바 메뉴 "기존 Tidal 계정" 항목 추가
+
+### 🛠️ 시스템 안정성
+- **tsconfig.json**: `tmp/` 디렉토리를 TypeScript 컴파일 대상에서 제외
+- **드롭다운 서브메뉴**: 상단 부가 기능 버튼(삭제 데이터, 내역, 엑셀 가져오기/내보내기)을 `⋯` 버튼 드롭다운으로 통합하여 UI 간소화
+
+
+## v1.6.1 - 2026-03-15
+
+### 🌊 Tidal 계정 관리 시스템 고도화
+- **날짜 계산 로직 정밀화**: 모든 배정 및 수정 시 '30일 = 1개월' 기준의 정밀한 날짜 계산 로직을 적용했습니다. 종료일 변경 시 개월 수가 자동 계산되며, 그 반대의 경우도 실시간으로 동기화됩니다.
+- **Master/User 슬롯 로직 유연화**: 슬롯 1번의 마스터(Master) 계정 강제성을 완화하여, 1번 슬롯을 일반 사용자(User)로 변경할 수 있도록 개선했습니다. 단, 다른 슬롯의 사용자를 마스터로 승격할 경우 해당 사용자는 자동으로 1번 슬롯으로 이동하며 단일 마스터 원칙을 유지합니다.
+- **배정 이동(Move) 기능 제한 해제**: 엑셀 임포트 등을 통해 주문 정보(`order_id`)가 연결되지 않은 슬롯도 배정 이동 기능을 사용할 수 있도록 API와 UI를 개선했습니다.
+
+### 🛠️ 데이터베이스 안정성 강화
+- **Safe Indexing (Two-Pass Update)**: 대량 임포트 또는 슬롯 번호 재정렬 시 발생하던 데이터베이스 유니크 제약 조건(Unique Constraint) 충돌 문제를 2단계 업데이트 방식을 통해 근본적으로 해결했습니다.
+
+
+### 📊 관리자 페이지 서버사이드 페이지네이션 도입
+- **대규모 데이터 처리 최적화**: 거래 내역(Orders), 메일 발송 이력(Mail History), 회원 정보(Member Information) 관리 페이지에 서버사이드 페이지네이션을 전면 도입했습니다.
+- **사용자 맞춤형 조회**: 페이지당 표시 개수(Default 25개)를 선택할 수 있는 기능을 추가하고, 검색 및 필터링 시에도 페이지네이션이 동적으로 연동되도록 구현했습니다.
+- **일관된 UI 디자인**: 모든 관리 서비스 페이지에 동일한 디자인의 페이지네이션 컨트롤러(Left-Center-Right 레이아웃)를 적용하여 사용성을 통일했습니다.
+
+### 👤 회원 관리 및 마이페이지 개선
+- **메모 컬럼 가독성 향상**: 회원 목록의 메모 필드가 40자를 초과할 경우 말줄임(...) 처리하고, 마우스 호버 시 전체 내용을 확인할 수 있는 툴팁 기능을 구현했습니다.
+- **마이페이지 데이터 타입 안정화**: 빌드 오류를 유발하던 `mypage/page.tsx` 내 `slot_number` 타입 정의 누락 문제를 수정하고 데이터 매핑 로직을 보완했습니다.
+
+### 🛠️ 시스템 안정성 및 버그 수정
+- **통계 에러 해결**: 관리자 메인 대시보드에서 `orders.filter` 관련 TypeError를 해결하여 실시간 통계가 정상적으로 표시되도록 수정했습니다.
+- **Excel 내보내기 고도화**: 페이지네이션 도입 이후에도 필터링된 전체 데이터를 Excel로 내보낼 수 있도록 클라이언트 사이드 데이터 처리 로직을 최적화했습니다.
+
+## v1.5.9 - 2026-03-10
+- **슬롯 인덱싱 표준화 (DAL-23)**: 사용자 및 관리자 화면 전체에서 슬롯 번호를 1-6 기반으로 통일하여 표시하도록 개선했습니다. (내부 로직은 0-5 유지)
+- **Tidal 계정 관리 정렬 개선**: List View에서 각 계정의 슬롯 배정 내역이 슬롯 번호 순서대로 오름차순 정렬되도록 수정했습니다.
+- **Tidal 관리 UI 버그 수정**: List View의 "슬롯 추가" 행에서 다음에 배정될 슬롯 번호가 실제와 다르게 표시되던 문제를 해결했습니다.
+
+## [Unreleased]
+
+### 🌊 Tidal 계정 관리 이메일 필드 추가 및 빌드 안정화
+- **이메일 필드 통합**: Tidal 계정 관리 Gridview 목록에 고객명과 전화번호 문자열 사이에 이메일 필드를 추가하여 고객 식별을 용이하게 했습니다.
+- **Vercel 빌드 오류 수정**: `any` 타입 사용, 미사용 변수, `null` 객체 참조 등으로 인해 발생하던 프로덕션 빌드 에러를 모두 수정하여 배포 품질을 확보했습니다.
+
+## v1.5.8 - 2026-03-07
+- **Vercel 빌드 오류 재수정**: Banks API에서 미사용 매개변수(`_req`)와 관련 import를 완전히 제거하여 엄격한 린트 규칙을 통과하도록 수정했습니다.
+
+
+## v1.5.7 - 2026-03-07
+- **Vercel 빌드 오류 수정**: 미사용 변수(`orderId`, `req`) 제거 및 `useEffect` 의존성 누락 문제(`useCallback` 적용)를 해결하여 배포 안정성을 확보했습니다.
+
+
+## v1.5.6 - 2026-03-07
+
+### 🔄 서비스 연장(Service Extension) 기능 구현
+- **마이페이지 연장 버튼 추가**: 활성 구독 정보 카드에 '서비스 연장하기' 버튼을 추가하여 간편하게 구독을 연장할 수 있는 경로를 마련했습니다.
+- **연장 모드 전용 흐름 시스템**: 서비스 상세 페이지에서 연장 모드(`mode=EXT`) 진입 시, 고객의 기존 Tidal ID를 자동으로 불러오고 이전 주문 내역을 조회하여 정보를 사전 입력하는 기능을 구현했습니다.
+- **연장 주문 이력 연결**: 신규 주문 생성 시 `related_order_id` 컬럼을 통해 이전 주문과 연결함으로써 서비스 연장 이력을 체계적으로 관리할 수 있도록 했습니다.
+
+### 👥 회원 관리 및 LNB UI/UX 개선
+- **회원 정보 디자인 개편**: 회원 정보 그리드 화면을 'Tidal 계정 관리' 화면과 동일한 프리미엄 톤앤매너로 통일하여 관리자 페이지의 일관성을 높였습니다.
+- **LNB 레이아웃 안정화**: 사이드바(LNB)의 너비를 고정하고 브라우저 리사이즈 시에도 영역이 침범되지 않도록 레이아웃 구조를 보완했습니다.
+- **메모 컬럼 가독성 최적화**: 긴 메모 데이터가 화면을 벗어나지 않도록 너비를 조정하고, 말줄임 처리 및 마우스 호버 시 전체 내용을 확인할 수 있는 툴팁 기능을 적용했습니다.
+
+### 💳 결제 시스템 보완 및 버그 수정
+- **입금 계좌 조회 API 신설**: 서비스 상세 페이지에서 활성화된 입금 계좌 정보를 불러오는 전용 공개 API(`/api/public/banks`)를 구축하여 결제 수단 정보가 표시되지 않던 문제를 해결했습니다.
+- **Tidal ID 조회 로직 개선**: 서비스 상세 페이지 진입 시 URL 파라미터를 통해 전달된 정보를 안정적으로 파싱하고 상태(State)에 반영하도록 로직을 강화했습니다.
+
+---
+
+## v1.5.5 - 2026-03-07
+
+### 👥 회원 관리 페이지 고도화 및 사용성 개선 (DAL-22)
+
+#### 핵심 업데이트 내역
+1. **회원 상태(구독 여부) 시스템 구축**:
+    - Tidal 구독 종료일(`end_date`)을 실시간으로 확인하여 '활성'/'비활성' 상태를 판별하는 백엔드 로직을 구현했습니다.
+    - 회원 목록에 **상태 배지**를 추가하고, 상태별(전체/활성/비활성) 필터링 기능을 탑재했습니다.
+2. **데이터 가독성 및 UI 개선**:
+    - **이메일 기반 ID 표시**: 기존 UUID 대신 이메일 주소를 기본 식별자로 표시하여 관리 편의성을 극대화했습니다. (마우스 오버 시 UUID 조회 가능)
+    - **테이블 컬럼 리사이징**: 데스크톱 환경에서 마우스 드래그로 각 컬럼의 너비를 자유롭게 조절할 수 있는 기능을 추가했습니다.
+    - **레이블 간소화**: '엑셀 다운로드' 버튼을 '엑셀'로 변경하는 등 전반적인 UI 텍스트를 정제했습니다.
+3. **모바일 최적화**:
+    - 모바일 카드 레이아웃에 이메일 기반 ID와 구독 상태 정보를 반영하여 한정된 화면에서도 핵심 정보를 즉시 확인할 수 있도록 개선했습니다.
+
+---
+
+## v1.5.4 - 2026-03-07
+
+### 📧 메일 발송 이력 관리 시스템 구축 (DAL-01)
+
+#### 핵심 업데이트 내역
+1. **메일 이력 로깅 자동화**:
+    - 모든 서비스 알림(주문 성공, 계정 배정, 만료 안내 등) 발송 시 `mail_history` 테이블에 수신자, 유형, 제목, 내용, 성공 여부를 자동으로 기록합니다.
+2. **관리자 메일 이력 조회 페이지**:
+    - **실시간 필터링**: 수신자 이메일/이름 검색, 메일 유형별/상태별 필터링 기능을 탑재했습니다.
+    - **UI 편의성**: 테이블 열 너비 조절(Resizable Columns), 발송 일시/유형/수신자 기준 정렬 기능을 제공합니다.
+    - **상세 보기**: 발송된 메일 본문(HTML)을 팝업으로 확인할 수 있는 기능을 추가했습니다.
+3. **재발송 기능**:
+    - 실패하거나 확인이 필요한 메일을 동일한 내용으로 즉시 재발송할 수 있는 기능을 API와 UI에 통합했습니다.
+
+### 🌊 타이달(Tidal) 계정 관리 기능 고도화 (DAL-20)
+
+#### 핵심 업데이트 내역
+1. **사용자 환경(UX) 개선**:
+    - **열 너비 조절**: Grid View 테이블에서 마우스 드래그로 원하는 열의 너비를 조정할 수 있습니다.
+    - **잔여일 조회**: 특정 일수(기본 7일) 내에 만료 예정인 배정 건을 한눈에 필터링하는 기능을 추가했습니다.
+    - **인터랙티브 정렬**: 종료일, 유형, 결제 이메일 등 주요 필드에 대한 실시간 정렬을 지원합니다.
+2. **UI 최적화**:
+    - 엑셀 관련 버튼 레이블을 간소화하고 전반적인 버튼 디자인을 표준화하여 가독성을 높였습니다.
+
+---
+
+### 🛒 요금제 관리 중복 오류 해결 (DAL-19)
+
+#### 핵심 업데이트 내역
+1. **비활성 요금제 중복 허용**:
+    - 동일한 상품 내에서 비활성화(Inactive) 상태인 요금제는 개월 수가 중복되어도 등록/수정이 가능하도록 DB 제약 조건을 개선했습니다.
+    - 활성화(Active) 상태인 요금제에 대해서만 개월 수 중복을 방지하여 데이터 무결성을 유지합니다.
+
+2. **API 에러 핸들링 강화**:
+    - 요금제 등록/수정 시 활성 요금제 중복 발생 시 사용자에게 "이미 동일한 개월 수의 활성 요금제가 존재합니다."라는 명확한 한글 에러 메시지를 반환하도록 개선했습니다.
+    - 서버 로그에 상세 에러(코드, 디테일)를 남겨 사후 추적이 용이하도록 보완했습니다.
+
+3. **DB 마이그레이션 적용**:
+    - `008_fix_product_plans_uniqueness.sql`을 통해 기존의 엄격한 UNIQUE 제약 조건을 삭제하고 부분 유니크 인덱스(Partial Unique Index)를 도입했습니다.
+
+---
+
+## v1.5.2 - 2026-03-01
+
+### 📅 날짜 계산 로직 통일 및 중복 클릭 방지 강화
+
+#### 핵심 업데이트 내역
+1. **날짜 계산 로직 변경 (30일/월 기준)**:
+    - 종료일(`end_date`) 계산 시 기존 달력 기준에서 **30일 x 개월** 기준으로 통일했습니다 (예: 12개월 = 360일).
+    - 관리자 배정 API 및 프론트엔드 UI 계산 로직을 모두 업데이트했습니다.
+
+2. **중복 클릭 방지 (Double-Click Prevention)**:
+    - 관리자 주문 내역 페이지에서 '배정 확인', '입금확인', '작업완료' 등 모든 주요 액션 버튼에 `isProcessing` 상태를 적용했습니다.
+    - 요청 처리 중에는 버튼이 비활성화되며, '처리 중...' 상태를 표시하여 중복 요청으로 인한 DB 에러(`23505`)를 원천 차단했습니다.
+
+3. **개인정보 페이지(마이페이지) 개선**:
+    - **순서 재배치**: 이메일을 가장 상단으로 배치하고, 이름/생년월일/연락처 순으로 정보를 정렬했습니다.
+    - **수정 권한 최적화**: 이메일을 계정 ID로 간주하여 수정 불가(`readOnly`) 처리하고, 생년월일은 사용자가 직접 수정할 수 있도록 변경했습니다.
+
+4. **빌드 안정성 확보**:
+    - 날짜 계산 로직 변경 후 발생한 미사용 import(`addMonths`)를 제거하여 프로덕션 빌드 실패 문제를 해결했습니다.
+
+---
+
+
+### 🛠️ API 안정화 및 관리자 편의성 강화
+
+#### 핵심 업데이트 내역
+1. **API 호출 안정성 확보 (Infinite Loading 방지)**:
+    - **XMLHttpRequest 전환**: Next.js 15의 `fetch` 불안정성(AbortError, Deadlock)을 해결하기 위해 `apiFetch` 유틸리티를 `XMLHttpRequest` 기반으로 전면 개편했습니다.
+    - **세션 캐싱 도입**: 불필요하게 반복되는 `supabase.auth.getSession()` 호출을 방지하기 위해 전역 세션 캐시 모듈을 적용, 무한 루프 발생 가능성을 차단했습니다.
+
+2. **관리자 기능 고도화**:
+    - **요금제 삭제 로직 개선**: 주문 내역이 있는 요금제 삭제 시도 시, 단순 에러 대신 "사용 중인 주문이 있어 삭제할 수 없으니 Inactive 상태로 변경하라"는 친절한 안내 메시지를 출력하도록 개선했습니다.
+    - **Tidal 관리 자동화**: 알림 전송 로직에서 불필요한 의존성을 제거하고 런타임 안정성을 높였습니다.
+
+3. **빌드 무결성 및 타입 안정성**:
+    - **프로덕션 빌드 성공**: ESLint 및 TypeScript 타입 에러(`no-explicit-any`, `unused-vars`)를 전량 수정하여 성공적인 배포 빌드를 보장합니다.
+
+---
+
+## v1.5.0 - 2026-02-24
+
+### 🚀 게스트 회원전환 프로세스 고도화 및 시스템 안정화
+
+#### 핵심 업데이트 내역
+1. **게스트-회원 전환 흐름 개선**:
+    - 주문 완료 페이지에서 즉시 회원가입이 가능하도록 UI를 통합했습니다.
+    - **이메일(ID) 변경 기능**: 주문 시 입력한 이메일 외에 원하는 이메일로 변경하여 가입할 수 있도록 유연성을 부여했습니다.
+    - **중복 확인 시스템**: 실시간 이메일 중복 체크 및 가입 가능 여부 시각화(Red/Blue Border)를 적용했습니다.
+    - **주문 자동 연결**: 회원가입 완료 시, 기존의 모든 게스트 주문이 신규 계정으로 자동 귀속되도록 DB 트리거를 구축했습니다.
+
+2. **어드민 Tidal 계정 관리 버그 수정**:
+    - **그룹 수정 오류 해결**: 그룹 정보(메모, 결제일 등) 수정 시 'Failed to update' 에러가 발생하던 문제를 API 데이터 필터링 로직을 통해 근본적으로 해결했습니다.
+    - 이제 슬롯 배정 정보가 포함된 그룹도 안전하게 메타데이터를 수정할 수 있습니다.
+
+3. **빌드 안정성 및 성능 최적화**:
+    - **ESLint 무결성 확보**: 프로덕션 빌드 시 중단 원인이 되었던 `any` 타입, 미사용 변수, React Hook 디펜던시 누락을 전량 수정했습니다.
+    - **Next.js 15 최적화**: 캐시 충돌 및 런타임 에러 방지를 위해 빌드 파이프라인과 의존성 구조를 정비했습니다.
+    - **로그아웃 고도화**: 로그아웃 시 로크 세션과 Supabase 세션을 동기화하여 완벽한 상태 초기화를 보장합니다.
+
+---
+
+### Added
+- **비밀번호 찾기(Forgot Password) 기능 구현 및 고도화**:
+    - 이메일, 이름, 전화번호 일치 확인을 통한 강화된 본인 인증 프로세스.
+    - Resend 기반 이메일 OTP(6자리) 발송 시스템.
+    - OTP 재발송 시 **60초 쿨타임(제한)** 적용으로 시스템 부하 방지.
+    - 새 비밀번호 설정 시 **기존 비밀번호와 동일한 비밀번호 설정 방지** (백엔드 검증 강화).
+    - 사용자 경험(UX) 최적화: `alert()` 대신 **인라인 상태 메시지(붉은색/푸른색)** 표시.
+    - 인터페이스 충돌 방지: 비밀번호 찾기 다이얼로그를 로그인 폼 외부로 분리.
+
+### Added
+- Responsive mobile menu for the Admin Portal (Sheet-based navigation).
+- Confirmation dialog after order assignment for optional redirection to Tidal management.
+- User name display in Header for all roles, with an "Admin" link specifically for administrators (Order: Admin -> Name -> Logout).
+- Refined Tidal account redirection: Automatically switches to "List View" (grouped) and expands only the relevant group when navigating from order assignment.
+- Improved order assignment sorting: Available accounts are now sorted primarily by master account expiry date and secondarily by the number of empty slots.
+- Fixed `used_slots` calculation: Online active assignments are now counted toward the used slot limit, ensuring inactive assignments (history) are correctly excluded across both Tidal management and Order assignment pages.
+
+### Changed
+- Simplified Admin access: Removed secondary password verification for accounts with 'admin' role.
+- Improved order assignment flow: Redirection now happens in the same window after user confirmation, bypassing popup blockers.
+- Optimized Admin Sidebar to be reusable between desktop and mobile.
+
+### Fixed
+- Next.js 15 build artifacts mismatch error (cleared `.next` cache).
+- Unused imports and variables in `AdminPage` causing build failures.
+- Missing `@supabase.js` runtime error by clearing build cache and zombie processes.
+
+## v1.4.0 - 2026-02-22
+
+### 🎨 마이페이지 디자인 개편 및 관리자 UI 최적화
+
+#### 핵심 업데이트 내역
+1. **마이페이지(MyPage) 전면 리뉴얼**:
+    - 사용성 개선을 위해 **개인정보 변경**, **내 구독 정보**, **내 주문 이력** 3개 핵심 섹션으로 레이아웃을 간소화했습니다.
+    - 프리미엄 글래스모피즘(Glassmorphism)과 부드러운 애니메이션을 적용하여 현대적이고 깔끔한 UI를 구현했습니다.
+    - 사용자가 직접 본인의 이름, 연락처, 이메일을 수정할 수 있는 기능을 추가했습니다.
+
+2. **관리자 주문 관리 효율성 강화**:
+    - **입금자명 가독성 개선**: 주문 고객명과 실제 입금자명이 다를 경우에만 `고객명 (입금자명)` 형식으로 표시하여 입금 확인 업무의 혼선을 방지했습니다.
+    - **엑셀 다운로드 연동**: 관리자 테이블뿐만 아니라 엑셀 추출 시에도 고객명/입금자명 구분 로직을 동일하게 적용했습니다.
+
+3. **빌드 안정성 및 성능 최적화**:
+    - **CSS 모듈 오류 수정**: `:global` 선택자 오용으로 인한 CSS 모듈 빌드 에러(non-pure selector)를 해결했습니다.
+    - **타입 안전성 강화**: `mypage/page.tsx` 내 `any` 타입을 제거하고 정밀한 인터페이스를 정의하여 프로덕션 빌드 무결성을 확보했습니다.
+    - **로그아웃 로직 강화**: 네트워크 오류 시에도 로컬 세션을 완전히 초기화하도록 로그아웃 기능을 보완했습니다.
+
+---
+
+## v1.3.0 - 2026-02-22
+
+### 🔔 알림 시스템 고도화 및 주문 번호 체계 개선
+
+#### 핵심 해결 및 개선 사항
+1. **관리자 주문 알림 복구 (Bug Fix)**:
+    - `site_settings` 테이블의 Key-Value 스키마 변경 사항이 주문 API(`src/app/api/orders/route.ts`)에 반영되지 않아 알림이 누락되던 문제를 해결했습니다.
+    - 이제 관리자 이메일 정보를 동적으로 정확하게 조회하여 실시간 알림을 발송합니다.
+
+2. **주문 번호 체계 변경 (YYMMDDNN)**:
+    - 기존 8자리 난수 방식에서 날짜 기반의 직관적인 8자리 형식으로 변경했습니다.
+    - **포맷**: `YY`(연도-2020) + `MMDD`(월일) + `NN`(당일 순번)
+    - 예: 2026년 2월 22일 첫 번째 주문 -> `06022201`
+    - DB 트리거 및 함수(`generate_order_number`) 업데이트 완료 (Migration 027)
+
+3. **알림 메일 콘텐츠 최적화**:
+    - 이메일 내 주문 번호를 UUID 대신 사람이 읽기 쉬운 `order_number`로 교체했습니다.
+    - 메일 하단 '관리자 페이지 바로가기' 링크를 프로덕션 환경(`https://dalbus.vercel.app/admin/orders`)으로 최적화했습니다.
+
+4. **문서화 강화**:
+    - **Hands-on 블로그 가이드** 추가: Antigravity와 Supabase를 활용한 서비스 구축 전 과정을 담은 상세 가이드(`docs/blog_guide.md`)를 작성했습니다.
+    - DB 스키마 및 기술 명세서 최신화
+
+---
+
+
+## v1.2.0 - 2026-02-20
+
+### 🎯 어드민 Tidal 계정 관리 고도화 및 빌드 안정화
+
+#### 핵심 개선 사항 (Core Improvements)
+1. **Tidal 계정 목록(List View) 정렬 및 시각화 고도화**:
+    - **슬롯 기반 자동 정렬**: 잔여 슬롯이 많은 계정(사용 슬롯 적은 순)이 상단에 노출되도록 기본 정렬 로직을 개선했습니다.
+    - **만료일 최적화**: 동일 잔여 슬롯 보유 시, 종료예정일이 먼 계정부터 내림차순으로 정렬하여 운영 효율성을 높였습니다.
+    - **만료 임박 시각화**: 종료예정일이 30일 이내이거나 이미 지난 경우 날짜 텍스트를 **빨간색 굵게** 표시하여 즉각적인 인지가 가능하도록 개선했습니다.
+    - **헤더 정렬 기능**: '종료예정일' 및 '슬롯' 컬럼 헤더에 클릭 정렬 기능을 추가하여 수동 정렬이 가능합니다.
+    - **UI 최적화**: 종료예정일 헤더 색상을 검정색으로 조정하여 가독성을 개선했습니다.
+
+2. **코드 구조 정형화 및 안정화 (Refactoring)**:
+    - 1,700라인 이상의 거대 컴포넌트(`TidalAccountsContent`)를 **State > Hooks/Effects > Fetching > Computed Helpers > Action Handlers > JSX** 순서로 논리적으로 재구성했습니다.
+    - 변수 및 함수의 정의 위치를 체계화하여 호이스팅(Hoisting) 관련 `ReferenceError` 및 `TypeError`를 근본적으로 차단했습니다.
+    - 불필요한 중복 로직(Filtered/Sorted Data 생성부)을 통합하여 유지보수성을 확보했습니다.
+
+3. **프로덕션 빌드 결함 전량 해결**:
+    - `npm run build` 시 발생하던 ESLint 에러(`any` 타입 사용, 미사용 변수, React Hook 디펜던시 누락 등)를 모두 해결했습니다.
+    - 특히 API 라우트(`order status update`)와 Tidal 관리 페이지의 타입 안전성을 강화했습니다.
+    - 전체 프로젝트 빌드 성공 확인 (Exit code: 0)
+
+---
+
+
+## v1.1.0 - 2026-02-19
+
+### 🛡️ Next.js 15 시스템 안정화 및 AbortError 완전 해결
+
+#### 핵심 해결 사항 (Critical Fixes)
+1. **Supabase "locks.js:98" 에러 해결**:
+    - Next.js 15 상위 버전 및 React Strict Mode에서 발생하는 Supabase 내부 `Navigator.locks` 충돌 문제를 해결했습니다.
+    - `supabase.ts`에서 커스텀 `lock` 핸들러(No-op)를 도입하여 브라우저 잠금 API 사용을 안전하게 우회했습니다.
+2. **AbortError 오버레이 원천 차단**:
+    - `ServiceContext`의 배경 데이터 페칭 로직을 `fetch`에서 `XMLHttpRequest` (XHR)로 전환하여 Next.js의 전역 fetch 가로채기 문제를 회피했습니다.
+    - `useRef` 기반의 `isMounted` 가드를 전면 도입하여 컴포넌트 언마운트 시의 상태 업데이트 에러를 방지했습니다.
+    - `ErrorHandler` 컴포넌트의 전역 캡처 로직을 강화하여 `AbortError` 오버레이가 사용자에게 노출되지 않도록 조치했습니다.
+3. **Next.js 15 규격 준수**:
+    - 모든 동적 API 라우트(`[id]`)에서 `params`를 정상적으로 `await` 하도록 수정하여 서버 사이드 경고 및 불안정성을 제거했습니다.
+
+#### 개선 사항 (Improvements)
+1. **관리자 기능 고도화**:
+    - **회원 관리**: 회원 목록에 ID 컬럼 추가 및 상세 모달 UI 개선으로 가독성 향상
+    - **설정 시스템**: `site_settings` 테이블을 Key-Value 구조로 리팩토링하여 유연한 운영 설정 가능 (발신자 이메일 설정 등 추가)
+2. **빌드 안정화**:
+    - 전체 가이드 프로젝트의 ESLint 에러 (`any` 타입, 미사용 변수/import)를 전량 수정했습니다.
+    - `npm run build` 및 `npm run lint` 통과 확인 (Exit code: 0)
+
+---
+
+## v1.0.0 - 2026-02-18
+3: 
+4: ### ⚙️ 빌드 안정화 및 알림 시스템 고도화
+5: 
+6: #### 개선 사항 (Improvements)
+7: 1. **빌드 안정성 강화**:
+8:     - Admin Tidal 페이지 및 Notify API 라우트의 ESLint 에러 (`any` 타입 사용, 미사용 변수) 해결
+9:     - 전체 프로젝트 `npm run build` 성공 확인
+10: 
+11: 2. **이메일 알림 시스템 가이드 추가**:
+12:     - Resend 403 (Forbidden) 오류에 대한 원인 분석 및 해결 가이드 제공
+13:     - 테스트 모드 제한 사항 및 운영 도메인 인증 절차 문서화
+14: 
+15: ---
+
+## v0.97 - 2026-02-16
+
+### 🔧 타입 안전성 및 빌드 안정화
+
+#### 개선 사항 (Improvements)
+1. **Admin 페이지 타입 안전성 강화**:
+    - 12개 Admin 페이지 및 7개 API 라우트에서 `any` 타입을 `unknown`으로 교체
+    - ESLint `no-explicit-any`, `no-unused-vars` 에러 전량 수정
+    - catch 블록의 에러 처리를 `instanceof Error` 패턴으로 통일
+
+2. **Vercel 빌드 안정화**:
+    - ESLint 에러로 인한 빌드 실패 문제 해결
+    - 미사용 import 및 변수 정리
+
+## v2.9 - 2026-02-15
+
+### 🚀 Grid View 도입 및 데이터 구조/UX 개선
+
+#### 새로운 기능 (New Features)
+1. **Grid View (격자 보기) 모드 추가**:
+    - **목적**: 계정별 그룹화된 기존 List View 외에, 모든 할당 내역을 평면적인 테이블로 관리 기능 필요
+    - **기능**:
+        - List View / Grid View 전환 토글 버튼 추가 (상단 버튼 그룹 좌측 배치)
+        - 전체 할당 내역을 단일 테이블로 조회 (ID, Tidal ID, PW, 구매자 정보, 주문번호, 시작/종료일, 마스터 정보 등)
+        - 각 행에서 직접 수정(Edit), 이동(Move), 삭제(Delete) 가능
+    - **UI/UX**:
+        - 계정(Account) 단위로 행 병합(Row Span)하여 시각적 구조화
+        - 마스터 계정 정보(Master ID)를 모든 연관 슬롯에 표시하여 식별 용이성 확보
+
+2. **주문 번호 포맷 변경**:
+    - **기존**: `ORD-YYYYMMDD-XXXX` 형식
+    - **변경**: **8자리 숫자 난수** (예: `12345678`) 포맷으로 변경 (보안 및 간소화)
+    - **기술적 구현**: DB Trigger/Function (`generate_order_number`) 교체 (Migration 021)
+
+#### 개선 사항 (Improvements)
+1. **Tidal ID 중복 검사 강화**:
+    - **문제**: 중복된 Tidal ID 입력 시 DB 에러가 발생하여 사용자에게 불친절한 메시지 노출
+    - **해결**: 백엔드 API에서 `23505` (Unique Constraint Violation) 에러를 캐치하여 "이미 사용 중인 Tidal ID입니다"라는 명확한 한글 에러 메시지 반환 처리
+
+2. **마스터 슬롯 중복 방지**:
+    - **기능**: 한 계정에 'Master' 슬롯이 이미 존재하는 경우, 추가로 Master 슬롯을 생성하려 할 때 경고 알림(Alert) 표시 및 생성 차단
+    - **효과**: 데이터 무결성 보장
+
+#### 버그 수정 및 리팩토링 (Fixes & Refactoring)
+1. **TypeScript 타입 안정성 강화**:
+    - API Routes (`assign`, `assignments`) 및 프론트엔드 페이지에서 `any` 타입 명시적 제거 및 올바른 타입 정의 적용
+    - 빌드 시 발생하던 린트 에러 해결
+
+#### 데이터베이스 변경 (Database Changes)
+- **Migration 021**: `generate_order_number` 함수 수정 (8자리 난수 생성 로직 적용)
+
+---
+
+## v2.8 - 2026-02-14
+
+### 🎯 Tidal 계정 관리 UI/UX 개선 및 슬롯 편집 기능 수정
+
+#### 주요 개선사항
+
+**슬롯 편집 저장 기능 수정**:
+- **문제**: 슬롯 편집 시 구매자 정보(이름, 전화번호, 이메일)가 저장되지 않던 문제 해결
+- **원인**: `order_accounts` 테이블에 buyer 정보 필드가 없어 `orders` 테이블 데이터만 참조
+- **해결**:
+  - `order_accounts` 테이블에 `buyer_name`, `buyer_phone`, `buyer_email` 컬럼 추가
+  - API 엔드포인트 수정하여 슬롯별로 독립적인 구매자 정보 저장 가능
+  - 데이터 표시 시 `order_accounts` 우선, `orders` 폴백 전략 적용
+
+**마스터 정보 컬럼 추가**:
+- Tidal 계정 관리 메인 테이블에 "마스터정보" 컬럼 신설
+- 표시 정보: `tidal_id/종료일/이용기간` (예: chchun@hifitidal.com/2027-1-22/15개월)
+- 마스터 슬롯이 없는 경우 "master 계정없음" 표시
+- 가입일로부터 현재까지 경과 개월 수 자동 계산 (date-fns 활용)
+
+**그리드 레이아웃 최적화**:
+- "그룹 ID"와 "결제 ID" 컬럼을 "결제계좌" 하나로 통합
+- 표시 형식: `GRP1-chchun@naver.com` (그룹ID-결제ID)
+- 마스터정보 컬럼 너비 확대 (col-span-2 → col-span-3)
+- 날짜가 잘려서 보이던 문제 해결
+
+#### 데이터베이스 변경
+- **Migration**: `order_accounts` 테이블에 buyer 필드 추가
+  ```sql
+  ALTER TABLE order_accounts
+  ADD COLUMN buyer_name TEXT,
+  ADD COLUMN buyer_phone TEXT,
+  ADD COLUMN buyer_email TEXT;
+  ```
+
+#### API 수정
+- `GET /api/admin/accounts`: `order_accounts`에서 buyer 필드 fetch 추가
+- `POST /api/admin/accounts/[id]/assign`: 슬롯 배정 시 buyer 정보 저장
+- `PUT /api/admin/assignments/[id]`: 슬롯 편집 시 buyer 정보 `order_accounts`에 저장
+  - 기존: buyer 정보를 `orders` 테이블에만 저장
+  - 변경: buyer 정보를 `order_accounts`에 저장 (슬롯별 독립 관리)
+
+#### TypeScript 타입 업데이트
+- `src/types/database.ts`: `order_accounts` 타입에 buyer 필드 추가
+- `src/app/(protected)/admin/tidal/page.tsx`:
+  - `Assignment` 인터페이스에 buyer 필드 추가
+  - `getMasterInfo()` 헬퍼 함수 추가
+
+#### Tailwind CSS 설정
+- `tailwind.config.js`: `grid-cols-13` 지원 추가
+
+#### 영향
+- ✅ 슬롯별로 구매자 정보를 독립적으로 편집 가능
+- ✅ 마스터 계정 정보를 메인 화면에서 한눈에 확인 가능
+- ✅ UI 공간 효율성 개선으로 더 많은 정보 표시
+- ✅ 데이터 정규화 개선 (슬롯 정보 = order_accounts, 주문 정보 = orders)
+
+---
+
+## v2.7 - 2026-02-11
+
+### 🔧 Excel Import 로직 개선 및 안정화
+
+#### 문제 해결
+- **오류 수정**: `there is no unique or exclusion constraint matching the ON CONFLICT specification` 해결
+- **오류 수정**: `null value in column "order_id" violates not-null constraint` 해결
+- **오류 수정**: 중복 `tidal_id` 데이터로 인한 constraint 생성 실패 해결
+
+#### 핵심 개선사항
+- **조건부 Upsert 전략 도입**:
+  - `tidal_id`가 있을 때: `tidal_id`로 upsert
+  - `tidal_id`가 없을 때: `(account_id, slot_number)`로 기존 레코드 확인 후 UPDATE/INSERT
+  - 빈 슬롯 처리 개선: `tidal_id`와 `slot_password` 모두 없을 때만 건너뛰기
+
+- **에러 메시지 한글화**:
+  - `unique constraint` → "중복된 Tidal ID 또는 슬롯 번호입니다."
+  - `ON CONFLICT` → "DB 제약조건이 설정되지 않았습니다. Migration 020을 실행해주세요."
+  - 사용자 친화적인 오류 메시지로 문제 해결 용이
+
+- **데이터 검증 강화**:
+  - 마스터 계정: `login_id`, `payment_email` 필수 체크
+  - 슬롯 번호: 0~5 범위 검증
+  - 빈 값 자동 trim 처리
+
+- **used_slots 자동 동기화**:
+  - 슬롯 임포트 완료 후 실제 배정 개수로 자동 업데이트
+  - 데이터 정합성 향상
+
+- **상세 로깅 추가**:
+  - 마스터별 처리 상태 추적
+  - 최종 요약 (성공/실패 개수)
+  - Vercel Function Logs에서 디버깅 용이
+
+- **주문번호 필드 지원**:
+  - 엑셀 "주문번호" 컬럼 파싱
+  - 기존 주문과 자동 연결
+
+#### 데이터베이스 마이그레이션
+- **Migration 018**: `accounts.login_pw` nullable 처리
+  - Excel 임포트 시 초기 비밀번호 없이도 마스터 계정 생성 가능
+
+- **Migration 019**: `order_accounts.order_id` nullable 처리
+  - 레거시 슬롯 데이터 임포트 지원
+  - 주문 없이 슬롯만 먼저 생성 가능
+
+- **Migration 020**: UNIQUE constraints 추가
+  - `tidal_id` UNIQUE: 1 Tidal ID = 1 Slot (중복 배정 방지)
+  - `(account_id, slot_number)` UNIQUE: 1 슬롯 = 1 배정 (중복 방지)
+
+#### 문서화
+- **TROUBLESHOOT_EXCEL_IMPORT.md**: SQL 실행 가이드 및 오류 해결 방법
+- **IMPORT_LOGIC_IMPROVEMENT.md**: 개선 상세 설명 및 구현 전략
+- **CHANGELOG_IMPORT_FIX.md**: 변경 이력 및 테스트 시나리오
+- **FIX_DUPLICATE_TIDAL_ID.sql**: 중복 데이터 정리 스크립트
+- **COMPLETE_MIGRATION_SCRIPT.sql**: 통합 마이그레이션 스크립트
+- **supabase/migrations/020_add_unique_tidal_id.sql**: Production용 마이그레이션 파일
+
+#### 영향
+- ✅ Migration 미실행 환경에서도 부분적으로 임포트 가능
+- ✅ 중복 데이터 사전 감지 및 명확한 오류 메시지
+- ✅ 부분 실패 시에도 성공 항목은 정상 저장
+- ✅ 운영 중 데이터 정합성 향상
+
+---
+
+## v0.91 - 2026-02-09
+
+## 📧 주문 알림 시스템 구현
+- **관리자 이메일 알림**:
+    - 주문 접수 시 관리자에게 이메일 자동 발송 기능 구현
+    - Resend API를 활용한 `sendAdminOrderNotification` 유틸리티 생성
+    - 주문 정보 (고객명, 연락처, 서비스, 금액, 요금제) 포함
+- **보안 강화**:
+    - 클라이언트에서 직접 DB 접근 제거
+    - `/api/orders` 서버 API 라우트 생성하여 주문 생성 및 알림 로직 분리
+
+## 🔍 관리자 주문 관리 고도화
+- **Multi-Select 필터**:
+    - **Status 필터**: 여러 주문 상태(주문신청, 입금확인, 배정완료, 작업완료)를 동시 선택하여 필터링
+    - `DataTableFacetedFilter` 재사용 가능 컴포넌트 생성
+    - shadcn/ui 컴포넌트(`popover`, `command`, `checkbox`, `separator`, `badge`) 추가
+- **전화번호 검색**:
+    - 전화번호 입력 필드를 통한 실시간 검색 기능
+    - Status 필터와 전화번호 검색을 동시 적용 가능
+- **UI 개선**:
+    - 필터를 오른쪽 정렬로 배치하여 가독성 향상
+    - 전화번호 검색 → Status 필터 순서로 배치
+
+## 📊 Excel 내보내기 기능 추가
+- **주문 내역 Export**:
+    - 회원 주문과 비회원 주문을 별도 시트로 분리하여 `.xlsx` 형식 다운로드
+    - 각 시트에 날짜, 주문번호, 고객명, 이메일, 연락처, 서비스, 이용기간, 금액, 상태 포함
+- **Tidal 계정 Export**:
+    - 마스터 계정 정보 (마스터 ID, 결제 계정, 결제일, 메모) 표시
+    - 각 마스터 계정마다 6개 고정 Slot 정보를 하위 행으로 표시 (빈 슬롯은 공란)
+    - Slot 정보: 고객명, 주문번호, 소속 ID, 소속 PW, 시작일, 종료일
+- **xlsx 라이브러리 설치**: `npm install xlsx`
+
+## 📱 모바일 UI/UX 최적화 (기존)
+- **헤더 리팩토링**:
+    - 모바일 화면에서 브랜드 로고 상시 노출
+    - 모바일에서 숨겨져 있던 주 메뉴(서비스, 공지사항, FAQ, Q&A)를 가로 스크롤 형태로 상시 노출 처리
+    - 메뉴명 간소화: '서비스 목록' → **'서비스'**
+- **반응형 디자인**:
+    - 모바일 기기에서의 버튼 크기, 텍스트 가독성 및 터치 편의성 조정
+
+## 🛒 주문 및 결제 프로세스 개선 (기존)
+- **주문 완료 전용 페이지 신설**:
+    - 기존 브라우저 `alert()` 알림을 전용 결과 페이지(`/public/checkout/success`)로 대체
+    - 주문 내역 요약(서비스명, 이용 기간, 결제 금액, 입금자명, 입금 계좌) 시각화
+- **결제 UI 디테일**:
+    - '전체동의' 시 '구독하기' 버튼 색상을 **검정색 배경/흰색 글자**로 명확하게 변경
+    - 이용 기간(개월 수) 정보가 누락되지 않도록 체크아웃 및 결과 페이지 로직 보완
+
+## 📊 주문 내역 관리 강화 (기존)
+- **이용 기간 표시 추가**:
+    - **관리자**: 주문 내역 목록에서 각 주문의 구독 기간(개월)을 바로 확인할 수 있도록 수정
+    - **사용자**: 마이페이지 '내 구독 정보' 카드에 이용 기간 정보 추가
+- **마이페이지 최적화**:
+    - DB v2.0 스키마 변경 사항에 맞춰 마이페이지 데이터 로드 로직 전면 수정 및 최적화
+
+## 📢 공지사항 및 FAQ 관리 시스템 고도화 (기존)
+- **공지사항 관리 기능**:
+    - 관리자 전용 공지사항 CRUD(생성, 조회, 수정, 삭제) 기능 구현
+    - 공지사항 상단 고정(Pin) 및 게시 상태 설정 기능 추가
+    - 동적 카테고리 시스템 도입 (`notice_categories` 테이블 생성 및 연동)
+- **FAQ 개선**:
+    - 사용자 페이지에서 '1:1 문의하기' 섹션 제거 요청 반영
+    - 관리자 FAQ 카테고리 관리 기능 안정화
+
+## 🛠️ 기술적 수정 사항
+- **API 안정화**: 주문 생성 API(`/api/orders`) 구현 및 예외 처리
+- **이메일 라이브러리**: Resend 통합 (`npm install resend`)
+- **Excel 라이브러리**: xlsx 통합 (`npm install xlsx`)
+- **린트 오류 해결**: 사용하지 않는 타입 제거 및 타입 정의 보완
+- **환경변수**: `RESEND_API_KEY` 추가 (.env.local)

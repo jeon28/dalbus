@@ -1,0 +1,18 @@
+
+> dalbus@1.0.0 lint
+> next lint
+
+`next lint` is deprecated and will be removed in Next.js 16.
+For new projects, use create-next-app to choose your preferred linter.
+For existing projects, migrate to the ESLint CLI:
+npx @next/codemod@canary next-lint-to-eslint-cli .
+
+
+./src/app/(protected)/mypage/page.tsx
+193:8  Warning: React Hook useCallback has a missing dependency: 'user'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+201:8  Warning: React Hook useEffect has a missing dependency: 'user'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/api/admin/members/[id]/accounts/route.ts
+54:13  Error: 'query' is never reassigned. Use 'const' instead.  prefer-const
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

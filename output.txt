@@ -1,0 +1,52 @@
+Checking Order: 209b2784-fff4-4574-8d10-44070e8d836e
+Order Data: {
+  id: '209b2784-fff4-4574-8d10-44070e8d836e',
+  order_number: 'ORD-20260209-100657-702',
+  user_id: null,
+  product_id: 'da10dfd7-5330-4f4d-9c3e-6c753ee35c59',
+  plan_id: '317be886-f262-4b47-a299-65bf76f0d9b3',
+  amount: 30000,
+  payment_status: 'paid',
+  assignment_status: 'waiting',
+  portone_payment_id: null,
+  paid_at: null,
+  assigned_at: null,
+  start_date: null,
+  end_date: null,
+  created_at: '2026-02-09T10:06:57.702054+00:00',
+  buyer_name: '?꾩갹??,
+  buyer_phone: '01087732200',
+  buyer_email: 'chchun@naver.com',
+  depositor_name: '?꾩갹??,
+  is_guest: true,
+  order_type: 'NEW',
+  related_order_id: null
+}
+Checking Assignments for Order ID: 209b2784-fff4-4574-8d10-44070e8d836e
+Assignments: []
+Checking all assignments for any order that has this as related_order_id
+Extension Orders: [
+  {
+    id: '6d5a44f7-90b7-4597-a0e0-89803f36b07c',
+    order_number: '62475918',
+    user_id: 'ca4e1a5e-48ed-473f-b081-8fa6bf250f86',
+    product_id: 'da10dfd7-5330-4f4d-9c3e-6c753ee35c59',
+    plan_id: '317be886-f262-4b47-a299-65bf76f0d9b3',
+    amount: 30000,
+    payment_status: 'paid',
+    assignment_status: 'waiting',
+    portone_payment_id: null,
+    paid_at: null,
+    assigned_at: null,
+    start_date: null,
+    end_date: null,
+    created_at: '2026-02-16T01:06:00.957849+00:00',
+    buyer_name: '?꾩갹??,
+    buyer_phone: '01087732200',
+    buyer_email: 'chchun@naver.com',
+    depositor_name: '?꾩갹??,
+    is_guest: false,
+    order_type: 'EXT',
+    related_order_id: '209b2784-fff4-4574-8d10-44070e8d836e'
+  }
+]

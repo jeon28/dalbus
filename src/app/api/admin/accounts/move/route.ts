@@ -1,0 +1,115 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { syncUsedSlots } from '@/lib/assignment-utils';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: NextRequest) {
+    try {
+        const body = await req.json();
+        const { order_id, assignment_id, target_account_id, target_slot_number, target_tidal_password } = body;
+        const assignmentTable = 'tidal_assignments';
+
+        if ((!order_id && !assignment_id) || !target_account_id) {
+            return NextResponse.json({ error: '필수 정보가 누락되었습니다. 이동할 대상을 확인해 주세요.' }, { status: 400 });
+        }
+
+        // 1. Get current assignment to find source account
+        let query = supabaseAdmin
+            .from(assignmentTable)
+            .select('account_id, id');
+
+        if (assignment_id) {
+            query = query.eq('id', assignment_id);
+        } else {
+            query = query.eq('order_id', order_id);
+        }
+
+        const { data: currentAssignment, error: findError } = await query.single();
+
+        if (findError || !currentAssignment) {
+            return NextResponse.json({ error: '배정 정보를 찾을 수 없거나 이동할 수 없는 상태입니다.' }, { status: 400 });
+        }
+
+        const sourceAccountId = currentAssignment.account_id;
+
+        // 2. Check Target Account availability and accurately count active slots
+        const { count: activeCount } = await supabaseAdmin
+            .from(assignmentTable)
+            .select('*', { count: 'exact', head: true })
+            .eq('account_id', target_account_id)
+            .eq('is_active', true);
+
+        const { data: targetAccount, error: targetError } = await supabaseAdmin
+            .from('tidal_accounts')
+            .select('max_slots')
+            .eq('id', target_account_id)
+            .single();
+
+        if (targetError) throw targetError;
+
+        if (activeCount !== null && activeCount >= targetAccount.max_slots) {
+            return NextResponse.json({ error: `선택한 계정의 슬롯이 모두 사용 중입니다 (${activeCount}/${targetAccount.max_slots}). 다른 계정을 선택하거나 기존 슬롯을 먼저 정리해 주세요.` }, { status: 400 });
+        }
+
+        // Check unique slot on target
+        if (target_slot_number !== undefined) {
+            const { data: collision } = await supabaseAdmin
+                .from(assignmentTable)
+                .select('id, is_active')
+                .eq('account_id', target_account_id)
+                .eq('slot_number', target_slot_number)
+                .single();
+
+            if (collision) {
+                if (collision.is_active) {
+                    return NextResponse.json({ error: `선택한 슬롯(Slot #${target_slot_number + 1})은 이미 사용 중입니다. 다른 슬롯 번호를 선택해 주세요.` }, { status: 400 });
+                } else {
+                    await supabaseAdmin.from(assignmentTable).delete().eq('id', collision.id);
+                }
+            }
+        }
+
+
+        // 3. Perform Move (Update order_accounts)
+        const updatePayload: {
+            account_id: string;
+            slot_number?: number;
+            tidal_password?: string;
+            assigned_at: string;
+            is_deleted: boolean;
+            is_active: boolean;
+            type?: 'master' | 'user';
+        } = {
+            account_id: target_account_id,
+            slot_number: target_slot_number,
+            tidal_password: target_tidal_password,
+            assigned_at: new Date().toISOString(),
+            is_deleted: false,
+            is_active: true
+        };
+
+        if (target_slot_number === 0) {
+            updatePayload.type = 'master';
+        } else if (target_slot_number !== undefined) {
+            updatePayload.type = 'user';
+        }
+
+        const { error: moveError } = await supabaseAdmin
+            .from(assignmentTable)
+            .update(updatePayload)
+            .eq('id', currentAssignment.id);
+
+        if (moveError) throw moveError;
+
+        // 4. Update used_slots counts
+        await syncUsedSlots(sourceAccountId, 'tidal_accounts', assignmentTable);
+        await syncUsedSlots(target_account_id, 'tidal_accounts', assignmentTable);
+
+        return NextResponse.json({ success: true });
+
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+}

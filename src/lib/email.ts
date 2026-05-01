@@ -1,0 +1,374 @@
+import { Resend } from 'resend';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+const getSenderEmail = async (): Promise<string> => {
+    try {
+        const { data } = await supabaseAdmin
+            .from('site_settings')
+            .select('value')
+            .eq('key', 'admin_sender_email')
+            .single();
+
+        if (data?.value) {
+            return `Dalbus <${data.value}>`;
+        }
+    } catch (error) {
+        console.error('Error fetching sender email:', error);
+    }
+    return 'Dalbus <onboarding@resend.dev>'; // Fallback
+};
+
+const logMailHistory = async (details: {
+    recipient_name?: string;
+    recipient_email: string;
+    mail_type: string;
+    subject: string;
+    content: string;
+    status: 'success' | 'failed';
+    error_message?: string;
+}) => {
+    try {
+        await supabaseAdmin.from('mail_history').insert({
+            recipient_name: details.recipient_name || '',
+            recipient_email: details.recipient_email,
+            mail_type: details.mail_type,
+            subject: details.subject,
+            content: details.content,
+            status: details.status,
+            error_message: details.error_message,
+            sent_at: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error logging mail history:', error);
+    }
+};
+
+/**
+ * DB에서 메일 템플릿을 가져와 치환자를 적용하는 함수
+ */
+const getDynamicTemplate = async (key: string, variables: Record<string, string | number | boolean | null | undefined>) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('email_templates')
+            .select('subject, content')
+            .eq('key', key)
+            .single();
+
+        if (error || !data) return null;
+
+        let { subject, content } = data;
+
+        // 치환자 적용
+        Object.keys(variables).forEach(vKey => {
+            const regex = new RegExp(`{${vKey}}`, 'g');
+            const value = variables[vKey]?.toString() || '';
+            subject = subject.replace(regex, value);
+            content = content.replace(regex, value);
+        });
+
+        return { subject, content };
+    } catch (error) {
+        console.error(`Error fetching dynamic template (${key}):`, error);
+        return null;
+    }
+};
+
+/**
+ * 메일 발송 및 이력 로깅을 위한 범용 함수
+ */
+export const sendEmail = async (details: {
+    recipient_email: string;
+    recipient_name?: string;
+    subject: string;
+    html: string;
+    mailType: string;
+}) => {
+    if (!resend) {
+        console.error('RESEND_API_KEY is missing. Email notification skipped.');
+        return { success: false, error: 'Missing API Key' };
+    }
+
+    const { recipient_email, recipient_name, subject, html, mailType } = details;
+    const sender = await getSenderEmail();
+
+    try {
+        const { data, error } = await resend.emails.send({
+            from: sender,
+            to: [recipient_email],
+            subject,
+            html,
+        });
+
+        const status = error ? 'failed' : 'success';
+        const error_message = error ? JSON.stringify(error) : undefined;
+
+        await logMailHistory({
+            recipient_name,
+            recipient_email,
+            mail_type: mailType,
+            subject,
+            content: html,
+            status,
+            error_message
+        });
+
+        if (error) {
+            console.error(`Email sending failed (${mailType}):`, error);
+            return { success: false, error };
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error(`Unexpected error sending email (${mailType}):`, error);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        await logMailHistory({
+            recipient_name,
+            recipient_email,
+            mail_type: mailType,
+            subject,
+            content: html,
+            status: 'failed',
+            error_message: errMsg
+        });
+        return { success: false, error };
+    }
+};
+
+interface OrderNotificationProps {
+    orderId: string;
+    productName: string;
+    planName: string;
+    amount: number;
+    buyerName: string;
+    buyerPhone: string | null;
+    depositorName: string;
+}
+
+export const sendAdminOrderNotification = async (
+    adminEmail: string,
+    order: OrderNotificationProps
+) => {
+    const { orderId, productName, planName, amount, buyerName, buyerPhone, depositorName } = order;
+    const subject = `[Dalbus] 신규 주문 알림 - ${buyerName}님`;
+    const html = `
+        <h1>신규 주문이 접수되었습니다!</h1>
+        <p><strong>주문 번호:</strong> ${orderId}</p>
+        <hr />
+        <h3>주문 상세</h3>
+        <ul>
+          <li><strong>상품:</strong> ${productName}</li>
+          <li><strong>요금제:</strong> ${planName}</li>
+          <li><strong>결제 금액:</strong> ${amount.toLocaleString()}원</li>
+        </ul>
+        <hr />
+        <h3>구매자 정보</h3>
+        <ul>
+          <li><strong>구매자명:</strong> ${buyerName}</li>
+          <li><strong>입금자명:</strong> ${depositorName}</li>
+          <li><strong>연락처:</strong> ${buyerPhone || '정보 없음'}</li>
+        </ul>
+        <hr />
+        <p>관리자 페이지에서 입금 확인 후 배정을 진행해주세요.</p>
+        <a href="https://dalbus.vercel.app/admin/orders">관리자 페이지 바로가기</a>
+      `;
+
+    return sendEmail({
+        recipient_email: adminEmail,
+        recipient_name: 'Admin',
+        subject,
+        html,
+        mailType: '주문 알림 (관리자)'
+    });
+};
+
+/**
+ * 사용자용 주문 접수 알림 메일 발송
+ */
+export const sendUserOrderNotification = async (
+    userEmail: string,
+    order: OrderNotificationProps
+) => {
+    const { orderId, productName, planName, amount, buyerName, depositorName } = order;
+
+    // DB 템플릿 시도
+    const dynamic = await getDynamicTemplate('ORDER_RECEIVED_USER', {
+        buyer_name: buyerName,
+        order_id: orderId,
+        product_name: productName,
+        plan_name: planName,
+        amount: amount.toLocaleString(),
+        depositor_name: depositorName
+    });
+
+    const subject = dynamic?.subject || `[Dalbus] 주문 접수 안내 - ${buyerName}님`;
+    const html = dynamic?.content || `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">주문이 정상적으로 접수되었습니다.</h2>
+          <p>안녕하세요, <strong>${buyerName}</strong>님! Dalbus를 이용해 주셔서 감사합니다.</p>
+          <p>주문하신 서비스의 입금이 확인되면 계정 배정이 시작됩니다.</p>
+          
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>주문 번호:</strong> ${orderId}</p>
+            <p style="margin: 5px 0;"><strong>상품명:</strong> ${productName}</p>
+            <p style="margin: 5px 0;"><strong>요금제:</strong> ${planName}</p>
+            <p style="margin: 5px 0;"><strong>결제 금액:</strong> ${amount.toLocaleString()}원</p>
+            <p style="margin: 5px 0;"><strong>입금자명:</strong> ${depositorName}</p>
+          </div>
+
+          <p>관리자가 입금 확인 후 영업일 기준 24시간 이내에 계정 세팅을 완료해 드립니다.</p>
+          <p>계정 배정 및 작업이 완료되면 다시 한번 안내 메일을 보내드리겠습니다.</p>
+          
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 발신전용입니다. 문의사항은 관리자 페이지 또는 고객센터를 이용해 주세요.
+          </p>
+        </div>
+      `;
+
+    return sendEmail({
+        recipient_email: userEmail,
+        recipient_name: buyerName,
+        subject,
+        html,
+        mailType: '주문 접수 안내'
+    });
+};
+
+interface ExpiryNotificationProps {
+    buyerName: string;
+    tidalId: string;
+    endDate: string;
+    message: string;
+}
+
+export const sendExpiryNotification = async (
+    targetEmail: string,
+    details: ExpiryNotificationProps,
+    templateKey: string = 'EXPIRY_NOTICE'
+) => {
+    const { buyerName, tidalId, endDate, message } = details;
+
+    // DB 템플릿 시도
+    const dynamic = await getDynamicTemplate(templateKey, {
+        buyer_name: buyerName,
+        tidal_id: tidalId,
+        end_date: endDate,
+        message: message // message 자체에 {buyer_name} 등이 포함되어 있을 수 있으므로 넘겨줌
+    });
+
+    const subject = dynamic?.subject || `[Dalbus] 서비스 만료 안내 - ${buyerName}님`;
+    const html = dynamic?.content || `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+          <h2 style="color: #2563eb;">서비스 만료 안내</h2>
+          <div style="white-space: pre-wrap; margin-bottom: 20px;">
+${message.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).replace(/{end_date}/g, endDate)}
+          </div>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 정보통신망법 등 관련 법령에 의거하여 발송되는 안내 메일입니다.
+          </p>
+        </div>
+      `;
+
+    return sendEmail({
+        recipient_email: targetEmail,
+        recipient_name: buyerName,
+        subject,
+        html,
+        mailType: '서비스 만료 안내'
+    });
+};
+
+interface AssignmentNotificationProps {
+    buyerName: string;
+    productName: string;
+    tidalId: string;
+    tidalPw: string;
+    endDate: string;
+}
+
+export const sendAssignmentNotification = async (
+    targetEmail: string,
+    details: AssignmentNotificationProps
+) => {
+    const { buyerName, productName, tidalId, tidalPw, endDate } = details;
+
+    // DB 템플릿 시도
+    const dynamic = await getDynamicTemplate('ASSIGNMENT_COMPLETE', {
+        buyer_name: buyerName,
+        product_name: productName,
+        tidal_id: tidalId,
+        tidal_pw: tidalPw,
+        end_date: endDate
+    });
+
+    const subject = dynamic?.subject || `[Dalbus] 계정 세팅 완료 안내 - ${buyerName}님`;
+    const html = dynamic?.content || `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">계정 세팅 완료 안내</h2>
+          <p>안녕하세요, <strong>${buyerName}</strong>님!</p>
+          <p>요청하신 <strong>${productName}</strong> 서비스의 계정 세팅이 완료되었습니다.</p>
+          
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Tidal ID:</strong> ${tidalId}</p>
+            <p style="margin: 5px 0;"><strong>Tidal PW:</strong> ${tidalPw}</p>
+            <p style="margin: 5px 0;"><strong>만료 예정일:</strong> ${endDate}</p>
+          </div>
+
+          <p>지금 바로 로그인하여 서비스를 이용하실 수 있습니다.</p>
+          <p>이용 중 궁금하신 점이 있다면 언제든 문의해 주세요.</p>
+          
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 발신전용입니다. 문의사항은 관리자 페이지 또는 고객센터를 이용해 주세요.
+          </p>
+        </div>
+      `;
+
+    return sendEmail({
+        recipient_email: targetEmail,
+        recipient_name: buyerName,
+        subject,
+        html,
+        mailType: '계정 세팅 완료 안내'
+    });
+};
+
+/**
+ * 비밀번호 초기화 인증번호 메일 발송
+ */
+export const sendPasswordResetCode = async (
+    targetEmail: string,
+    code: string
+) => {
+    const subject = `[Dalbus] 비밀번호 초기화 인증번호 안내`;
+    const html = `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">비밀번호 초기화 인증번호</h2>
+          <p>안녕하세요, Dalbus입니다.</p>
+          <p>비밀번호를 초기화하기 위한 인증번호입니다. 아래 번호를 입력창에 입력해 주세요.</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <span style="font-size: 2rem; font-weight: bold; letter-spacing: 5px; color: #2563eb;">${code}</span>
+          </div>
+
+          <p>인증번호는 발송 후 10분 동안만 유효합니다.</p>
+          <p>본인이 요청하지 않은 경우 이 메일을 무시해 주세요.</p>
+          
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 발신전용입니다. 문의사항은 고객센터를 이용해 주세요.
+          </p>
+        </div>
+      `;
+
+    return sendEmail({
+        recipient_email: targetEmail,
+        subject,
+        html,
+        mailType: '비밀번호 초기화 인증번호'
+    });
+};

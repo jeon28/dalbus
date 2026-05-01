@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.mcp.json
+
+# duplicate/nested repository folder
+dalbus/
+
+# vercel
+.vercel/
+.vercel
+
+# logs
+error.log
+output.log
+
+# editor
+.claude/
+
+# migrations
+order_accounts_migration.sql
+
+# local storage
+supabase/.temp/
+supabase-migration/
+
+# sensitive sensitive
+mcp_config.json
