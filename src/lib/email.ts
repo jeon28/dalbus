@@ -4,6 +4,9 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 const resendApiKey = process.env.RESEND_API_KEY;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
+const resendHifiApiKey = process.env.RESEND_HIFI_API_KEY;
+const resendHifi = resendHifiApiKey ? new Resend(resendHifiApiKey) : null;
+
 const getSenderEmail = async (): Promise<string> => {
     try {
         const { data } = await supabaseAdmin
@@ -87,16 +90,21 @@ export const sendEmail = async (details: {
     mailType: string;
     from?: string;
 }) => {
-    if (!resend) {
-        console.error('RESEND_API_KEY is missing. Email notification skipped.');
-        return { success: false, error: 'Missing API Key' };
-    }
-
     const { recipient_email, recipient_name, subject, html, mailType, from } = details;
     const sender = from || await getSenderEmail();
 
+    // hifitidal.com 발신 시 별도 Resend 계정 사용
+    const isHifi = sender.includes('hifitidal.com');
+    const client = isHifi ? resendHifi : resend;
+
+    if (!client) {
+        const keyName = isHifi ? 'RESEND_HIFI_API_KEY' : 'RESEND_API_KEY';
+        console.error(`${keyName} is missing. Email notification skipped.`);
+        return { success: false, error: `Missing ${keyName}` };
+    }
+
     try {
-        const { data, error } = await resend.emails.send({
+        const { data, error } = await client.emails.send({
             from: sender,
             to: [recipient_email],
             subject,
