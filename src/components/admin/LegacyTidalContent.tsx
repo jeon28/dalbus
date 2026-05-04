@@ -657,11 +657,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             const res = await fetchFn('/api/admin/tidal/notify', { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ 
-                    recipients, 
+                body: JSON.stringify({
+                    recipients,
                     messageTemplate: notificationMessage,
-                    templateKey: selectedTemplateKey 
-                }) 
+                    templateKey: selectedTemplateKey,
+                    senderEmail: 'HiFi Tidal <hifitidal@hifitidal.com>'
+                })
             });
             if (res.ok) { alert('발송되었습니다.'); setIsNotifyModalOpen(false); setSelectedAssignmentIds(new Set()); }
             else alert('발송 실패');

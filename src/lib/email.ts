@@ -85,14 +85,15 @@ export const sendEmail = async (details: {
     subject: string;
     html: string;
     mailType: string;
+    from?: string;
 }) => {
     if (!resend) {
         console.error('RESEND_API_KEY is missing. Email notification skipped.');
         return { success: false, error: 'Missing API Key' };
     }
 
-    const { recipient_email, recipient_name, subject, html, mailType } = details;
-    const sender = await getSenderEmail();
+    const { recipient_email, recipient_name, subject, html, mailType, from } = details;
+    const sender = from || await getSenderEmail();
 
     try {
         const { data, error } = await resend.emails.send({
@@ -247,7 +248,8 @@ interface ExpiryNotificationProps {
 export const sendExpiryNotification = async (
     targetEmail: string,
     details: ExpiryNotificationProps,
-    templateKey: string = 'EXPIRY_NOTICE'
+    templateKey: string = 'EXPIRY_NOTICE',
+    senderOverride?: string
 ) => {
     const { buyerName, tidalId, endDate, message } = details;
 
@@ -278,7 +280,8 @@ ${message.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).re
         recipient_name: buyerName,
         subject,
         html,
-        mailType: '서비스 만료 안내'
+        mailType: '서비스 만료 안내',
+        from: senderOverride
     });
 };
 
