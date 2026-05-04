@@ -30,6 +30,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
 
 interface Assignment {
     id: string;
@@ -163,9 +164,9 @@ function TidalAccountsContent() {
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
-    const [emailTemplates, setEmailTemplates] = useState<{key: string, name: string, subject?: string, content?: string}[]>([]);
+    const [emailTemplates, setEmailTemplates] = useState<{id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[]}[]>([]);
     const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
-    const [showNotifyPreview, setShowNotifyPreview] = useState(false);
+    const [isTemplateEditOpen, setIsTemplateEditOpen] = useState(false);
     const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
     
     // Quick Edit Feature State
@@ -2286,90 +2287,52 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </DialogContent>
             </Dialog>
             <Dialog open={isNotifyModalOpen} onOpenChange={setIsNotifyModalOpen}>
-                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-[640px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>만료 알림 메세지 발송</DialogTitle>
+                        <DialogTitle>만료 알림 메세지 발송 ({selectedAssignmentIds.size}명)</DialogTitle>
                     </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">발송 템플릿 선택</Label>
-                            <Select value={selectedTemplateKey} onValueChange={setSelectedTemplateKey}>
-                                <SelectTrigger className="h-10 border-slate-200">
-                                    <SelectValue placeholder="템플릿 선택" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {emailTemplates.filter(t => !t.key.startsWith('LEGACY')).map(t => (
-                                        <SelectItem key={t.key} value={t.key}>{t.name} ({t.key})</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
-                            <p className="font-bold mb-1">💡 안내</p>
-                            <p>전체 {selectedAssignmentIds.size}명의 회원에게 메일을 발송합니다.</p>
-                            <p>치환 코드: <b>{'{buyer_name}'}, {'{tidal_id}'}, {'{end_date}'}</b></p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex justify-between items-center">
-                                <span>발신 명단 ({selectedAssignmentIds.size})</span>
-                                <Button variant="ghost" size="sm" onClick={() => setSelectedAssignmentIds(new Set())} className="h-6 px-2 text-[10px]">전체 삭제</Button>
-                            </Label>
-                            <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 border rounded-md max-h-40 overflow-y-auto">
-                                {Array.from(selectedAssignmentIds).map(id => {
-                                    const item = getFlattenedAssignments().find(a => a.id === id);
-                                    if (!item) return null;
-                                    const bName = item.assignment.buyer_name || item.assignment.orders?.buyer_name || '고객';
-                                    const tId = item.assignment.tidal_id || '알 수 없음';
-                                    const eDate = item.assignment.end_date ? format(parseISO(item.assignment.end_date), 'yy/MM/dd') : '알 수 없음';
-                                    return (
-                                        <div key={id} className="flex items-center justify-between gap-1 bg-white border border-gray-200 px-2 py-1.5 rounded shadow-sm text-[11px] group hover:border-orange-300">
-                                            <span className="text-gray-600 truncate">{bName} / {eDate} / {tId}</span>
-                                            <button
-                                                onClick={() => handleToggleSelection(id)}
-                                                className="p-1 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors flex-shrink-0"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
+                    <div className="py-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <Select value={selectedTemplateKey} onValueChange={setSelectedTemplateKey}>
+                                    <SelectTrigger className="h-10 border-slate-200">
+                                        <SelectValue placeholder="템플릿 선택" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {emailTemplates.filter(t => !t.key.startsWith('LEGACY')).map(t => (
+                                            <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>메세지 내용 (메일 본문)</Label>
-                            <textarea
-                                className="w-full h-48 p-3 text-sm border rounded-md focus:ring-2 focus:ring-primary outline-none whitespace-pre-wrap"
-                                value={notificationMessage}
-                                onChange={(e) => setNotificationMessage(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <Button type="button" size="sm" variant="outline"
-                                className="h-7 px-3 text-xs"
-                                onClick={() => setShowNotifyPreview(v => !v)}
+                            <Button type="button" variant="outline" size="sm" className="h-10 px-3 text-xs shrink-0"
+                                onClick={() => setIsTemplateEditOpen(true)}
+                                disabled={!selectedTemplateKey}
                             >
-                                {showNotifyPreview ? '미리보기 닫기' : '📧 발송 메일 미리보기'}
+                                메일 수정하기
                             </Button>
-                            {showNotifyPreview && (() => {
-                                const tmpl = emailTemplates.find(t => t.key === selectedTemplateKey);
-                                const sampleId = Array.from(selectedAssignmentIds)[0];
-                                const sample = sampleId ? getFlattenedAssignments().find(a => a.id === sampleId) : null;
-                                const buyerName = sample?.assignment.buyer_name || sample?.assignment.orders?.buyer_name || '홍길동';
-                                const tidalId = sample?.assignment.tidal_id || 'sample@tidal.com';
-                                const endDate = sample?.assignment.end_date || '2027.05.02';
-                                const html = tmpl?.content
-                                    ? tmpl.content.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).replace(/{end_date}/g, endDate).replace(/{message}/g, notificationMessage)
-                                    : `<pre style="font-family:sans-serif;padding:16px;white-space:pre-wrap">${notificationMessage}</pre>`;
-                                return (
-                                    <div className="mt-2 border rounded-xl overflow-hidden shadow-sm">
-                                        <div className="bg-slate-100 px-3 py-1.5 text-[10px] text-slate-500 font-mono border-b">
-                                            미리보기 — {sample ? `${buyerName} / ${tidalId}` : '샘플 데이터'}
-                                        </div>
-                                        <iframe srcDoc={html} className="w-full h-72 bg-white" sandbox="allow-same-origin" />
-                                    </div>
-                                );
-                            })()}
                         </div>
+
+                        {(() => {
+                            const tmpl = emailTemplates.find(t => t.key === selectedTemplateKey);
+                            const sampleId = Array.from(selectedAssignmentIds)[0];
+                            const sample = sampleId ? getFlattenedAssignments().find(a => a.id === sampleId) : null;
+                            const buyerName = sample?.assignment.buyer_name || sample?.assignment.orders?.buyer_name || '홍길동';
+                            const tidalId = sample?.assignment.tidal_id || 'sample@tidal.com';
+                            const endDate = sample?.assignment.end_date || '2027.05.02';
+                            const html = tmpl?.content
+                                ? tmpl.content.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).replace(/{end_date}/g, endDate).replace(/{message}/g, notificationMessage)
+                                : '<div style="padding:24px;color:#999;font-family:sans-serif;text-align:center">템플릿을 선택하면 미리보기가 표시됩니다.</div>';
+                            return (
+                                <div className="border rounded-xl overflow-hidden shadow-sm">
+                                    <div className="bg-slate-100 px-3 py-1.5 text-[10px] text-slate-500 font-mono border-b flex items-center justify-between">
+                                        <span>미리보기 — {sample ? `${buyerName} / ${tidalId} / ${endDate}` : '샘플 데이터'}</span>
+                                        {tmpl?.subject && <span className="text-slate-400">제목: {tmpl.subject}</span>}
+                                    </div>
+                                    <iframe srcDoc={html} className="w-full h-80 bg-white" sandbox="allow-same-origin" />
+                                </div>
+                            );
+                        })()}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsNotifyModalOpen(false)}>취소</Button>
@@ -2379,6 +2342,20 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <EmailTemplateModal
+                isOpen={isTemplateEditOpen}
+                onClose={() => setIsTemplateEditOpen(false)}
+                template={emailTemplates.find(t => t.key === selectedTemplateKey) as any ?? null}
+                onSave={() => {
+                    setIsTemplateEditOpen(false);
+                    apiFetch('/api/admin/email-templates').then(res => {
+                        if (res.ok) res.json().then((data: {id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[]}[]) => {
+                            setEmailTemplates(data);
+                        });
+                    });
+                }}
+            />
 
 
             {/* Memo Modal */}
