@@ -158,9 +158,10 @@ export function LegacyTidalContent({
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
-    const [emailTemplates, setEmailTemplates] = useState<{key: string, name: string}[]>([]);
-    const [selectedTemplateKey, setSelectedTemplateKey] = useState('EXPIRY_NOTICE');
+    const [emailTemplates, setEmailTemplates] = useState<{key: string, name: string, subject?: string, content?: string}[]>([]);
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
+    const [showNotifyPreview, setShowNotifyPreview] = useState(false);
     const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
     const [currentMemoInput, setCurrentMemoInput] = useState('');
     const [memoTargetAccountId, setMemoTargetAccountId] = useState('');
@@ -286,6 +287,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             if (res.ok) {
                 const data = await res.json();
                 setEmailTemplates(data);
+                const firstLegacy = data.find((t: {key: string}) => t.key.startsWith('LEGACY'));
+                if (firstLegacy) setSelectedTemplateKey(firstLegacy.key);
             }
         } catch (error) { console.error(error); }
     }, [fetchFn]);
@@ -1509,7 +1512,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
             {/* [MODAL: NOTIFY] */}
             <Dialog open={isNotifyModalOpen} onOpenChange={setIsNotifyModalOpen}>
-                <DialogContent className="sm:max-w-[550px]">
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle>알림 메일 발송</DialogTitle></DialogHeader>
                     <div className="py-4 space-y-4">
                         <div className="space-y-2">
@@ -1519,7 +1522,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                     <SelectValue placeholder="템플릿 선택" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {emailTemplates.map(t => (
+                                    {emailTemplates.filter(t => t.key.startsWith('LEGACY')).map(t => (
                                         <SelectItem key={t.key} value={t.key}>{t.name} ({t.key})</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -1531,11 +1534,37 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             <p className="opacity-80">선택된 회원들에게 안내 메일을 발송합니다. 아래 치환 코드를 본문에 포함할 수 있습니다.</p>
                             <p className="mt-2 font-mono bg-white/50 p-1 rounded inline-block text-[10px]">{'{buyer_name}'}, {'{tidal_id}'}, {'{end_date}'}, {'{message}'}</p>
                         </div>
-                        <textarea 
-                            className="w-full h-80 p-4 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none whitespace-pre-wrap transition-all shadow-sm" 
-                            value={notificationMessage} 
-                            onChange={e => setNotificationMessage(e.target.value)} 
+                        <textarea
+                            className="w-full h-48 p-4 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none whitespace-pre-wrap transition-all shadow-sm"
+                            value={notificationMessage}
+                            onChange={e => setNotificationMessage(e.target.value)}
                         />
+                        <div>
+                            <Button type="button" size="sm" variant="outline"
+                                className="h-7 px-3 text-xs"
+                                onClick={() => setShowNotifyPreview(v => !v)}
+                            >
+                                {showNotifyPreview ? '미리보기 닫기' : '📧 발송 메일 미리보기'}
+                            </Button>
+                            {showNotifyPreview && (() => {
+                                const tmpl = emailTemplates.find(t => t.key === selectedTemplateKey);
+                                const sample = getFlattenedAssignments().find(a => selectedAssignmentIds.has(a.id));
+                                const buyerName = sample?.assignment.buyer_name || '홍길동';
+                                const tidalId = sample?.assignment.tidal_id || 'sample@tidal.com';
+                                const endDate = sample?.assignment.end_date || '2027.05.02';
+                                const html = tmpl?.content
+                                    ? tmpl.content.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).replace(/{end_date}/g, endDate).replace(/{message}/g, notificationMessage)
+                                    : `<pre style="font-family:sans-serif;padding:16px;white-space:pre-wrap">${notificationMessage}</pre>`;
+                                return (
+                                    <div className="mt-2 border rounded-xl overflow-hidden shadow-sm">
+                                        <div className="bg-slate-100 px-3 py-1.5 text-[10px] text-slate-500 font-mono border-b">
+                                            미리보기 — {sample ? `${buyerName} / ${tidalId}` : '샘플 데이터'}
+                                        </div>
+                                        <iframe srcDoc={html} className="w-full h-72 bg-white" sandbox="allow-same-origin" />
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsNotifyModalOpen(false)} className="h-10">취소</Button>
