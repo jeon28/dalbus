@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
 
         const orders = (rawOrders as unknown as RawOrder[])?.map((o) => ({
             ...o,
-            end_date: o.order_accounts?.[0]?.end_date || null
+            end_date: o.order_accounts?.[0]?.end_date || null,
+            tidal_id: o.order_accounts?.[0]?.tidal_id || null
         }));
 
         return NextResponse.json({ orders });

@@ -45,6 +45,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         id: string;
         order_number: string;
         end_date: string | null;
+        tidal_id: string | null;
         buyer_name: string | null;
         buyer_phone: string | null;
         buyer_email: string | null;
@@ -294,7 +295,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 body: JSON.stringify({
                     orderData,
                     product_name: product.name,
-                    plan_name: selectedPlan.duration_months + '개월'
+                    plan_name: selectedPlan.duration_months + '개월',
+                    extend_tidal_id: orderMode === 'EXT' ? (selectedOrder?.tidal_id || null) : null
                 })
             });
 
@@ -523,17 +525,25 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     {(orderMode === 'NEW' || selectedOrder) && (
                         <div className="space-y-4">
                             {selectedOrder && (
-                                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 mb-4 flex justify-between items-center">
-                                    <div>
-                                        <p className="text-xs text-primary font-bold">선택된 연장 대상</p>
-                                        <p className="text-sm font-medium">{product.name} ({selectedOrder.order_number})</p>
+                                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 mb-4">
+                                    <div className="flex justify-between items-start">
+                                        <div className="space-y-0.5">
+                                            {selectedOrder.tidal_id && (
+                                                <p className="text-base font-bold text-primary">{selectedOrder.tidal_id}</p>
+                                            )}
+                                            <p className="text-xs text-primary font-bold">선택된 연장 대상</p>
+                                            <p className="text-sm font-medium">{product.name} ({selectedOrder.order_number})</p>
+                                            {selectedOrder.end_date && (
+                                                <p className="text-xs text-muted-foreground">현재 만료일: {selectedOrder.end_date}</p>
+                                            )}
+                                        </div>
+                                        <button
+                                            className="text-xs text-muted-foreground underline shrink-0 ml-2"
+                                            onClick={() => setSelectedOrder(null)}
+                                        >
+                                            변경
+                                        </button>
                                     </div>
-                                    <button
-                                        className="text-xs text-muted-foreground underline"
-                                        onClick={() => setSelectedOrder(null)}
-                                    >
-                                        변경
-                                    </button>
                                 </div>
                             )}
                             <Input
@@ -656,7 +666,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
                 <button
                     className={`${styles.submitBtn} w-full mt-8 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl`}
-                    disabled={loading || (!user && (!agreements.privacy || !agreements.terms))}
+                    disabled={loading || (orderMode === 'EXT' && !selectedOrder) || (!user && (!agreements.privacy || !agreements.terms))}
                     onClick={handleSubscribe}
                 >
                     {loading ? '처리 중...' : '구독하기'}
