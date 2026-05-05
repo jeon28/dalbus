@@ -57,6 +57,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [plans, setPlans] = useState<Plan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+    const [isPlanExpanded, setIsPlanExpanded] = useState(true);
     const [loading, setLoading] = useState(false);
     const [selectedBankId, setSelectedBankId] = useState('');
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
@@ -374,11 +375,20 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     <h3 className="text-lg font-bold mb-3">이용 기간 선택</h3>
                     <div className={styles.optionList}>
                         {plans.length > 0 ? (
-                            plans.map((plan) => (
+                            plans
+                                .filter(plan => isPlanExpanded || selectedPeriod === plan.duration_months)
+                                .map((plan) => (
                                 <div
                                     key={plan.id}
                                     className={`${styles.optionItem} ${selectedPeriod === plan.duration_months ? styles.active : ''} glass`}
-                                    onClick={() => setSelectedPeriod(plan.duration_months)}
+                                    onClick={() => {
+                                        if (selectedPeriod === plan.duration_months) {
+                                            setIsPlanExpanded(v => !v);
+                                        } else {
+                                            setSelectedPeriod(plan.duration_months);
+                                            setIsPlanExpanded(false);
+                                        }
+                                    }}
                                 >
                                     <span>
                                         {plan.duration_months}개월
@@ -388,7 +398,12 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                             </span>
                                         )}
                                     </span>
-                                    <span>{plan.price.toLocaleString()}원</span>
+                                    <span className="flex items-center gap-2">
+                                        {plan.price.toLocaleString()}원
+                                        {selectedPeriod === plan.duration_months && !isPlanExpanded && (
+                                            <span className="text-[10px] text-slate-400">▼ 변경</span>
+                                        )}
+                                    </span>
                                 </div>
                             ))
                         ) : (
