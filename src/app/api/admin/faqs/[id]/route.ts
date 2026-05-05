@@ -9,7 +9,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const body = await req.json();
         const { data, error } = await supabaseAdmin
             .from('faqs')
-            .update({ ...body, updated_at: new Date().toISOString() })
+            .update({ ...body })
             .eq('id', id)
             .select()
             .single();
