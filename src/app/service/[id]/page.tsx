@@ -148,32 +148,48 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 depositor: prev.depositor || user.name || ''
             }));
 
-            // Fetch all unique buyer_emails from previous orders
-            const fetchUniqueEmails = async () => {
+            // Fetch all unique buyer_emails and assigned tidal_id from previous orders
+            const fetchUserOrderInfo = async () => {
                 const { data, error } = await supabase
                     .from('orders')
-                    .select('buyer_email')
+                    .select('id, buyer_email')
                     .eq('user_id', user.id);
-                
+
                 if (!error && data) {
                     const emails = new Set<string>();
                     if (user.email) emails.add(user.email);
                     data.forEach(o => {
                         if (o.buyer_email) emails.add(o.buyer_email);
                     });
-                    
+
                     const uniqueEmails = Array.from(emails);
                     setUserEmails(uniqueEmails);
-                    
-                    // If multiple emails but current email is empty, pre-fill with first one
+
                     if (uniqueEmails.length > 0 && !guestInfo.email) {
                         setGuestInfo(prev => ({ ...prev, email: uniqueEmails[0] }));
+                    }
+
+                    // 배정된 Tidal ID 자동 조회
+                    const orderIds = data.map(o => o.id);
+                    if (orderIds.length > 0) {
+                        const { data: assignData } = await supabase
+                            .from('order_accounts')
+                            .select('tidal_id')
+                            .in('order_id', orderIds)
+                            .not('tidal_id', 'is', null)
+                            .eq('is_deleted', false)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .single();
+                        if (assignData?.tidal_id) {
+                            setGuestInfo(prev => ({ ...prev, tidalId: assignData.tidal_id }));
+                        }
                     }
                 } else {
                     setUserEmails(user.email ? [user.email] : []);
                 }
             };
-            fetchUniqueEmails();
+            fetchUserOrderInfo();
         } else {
             setUserEmails([]);
         }
@@ -440,21 +456,43 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
                     {orderMode === 'EXT' && !selectedOrder && (
                         <div className="glass p-5 rounded-xl space-y-4 border border-primary/20 bg-primary/5">
-                            <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
-                            <div className="space-y-4">
-                                <Input
-                                    placeholder="구매 시 사용한 Tidal ID (예: tidalid@hifitidal.com)"
-                                    value={guestInfo.tidalId}
-                                    onChange={(e) => setGuestInfo({ ...guestInfo, tidalId: e.target.value })}
-                                />
-                                <button
-                                    className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
-                                    onClick={handleLookup}
-                                    disabled={lookupLoading}
-                                >
-                                    {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
-                                </button>
-                            </div>
+                            {user && guestInfo.tidalId ? (
+                                <div className="space-y-2">
+                                    <p className="text-xs text-center text-slate-500">배정된 Tidal ID로 주문을 조회합니다.</p>
+                                    <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border border-primary/30">
+                                        <span className="flex-1 text-sm font-bold text-primary">{guestInfo.tidalId}</span>
+                                        <button className="text-[11px] text-slate-400 hover:text-slate-600 underline shrink-0"
+                                            onClick={() => setGuestInfo({ ...guestInfo, tidalId: '' })}>
+                                            변경
+                                        </button>
+                                    </div>
+                                    <button
+                                        className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
+                                        onClick={handleLookup}
+                                        disabled={lookupLoading}
+                                    >
+                                        {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
+                                    <div className="space-y-4">
+                                        <Input
+                                            placeholder="구매 시 사용한 Tidal ID (예: tidalid@hifitidal.com)"
+                                            value={guestInfo.tidalId}
+                                            onChange={(e) => setGuestInfo({ ...guestInfo, tidalId: e.target.value })}
+                                        />
+                                        <button
+                                            className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
+                                            onClick={handleLookup}
+                                            disabled={lookupLoading}
+                                        >
+                                            {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
 
                             {lookupMessage && <p className="text-xs text-center text-red-500 mt-2">{lookupMessage}</p>}
 
