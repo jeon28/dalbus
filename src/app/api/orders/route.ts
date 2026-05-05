@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
         await getServerSession(req);
 
         const body = await req.json();
-        const { orderData, product_name, plan_name } = body;
+        const { orderData, product_name, plan_name, extend_tidal_id } = body;
 
         // Normalize phone number
         const normalizedOrderData = {
@@ -48,7 +48,9 @@ export async function POST(req: NextRequest) {
                 amount: orderData.amount,
                 buyerName: orderData.buyer_name,
                 buyerPhone: orderData.buyer_phone,
-                depositorName: orderData.depositor_name
+                depositorName: orderData.depositor_name,
+                orderType: normalizedOrderData.order_type,
+                extendTidalId: extend_tidal_id || null
             };
 
             // Admin notification
