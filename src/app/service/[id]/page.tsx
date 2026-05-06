@@ -54,6 +54,16 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         };
     }
 
+    interface UserTidalAccount {
+        orderId: string;
+        orderNumber: string;
+        tidalId: string;
+        endDate: string | null;
+        buyerName: string | null;
+        buyerPhone: string | null;
+        buyerEmail: string | null;
+    }
+
     const [product, setProduct] = useState<Product | null>(null);
     const [plans, setPlans] = useState<Plan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -67,6 +77,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [lookupResults, setLookupResults] = useState<ExtensionOrder[]>([]);
     const [lookupMessage, setLookupMessage] = useState('');
     const [userEmails, setUserEmails] = useState<string[]>([]);
+    const [userTidalAccounts, setUserTidalAccounts] = useState<UserTidalAccount[]>([]);
 
     const [guestInfo, setGuestInfo] = useState({
         name: '',
@@ -149,11 +160,11 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 depositor: prev.depositor || user.name || ''
             }));
 
-            // Fetch all unique buyer_emails and assigned tidal_id from previous orders
+            // Fetch all unique buyer_emails from previous orders
             const fetchUserOrderInfo = async () => {
                 const { data, error } = await supabase
                     .from('orders')
-                    .select('id, buyer_email')
+                    .select('buyer_email')
                     .eq('user_id', user.id);
 
                 if (!error && data) {
@@ -162,29 +173,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     data.forEach(o => {
                         if (o.buyer_email) emails.add(o.buyer_email);
                     });
-
-                    const uniqueEmails = Array.from(emails);
-                    setUserEmails(uniqueEmails);
-
-                    if (uniqueEmails.length > 0 && !guestInfo.email) {
-                        setGuestInfo(prev => ({ ...prev, email: uniqueEmails[0] }));
-                    }
-
-                    // 배정된 Tidal ID 자동 조회
-                    const orderIds = data.map(o => o.id);
-                    if (orderIds.length > 0) {
-                        const { data: assignData } = await supabase
-                            .from('order_accounts')
-                            .select('tidal_id')
-                            .in('order_id', orderIds)
-                            .not('tidal_id', 'is', null)
-                            .order('created_at', { ascending: false })
-                            .limit(1)
-                            .maybeSingle();
-                        if (assignData?.tidal_id) {
-                            setGuestInfo(prev => ({ ...prev, tidalId: assignData.tidal_id }));
-                        }
-                    }
+                    setUserEmails(Array.from(emails));
                 } else {
                     setUserEmails(user.email ? [user.email] : []);
                 }
@@ -195,6 +184,56 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
+
+    // Fetch user's tidal accounts for this product (for EXT tab)
+    useEffect(() => {
+        if (!user || !id) return;
+
+        const fetchUserTidalAccounts = async () => {
+            interface OrderWithAccounts {
+                id: string;
+                order_number: string;
+                buyer_name: string | null;
+                buyer_phone: string | null;
+                buyer_email: string | null;
+                order_accounts: { tidal_id: string | null; end_date: string | null }[] | null;
+            }
+
+            const { data } = await supabase
+                .from('orders')
+                .select('id, order_number, buyer_name, buyer_phone, buyer_email, order_accounts ( tidal_id, end_date )')
+                .eq('user_id', user.id)
+                .eq('product_id', id)
+                .neq('payment_status', 'failed')
+                .neq('payment_status', 'cancelled')
+                .neq('payment_status', 'refunded')
+                .order('created_at', { ascending: false });
+
+            if (data) {
+                const seen = new Set<string>();
+                const accounts: UserTidalAccount[] = [];
+                for (const order of (data as unknown as OrderWithAccounts[])) {
+                    for (const acc of (order.order_accounts || [])) {
+                        if (acc.tidal_id && !seen.has(acc.tidal_id)) {
+                            seen.add(acc.tidal_id);
+                            accounts.push({
+                                orderId: order.id,
+                                orderNumber: order.order_number,
+                                tidalId: acc.tidal_id,
+                                endDate: acc.end_date,
+                                buyerName: order.buyer_name,
+                                buyerPhone: order.buyer_phone,
+                                buyerEmail: order.buyer_email,
+                            });
+                        }
+                    }
+                }
+                setUserTidalAccounts(accounts);
+            }
+        };
+
+        fetchUserTidalAccounts();
+    }, [user, id]);
 
     const handleLookup = useCallback(async () => {
         if (!guestInfo.tidalId) {
@@ -230,13 +269,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             setLookupLoading(false);
         }
     }, [guestInfo.tidalId, id]);
-
-    // Auto lookup when tidalId is pre-filled and mode is EXT
-    useEffect(() => {
-        if (orderMode === 'EXT' && guestInfo.tidalId && product && lookupResults.length === 0 && !lookupLoading && !selectedOrder) {
-            handleLookup();
-        }
-    }, [orderMode, guestInfo.tidalId, product, handleLookup, lookupLoading, lookupResults.length, selectedOrder]);
 
     const toggleAllAgreements = (checked: boolean) => {
         setAgreements({ all: checked, privacy: checked, terms: checked });
@@ -456,26 +488,44 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     </h3>
 
                     {orderMode === 'EXT' && !selectedOrder && (
-                        <div className="glass p-5 rounded-xl space-y-4 border border-primary/20 bg-primary/5">
-                            {user && guestInfo.tidalId ? (
-                                <div className="space-y-2">
-                                    <p className="text-xs text-center text-slate-500">배정된 Tidal ID로 주문을 조회합니다.</p>
-                                    <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-lg border border-primary/30">
-                                        <span className="flex-1 text-sm font-bold text-primary">{guestInfo.tidalId}</span>
-                                        <button className="text-[11px] text-slate-400 hover:text-slate-600 underline shrink-0"
-                                            onClick={() => setGuestInfo({ ...guestInfo, tidalId: '' })}>
-                                            변경
-                                        </button>
-                                    </div>
-                                    <button
-                                        className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
-                                        onClick={handleLookup}
-                                        disabled={lookupLoading}
-                                    >
-                                        {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
-                                    </button>
-                                </div>
+                        <div className="glass p-5 rounded-xl space-y-3 border border-primary/20 bg-primary/5">
+                            {user ? (
+                                // 로그인: 배정된 Tidal ID 목록 직접 표시
+                                userTidalAccounts.length > 0 ? (
+                                    <>
+                                        <p className="text-xs text-center text-slate-500">연장할 구독을 선택하세요.</p>
+                                        {userTidalAccounts.map((acc) => (
+                                            <div
+                                                key={acc.tidalId}
+                                                className="flex items-center justify-between p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
+                                                onClick={() => handleSelectOrderForExtension({
+                                                    id: acc.orderId,
+                                                    order_number: acc.orderNumber,
+                                                    end_date: acc.endDate,
+                                                    tidal_id: acc.tidalId,
+                                                    buyer_name: acc.buyerName,
+                                                    buyer_phone: acc.buyerPhone,
+                                                    buyer_email: acc.buyerEmail,
+                                                    products: { name: product?.name || '' }
+                                                })}
+                                            >
+                                                <div>
+                                                    <p className="text-sm font-bold text-primary">{acc.tidalId}</p>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        종료일: {acc.endDate || '정보없음'}
+                                                    </p>
+                                                </div>
+                                                <span className="text-xs text-primary font-bold shrink-0 ml-2">선택하기 →</span>
+                                            </div>
+                                        ))}
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-center text-muted-foreground py-4">
+                                        배정된 계정 정보가 없습니다.
+                                    </p>
+                                )
                             ) : (
+                                // 비로그인: Tidal ID 직접 입력 후 조회
                                 <>
                                     <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
                                     <div className="space-y-4">
@@ -492,31 +542,30 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                             {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
                                         </button>
                                     </div>
-                                </>
-                            )}
 
-                            {lookupMessage && <p className="text-xs text-center text-red-500 mt-2">{lookupMessage}</p>}
+                                    {lookupMessage && <p className="text-xs text-center text-red-500 mt-2">{lookupMessage}</p>}
 
-                            {lookupResults.length > 0 && (
-                                <div className="mt-4 space-y-2">
-                                    <p className="text-xs font-bold text-muted-foreground mb-2">연장 가능한 내역 ({lookupResults.length})</p>
-                                    {lookupResults.map((o) => (
-                                        <div
-                                            key={o.id}
-                                            className="p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
-                                            onClick={() => handleSelectOrderForExtension(o)}
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm font-bold">{o.products?.name}</span>
-                                                <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">{o.order_number}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <span className="text-xs text-muted-foreground">만료일: {o.end_date || '정보없음'}</span>
-                                                <span className="text-xs text-primary font-bold">선택하기 →</span>
-                                            </div>
+                                    {lookupResults.length > 0 && (
+                                        <div className="mt-2 space-y-2">
+                                            <p className="text-xs font-bold text-muted-foreground">연장 가능한 내역 ({lookupResults.length})</p>
+                                            {lookupResults.map((o) => (
+                                                <div
+                                                    key={o.id}
+                                                    className="flex items-center justify-between p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
+                                                    onClick={() => handleSelectOrderForExtension(o)}
+                                                >
+                                                    <div>
+                                                        <p className="text-sm font-bold text-primary">{o.tidal_id || o.order_number}</p>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                            종료일: {o.end_date || '정보없음'}
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-xs text-primary font-bold shrink-0 ml-2">선택하기 →</span>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
