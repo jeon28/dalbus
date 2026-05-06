@@ -550,11 +550,10 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                             {selectedOrder.end_date && (() => {
                                                 const newEndDate = format(addDays(parseISO(selectedOrder.end_date), selectedPeriod * 30), 'yyyy-MM-dd');
                                                 return (
-                                                    <p className="text-xs text-muted-foreground">
-                                                        현재 만료일: {selectedOrder.end_date}
-                                                        {' → '}
-                                                        <span className="font-bold text-primary">{newEndDate}</span>
-                                                    </p>
+                                                    <>
+                                                        <p className="text-xs text-muted-foreground">현재 만료일: {selectedOrder.end_date}</p>
+                                                        <p className="text-xs"><span className="font-bold text-primary">연장후 만료일: {newEndDate}</span></p>
+                                                    </>
                                                 );
                                             })()}
                                         </div>
