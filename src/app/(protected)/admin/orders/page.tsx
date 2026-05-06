@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
 import { addDays, differenceInMonths, format, parseISO } from 'date-fns';
@@ -603,6 +603,32 @@ export default function OrderHistoryPage() {
         }
     };
 
+    const handleDeleteUnpaidOrders = async () => {
+        const unpaidCount = orders.filter(o => getOrderStatus(o) === '주문신청').length;
+        if (unpaidCount === 0) {
+            alert('삭제할 미입금 주문이 없습니다.');
+            return;
+        }
+        if (isProcessing || !confirm(`미입금(주문신청) 상태의 주문 ${unpaidCount}건을 삭제하시겠습니까?\n배정된 계정이 없는 주문만 삭제됩니다.`)) return;
+
+        setIsProcessing(true);
+        try {
+            const res = await apiFetch('/api/admin/orders', { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || '삭제 실패');
+            }
+            const result = await res.json();
+            alert(`${result.deleted}건이 삭제되었습니다.`);
+            fetchOrders();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '오류가 발생했습니다.';
+            alert(message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' | null = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -845,6 +871,10 @@ export default function OrderHistoryPage() {
                             <Button onClick={exportToExcel} variant="outline" size="sm" className="shrink-0 h-9">
                                 <Download className="mr-1 h-4 w-4" />
                                 <span className="hidden sm:inline">엑셀</span>
+                            </Button>
+                            <Button onClick={handleDeleteUnpaidOrders} variant="outline" size="sm" className="shrink-0 h-9 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600" disabled={isProcessing}>
+                                <Trash2 className="mr-1 h-4 w-4" />
+                                <span className="hidden sm:inline">미입금 삭제</span>
                             </Button>
                         </div>
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
