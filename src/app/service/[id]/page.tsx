@@ -190,45 +190,10 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         if (!user || !id) return;
 
         const fetchUserTidalAccounts = async () => {
-            interface OrderWithAccounts {
-                id: string;
-                order_number: string;
-                buyer_name: string | null;
-                buyer_phone: string | null;
-                buyer_email: string | null;
-                order_accounts: { tidal_id: string | null; end_date: string | null }[] | null;
-            }
-
-            const { data } = await supabase
-                .from('orders')
-                .select('id, order_number, buyer_name, buyer_phone, buyer_email, order_accounts ( tidal_id, end_date )')
-                .eq('user_id', user.id)
-                .eq('product_id', id)
-                .neq('payment_status', 'failed')
-                .neq('payment_status', 'cancelled')
-                .neq('payment_status', 'refunded')
-                .order('created_at', { ascending: false });
-
-            if (data) {
-                const seen = new Set<string>();
-                const accounts: UserTidalAccount[] = [];
-                for (const order of (data as unknown as OrderWithAccounts[])) {
-                    for (const acc of (order.order_accounts || [])) {
-                        if (acc.tidal_id && !seen.has(acc.tidal_id)) {
-                            seen.add(acc.tidal_id);
-                            accounts.push({
-                                orderId: order.id,
-                                orderNumber: order.order_number,
-                                tidalId: acc.tidal_id,
-                                endDate: acc.end_date,
-                                buyerName: order.buyer_name,
-                                buyerPhone: order.buyer_phone,
-                                buyerEmail: order.buyer_email,
-                            });
-                        }
-                    }
-                }
-                setUserTidalAccounts(accounts);
+            const res = await apiFetch(`/api/user/tidal-accounts?productId=${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setUserTidalAccounts(data.accounts || []);
             }
         };
 
