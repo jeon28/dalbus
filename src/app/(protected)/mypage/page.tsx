@@ -379,7 +379,7 @@ export default function MyPage() {
                                         <p>기간: {sub.start_date} ~ {sub.end_date} ({sub.duration})</p>
                                         <p>만료일: {sub.end_date}</p>
                                         {sub.order_number && (
-                                            <p className="text-muted-foreground">주문번호: {sub.order_number}</p>
+                                            <p className="text-muted-foreground">주문번호: {sub.order_number.replace(/^DAL-/, '')}</p>
                                         )}
                                     </div>
                                     <div className="bg-white/50 p-3 rounded-lg text-sm font-mono space-y-1 border border-white/20">
