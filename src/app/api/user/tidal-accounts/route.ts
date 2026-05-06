@@ -16,9 +16,10 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'productId is required' }, { status: 400 });
         }
 
-        const { data: orders, error } = await supabaseAdmin
+        // Get user's orders for this product first
+        const { data: orders, error: orderError } = await supabaseAdmin
             .from('orders')
-            .select('id, order_number, buyer_name, buyer_phone, buyer_email, order_accounts ( tidal_id, end_date )')
+            .select('id, order_number, buyer_name, buyer_phone, buyer_email')
             .eq('user_id', session.id)
             .eq('product_id', productId)
             .neq('payment_status', 'failed')
@@ -26,18 +27,29 @@ export async function GET(req: NextRequest) {
             .neq('payment_status', 'refunded')
             .order('created_at', { ascending: false });
 
+        if (orderError) {
+            return NextResponse.json({ error: orderError.message }, { status: 500 });
+        }
+
+        const orderIds = (orders || []).map(o => o.id);
+
+        if (orderIds.length === 0) {
+            return NextResponse.json({ accounts: [] });
+        }
+
+        // Read actual assignments from tidal_assignments table
+        const { data: assignments, error } = await supabaseAdmin
+            .from('tidal_assignments')
+            .select('order_id, tidal_id, end_date')
+            .not('is_deleted', 'is', true)
+            .eq('is_active', true)
+            .in('order_id', orderIds);
+
         if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        interface OrderWithAccounts {
-            id: string;
-            order_number: string;
-            buyer_name: string | null;
-            buyer_phone: string | null;
-            buyer_email: string | null;
-            order_accounts: { tidal_id: string | null; end_date: string | null }[] | null;
-        }
+        const orderMap = new Map((orders || []).map(o => [o.id, o]));
 
         const seen = new Set<string>();
         const accounts: {
@@ -50,20 +62,19 @@ export async function GET(req: NextRequest) {
             buyerEmail: string | null;
         }[] = [];
 
-        for (const order of ((orders || []) as unknown as OrderWithAccounts[])) {
-            for (const acc of (order.order_accounts || [])) {
-                if (acc.tidal_id && !seen.has(acc.tidal_id)) {
-                    seen.add(acc.tidal_id);
-                    accounts.push({
-                        orderId: order.id,
-                        orderNumber: order.order_number,
-                        tidalId: acc.tidal_id,
-                        endDate: acc.end_date,
-                        buyerName: order.buyer_name,
-                        buyerPhone: order.buyer_phone,
-                        buyerEmail: order.buyer_email,
-                    });
-                }
+        for (const acc of (assignments || [])) {
+            if (acc.tidal_id && !seen.has(acc.tidal_id)) {
+                seen.add(acc.tidal_id);
+                const order = orderMap.get(acc.order_id);
+                accounts.push({
+                    orderId: acc.order_id,
+                    orderNumber: order?.order_number || '',
+                    tidalId: acc.tidal_id,
+                    endDate: acc.end_date,
+                    buyerName: order?.buyer_name || null,
+                    buyerPhone: order?.buyer_phone || null,
+                    buyerEmail: order?.buyer_email || null,
+                });
             }
         }
 
