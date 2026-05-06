@@ -178,10 +178,9 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             .select('tidal_id')
                             .in('order_id', orderIds)
                             .not('tidal_id', 'is', null)
-                            .eq('is_deleted', false)
                             .order('created_at', { ascending: false })
                             .limit(1)
-                            .single();
+                            .maybeSingle();
                         if (assignData?.tidal_id) {
                             setGuestInfo(prev => ({ ...prev, tidalId: assignData.tidal_id }));
                         }
@@ -211,14 +210,14 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         try {
             const res = await apiFetch('/api/orders/lookup', {
                 method: 'POST',
-                body: JSON.stringify({ tidalId: guestInfo.tidalId })
+                body: JSON.stringify({ tidalId: guestInfo.tidalId, productId: id })
             });
             const data = await res.json();
 
             if (res.ok) {
-                const filtered = (data.orders || []).filter((o: ExtensionOrder) => o.products?.name === product?.name);
-                setLookupResults(filtered);
-                if (filtered.length === 0) {
+                const orders = data.orders || [];
+                setLookupResults(orders);
+                if (orders.length === 0) {
                     setLookupMessage('연장 가능한 주문 내역이 없습니다.');
                 }
             } else {
@@ -230,7 +229,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         } finally {
             setLookupLoading(false);
         }
-    }, [guestInfo.tidalId, product?.name]);
+    }, [guestInfo.tidalId, id]);
 
     // Auto lookup when tidalId is pre-filled and mode is EXT
     useEffect(() => {
