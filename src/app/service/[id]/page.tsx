@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/lib/supabase';
+import { addDays, format, parseISO } from 'date-fns';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -546,9 +547,16 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                             )}
                                             <p className="text-xs text-primary font-bold">선택된 연장 대상</p>
                                             <p className="text-sm font-medium">{product.name} ({selectedOrder.order_number})</p>
-                                            {selectedOrder.end_date && (
-                                                <p className="text-xs text-muted-foreground">현재 만료일: {selectedOrder.end_date}</p>
-                                            )}
+                                            {selectedOrder.end_date && (() => {
+                                                const newEndDate = format(addDays(parseISO(selectedOrder.end_date), selectedPeriod * 30), 'yyyy-MM-dd');
+                                                return (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        현재 만료일: {selectedOrder.end_date}
+                                                        {' → '}
+                                                        <span className="font-bold text-primary">{newEndDate}</span>
+                                                    </p>
+                                                );
+                                            })()}
                                         </div>
                                         <button
                                             className="text-xs text-muted-foreground underline shrink-0 ml-2"
