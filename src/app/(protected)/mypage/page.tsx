@@ -175,7 +175,8 @@ export default function MyPage() {
                                 account_id: '정보 확인 중',
                                 account_pw: '정보 확인 중',
                                 status: '이용 중',
-                                order_id: item.id
+                                order_id: item.id,
+                                order_number: item.order_number || ''
                             }));
                         setSubscriptions(activeSubs);
                     }
