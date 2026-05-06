@@ -102,6 +102,11 @@ export default function OrderHistoryPage() {
 
     const statuses = [
         {
+            value: "미입금",
+            label: "미입금",
+            icon: Circle,
+        },
+        {
             value: "주문신청",
             label: "주문신청",
             icon: Circle,

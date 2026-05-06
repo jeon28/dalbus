@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
             query = query.eq('assignment_status', 'assigned');
         } else if (status === '입금확인') {
             query = query.eq('payment_status', 'paid').neq('assignment_status', 'assigned').neq('assignment_status', 'completed');
-        } else if (status === '주문신청') {
+        } else if (status === '주문신청' || status === '미입금') {
             query = query.neq('payment_status', 'paid');
         }
     }
