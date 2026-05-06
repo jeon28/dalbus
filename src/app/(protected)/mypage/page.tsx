@@ -55,6 +55,7 @@ interface SupabaseAccountAssignment {
     start_date: string | null;
     end_date: string | null;
     orders: {
+        order_number?: string;
         product_id: string;
         products: {
             name: string;
@@ -158,7 +159,7 @@ export default function MyPage() {
                             account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
                             status: '이용 중',
                             order_id: acc.order_id,
-                            order_number: (acc as unknown as { order_number?: string }).order_number || '',
+                            order_number: (acc as unknown as { order_number?: string }).order_number || acc.orders?.order_number || '',
                             slot_number: acc.slot_number
                         }));
                         setSubscriptions(enrichedSubs);

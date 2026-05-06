@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         if (orderIds.length > 0) {
             const { data, error: assignmentError } = await supabaseAdmin
                 .from('tidal_assignments')
-                .select('*, order_id, order_number, orders(product_id, products(name), product_plans(duration_months))')
+                .select('*, order_id, order_number, orders(order_number, product_id, products(name), product_plans(duration_months))')
                 .not('is_deleted', 'is', true)
                 .eq('is_active', true)
                 .in('order_id', orderIds);
