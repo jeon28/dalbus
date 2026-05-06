@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     try {
-        const { tidalId: rawTidalId } = await req.json();
+        const { tidalId: rawTidalId, productId } = await req.json();
         const tidalId = rawTidalId?.trim();
 
         if (!tidalId) {
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
         // Find orders matching Tidal ID
         // We look for orders via order_accounts join
-        const { data: rawOrders, error } = await supabaseAdmin
+        let query = supabaseAdmin
             .from('orders')
             .select(`
                 id,
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
                 buyer_name,
                 buyer_phone,
                 buyer_email,
+                product_id,
                 products ( name ),
                 product_plans ( duration_months ),
                 order_accounts!inner ( tidal_id, end_date )
@@ -33,6 +34,12 @@ export async function POST(req: NextRequest) {
             .neq('payment_status', 'cancelled')
             .neq('payment_status', 'refunded')
             .order('created_at', { ascending: false });
+
+        if (productId) {
+            query = query.eq('product_id', productId);
+        }
+
+        const { data: rawOrders, error } = await query;
 
         if (error) {
             console.error('Order match error:', error);
@@ -45,6 +52,7 @@ export async function POST(req: NextRequest) {
             order_number: string;
             created_at: string;
             payment_status: string;
+            product_id: string | null;
             products: { name: string } | null;
             product_plans: { duration_months: number } | null;
             order_accounts: { tidal_id: string; end_date: string }[] | null;
