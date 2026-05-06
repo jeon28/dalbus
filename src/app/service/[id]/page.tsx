@@ -69,7 +69,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [plans, setPlans] = useState<Plan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
-    const [isPlanExpanded, setIsPlanExpanded] = useState(true);
+    const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
     const [selectedBankId, setSelectedBankId] = useState('');
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
@@ -115,7 +115,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     if (prodData.product_plans && prodData.product_plans.length > 0) {
                         const sortedPlans = [...prodData.product_plans].sort((a, b) => a.duration_months - b.duration_months);
                         setPlans(sortedPlans);
-                        setSelectedPeriod(sortedPlans[0].duration_months);
+                        setSelectedPeriod(sortedPlans[sortedPlans.length - 1].duration_months);
                     }
                 }
 
