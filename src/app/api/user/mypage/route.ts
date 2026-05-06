@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
             let assignmentsQuery = supabaseAdmin
                 .from('order_accounts')
                 .select('*, order_id, orders(product_id, products(name), product_plans(duration_months))')
-                .eq('is_deleted', false);
+                .neq('is_deleted', true);
 
             if (orderIds.length > 0 && userEmail) {
                 assignmentsQuery = assignmentsQuery.or(`order_id.in.(${orderIds.join(',')}),buyer_email.eq.${userEmail}`);
