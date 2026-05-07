@@ -164,7 +164,7 @@ function TidalAccountsContent() {
     // Deleted group edit state
     const [isEditDeletedGroupOpen, setIsEditDeletedGroupOpen] = useState(false);
     const [editDeletedGroup, setEditDeletedGroup] = useState<Account | null>(null);
-    const [editDeletedGroupLoginId, setEditDeletedGroupLoginId] = useState('');
+    const [editDeletedGroupForm, setEditDeletedGroupForm] = useState({ login_id: '', payment_email: '', payment_day: 1, memo: '' });
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
@@ -895,13 +895,18 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
-    const handleEditDeletedGroupId = async () => {
-        if (!editDeletedGroup || !editDeletedGroupLoginId.trim()) return;
+    const handleEditDeletedGroup = async () => {
+        if (!editDeletedGroup || !editDeletedGroupForm.login_id.trim()) return;
         try {
             const res = await apiFetch(`/api/admin/accounts/${editDeletedGroup.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ login_id: editDeletedGroupLoginId.trim() })
+                body: JSON.stringify({
+                    login_id: editDeletedGroupForm.login_id.trim(),
+                    payment_email: editDeletedGroupForm.payment_email.trim(),
+                    payment_day: editDeletedGroupForm.payment_day,
+                    memo: editDeletedGroupForm.memo.trim(),
+                })
             });
             if (res.status === 409) {
                 alert('이미 사용 중인 그룹 ID입니다.');
@@ -910,7 +915,44 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             if (!res.ok) throw new Error('수정 실패');
             setIsEditDeletedGroupOpen(false);
             fetchAccounts();
-            alert('그룹 ID가 수정되었습니다.');
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleRestoreDeletedGroup = async (acc: Account) => {
+        if (!confirm(`"${acc.login_id}" 그룹을 재등록(복원)하시겠습니까?`)) return;
+        try {
+            const res = await apiFetch(`/api/admin/accounts/${acc.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'available' })
+            });
+            if (!res.ok) throw new Error('재등록 실패');
+            fetchAccounts();
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleEditAndRestoreDeletedGroup = async () => {
+        if (!editDeletedGroup || !editDeletedGroupForm.login_id.trim()) return;
+        try {
+            const res = await apiFetch(`/api/admin/accounts/${editDeletedGroup.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    login_id: editDeletedGroupForm.login_id.trim(),
+                    payment_email: editDeletedGroupForm.payment_email.trim(),
+                    payment_day: editDeletedGroupForm.payment_day,
+                    memo: editDeletedGroupForm.memo.trim(),
+                    status: 'available',
+                })
+            });
+            if (res.status === 409) { alert('이미 사용 중인 그룹 ID입니다.'); return; }
+            if (!res.ok) throw new Error('재등록 실패');
+            setIsEditDeletedGroupOpen(false);
+            fetchAccounts();
         } catch (error) {
             alert('실패: ' + (error instanceof Error ? error.message : String(error)));
         }
@@ -2129,6 +2171,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             <tr className="bg-red-50 border-b text-gray-500">
                                                 <th className="p-3 text-left">그룹 ID</th>
                                                 <th className="p-3 text-left">결제 계정</th>
+                                                <th className="p-3 text-center">결제일</th>
                                                 <th className="p-3 text-left">메모</th>
                                                 <th className="p-3 text-center">관리</th>
                                             </tr>
@@ -2140,18 +2183,31 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                     <tr key={acc.id} className="hover:bg-red-50/30">
                                                         <td className="p-3 font-bold text-red-700">{acc.login_id}</td>
                                                         <td className="p-3 text-gray-500">{(acc as unknown as { payment_email?: string }).payment_email || '-'}</td>
+                                                        <td className="p-3 text-gray-500 text-center">{(acc as unknown as { payment_day?: number }).payment_day || '-'}</td>
                                                         <td className="p-3 text-gray-400">{acc.memo || '-'}</td>
-                                                        <td className="p-3 text-center">
+                                                        <td className="p-3 text-center flex items-center gap-1 justify-center">
                                                             <Button
                                                                 size="sm" variant="ghost"
                                                                 className="h-7 px-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 text-xs"
                                                                 onClick={() => {
                                                                     setEditDeletedGroup(acc);
-                                                                    setEditDeletedGroupLoginId(acc.login_id || '');
+                                                                    setEditDeletedGroupForm({
+                                                                        login_id: acc.login_id || '',
+                                                                        payment_email: (acc as unknown as { payment_email?: string }).payment_email || '',
+                                                                        payment_day: (acc as unknown as { payment_day?: number }).payment_day || 1,
+                                                                        memo: acc.memo || '',
+                                                                    });
                                                                     setIsEditDeletedGroupOpen(true);
                                                                 }}
                                                             >
-                                                                ID 수정
+                                                                수정
+                                                            </Button>
+                                                            <Button
+                                                                size="sm" variant="ghost"
+                                                                className="h-7 px-2 text-green-600 hover:text-green-800 hover:bg-green-50 text-xs"
+                                                                onClick={() => handleRestoreDeletedGroup(acc)}
+                                                            >
+                                                                재등록
                                                             </Button>
                                                         </td>
                                                     </tr>
@@ -2230,31 +2286,62 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </DialogContent>
             </Dialog>
 
-            {/* Edit Deleted Group Login ID Modal */}
+            {/* Edit Deleted Group Modal */}
             <Dialog open={isEditDeletedGroupOpen} onOpenChange={setIsEditDeletedGroupOpen}>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>삭제된 그룹 ID 수정</DialogTitle>
-                        <DialogDescription className="text-xs text-gray-500">중복되지 않는 새 그룹 ID를 입력하세요.</DialogDescription>
+                    <DialogHeader>
+                        <DialogTitle>삭제된 그룹 수정</DialogTitle>
+                        <DialogDescription className="text-xs text-gray-500">정보를 수정한 후 재등록 버튼으로 복원할 수 있습니다.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right text-sm">현재 ID</Label>
-                            <span className="col-span-3 text-sm font-mono text-gray-500">{editDeletedGroup?.login_id}</span>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="new_group_id" className="text-right text-sm">새 그룹 ID <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="del_login_id" className="text-right text-sm">그룹 ID <span className="text-red-500">*</span></Label>
                             <Input
-                                id="new_group_id"
-                                value={editDeletedGroupLoginId}
-                                onChange={(e) => setEditDeletedGroupLoginId(e.target.value)}
+                                id="del_login_id"
+                                value={editDeletedGroupForm.login_id}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, login_id: e.target.value }))}
                                 className="col-span-3"
                                 placeholder="예: TG003"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="del_payment_email" className="text-right text-sm">결제 계정</Label>
+                            <Input
+                                id="del_payment_email"
+                                value={editDeletedGroupForm.payment_email}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, payment_email: e.target.value }))}
+                                className="col-span-3"
+                                placeholder="payment@email.com"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="del_payment_day" className="text-right text-sm">결제일</Label>
+                            <Input
+                                id="del_payment_day"
+                                type="number" min="1" max="31"
+                                value={editDeletedGroupForm.payment_day}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, payment_day: parseInt(e.target.value) || 1 }))}
+                                className="col-span-3"
+                                placeholder="1~31"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="del_memo" className="text-right text-sm">메모</Label>
+                            <Input
+                                id="del_memo"
+                                value={editDeletedGroupForm.memo}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, memo: e.target.value }))}
+                                className="col-span-3"
                             />
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsEditDeletedGroupOpen(false)}>취소</Button>
-                        <Button onClick={handleEditDeletedGroupId} disabled={!editDeletedGroupLoginId.trim()}>수정 완료</Button>
+                        <Button variant="outline" className="text-green-700 border-green-300 hover:bg-green-50"
+                            onClick={handleEditAndRestoreDeletedGroup}
+                            disabled={!editDeletedGroupForm.login_id.trim()}
+                        >수정 후 재등록</Button>
+                        <Button onClick={handleEditDeletedGroup} disabled={!editDeletedGroupForm.login_id.trim()}>수정 완료</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
