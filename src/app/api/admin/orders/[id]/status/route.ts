@@ -31,18 +31,7 @@ export async function PUT(
         // If status is updated to 'completed', send email to buyer
         if (updates.assignment_status === 'completed') {
             try {
-                type OrderWithDetails = {
-                    buyer_email: string | null;
-                    buyer_name: string | null;
-                    products: { name: string } | { name: string }[] | null;
-                    order_accounts: {
-                        tidal_id: string | null;
-                        tidal_password: string | null;
-                        end_date: string | null;
-                    }[] | null;
-                };
-
-                const { data } = await supabaseAdmin
+                const { data: orderData } = await supabaseAdmin
                     .from('orders')
                     .select(`
                         buyer_email,
@@ -57,33 +46,84 @@ export async function PUT(
                     .eq('id', params.id)
                     .single();
 
-                const order = data as OrderWithDetails | null;
+                type OA = { tidal_id: string | null; tidal_password: string | null; end_date: string | null };
+                type TidalAcc = { login_pw: string | null };
+                type TA = { tidal_id: string | null; tidal_password: string | null; end_date: string | null; is_active: boolean | null; is_deleted: boolean | null; tidal_accounts: TidalAcc | TidalAcc[] | null };
+                type OrderRow = {
+                    buyer_email: string | null;
+                    buyer_name: string | null;
+                    products: { name: string } | { name: string }[] | null;
+                    order_accounts: OA[] | null;
+                };
 
-                if (order && order.buyer_email && order.order_accounts && order.order_accounts.length > 0) {
-                    const { sendAssignmentNotification } = await import('@/lib/email');
-                    const oa = order.order_accounts[0];
-                    const productName = Array.isArray(order.products)
-                        ? order.products[0]?.name
-                        : order.products?.name;
-
-                    const emailResult = await sendAssignmentNotification(order.buyer_email, {
-                        buyerName: order.buyer_name || '고객',
-                        productName: productName || '상품',
-                        tidalId: oa.tidal_id || '',
-                        tidalPw: oa.tidal_password || '',
-                        endDate: oa.end_date || ''
-                    });
-
-                    if (!emailResult.success) {
-                        console.error('Assignment email failed for order', params.id, ':', emailResult.error);
-                    }
-
-                    return NextResponse.json({
-                        success: true,
-                        emailSent: emailResult.success,
-                        emailError: emailResult.error
-                    });
+                const order = orderData as OrderRow | null;
+                if (!order?.buyer_email) {
+                    return NextResponse.json({ success: true, emailSent: false, emailError: 'No buyer email' });
                 }
+
+                const productName = Array.isArray(order.products)
+                    ? order.products[0]?.name
+                    : order.products?.name;
+                const buyerName = order.buyer_name || '고객';
+
+                // Try order_accounts first (legacy), then tidal_assignments (new system)
+                let tidalId = '';
+                let tidalPw = '';
+                let endDate = '';
+
+                const legacyOA = order.order_accounts?.[0];
+                if (legacyOA?.tidal_id) {
+                    tidalId = legacyOA.tidal_id;
+                    tidalPw = legacyOA.tidal_password || '';
+                    endDate = legacyOA.end_date || '';
+                } else {
+                    // Fetch from tidal_assignments
+                    const { data: taRows } = await supabaseAdmin
+                        .from('tidal_assignments')
+                        .select(`
+                            tidal_id,
+                            tidal_password,
+                            end_date,
+                            is_active,
+                            is_deleted,
+                            tidal_accounts:account_id ( login_pw )
+                        `)
+                        .eq('order_id', params.id)
+                        .not('is_deleted', 'is', true)
+                        .eq('is_active', true)
+                        .limit(1);
+
+                    const ta = taRows?.[0] as TA | undefined;
+                    if (ta?.tidal_id) {
+                        tidalId = ta.tidal_id;
+                        const acc = Array.isArray(ta.tidal_accounts) ? ta.tidal_accounts[0] : ta.tidal_accounts;
+                        tidalPw = ta.tidal_password || acc?.login_pw || '';
+                        endDate = ta.end_date || '';
+                    }
+                }
+
+                if (!tidalId) {
+                    return NextResponse.json({ success: true, emailSent: false, emailError: 'No assignment found' });
+                }
+
+                const { sendAssignmentNotification } = await import('@/lib/email');
+                const emailResult = await sendAssignmentNotification(order.buyer_email, {
+                    buyerName,
+                    productName: productName || '상품',
+                    tidalId,
+                    tidalPw,
+                    endDate
+                });
+
+                if (!emailResult.success) {
+                    console.error('Assignment email failed for order', params.id, ':', emailResult.error);
+                }
+
+                return NextResponse.json({
+                    success: true,
+                    emailSent: emailResult.success,
+                    emailError: emailResult.error
+                });
             } catch (notifyError) {
                 console.error('Failed to send assignment notification:', notifyError);
                 return NextResponse.json({
