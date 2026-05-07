@@ -216,9 +216,10 @@ export default function OrderHistoryPage() {
 
     const getOrderStatus = (order: Order) => {
         if (order.assignment_status === 'completed') return '작업완료';
-        if (order.assignment_status === 'assigned') return '배정완료'; // Linked
+        if (order.assignment_status === 'assigned') return '배정완료';
         if (order.payment_status === 'paid') return '입금확인';
-        return '주문신청'; // Pending payment
+        if (order.payment_status === 'not_paid') return '미입금';
+        return '주문신청';
     };
 
     const exportToExcel = () => {
@@ -505,6 +506,24 @@ export default function OrderHistoryPage() {
         }
     };
 
+    const handleMarkNotPaid = async (orderId: string) => {
+        if (isProcessing || !confirm('미입금 처리하시겠습니까?')) return;
+        setIsProcessing(true);
+        try {
+            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payment_status: 'not_paid' })
+            });
+            if (!res.ok) throw new Error('Update failed');
+            fetchOrders();
+        } catch {
+            alert('미입금 처리 실패');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handleRevertPayment = async (orderId: string) => {
         if (isProcessing || !confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
         setIsProcessing(true);
@@ -666,7 +685,8 @@ export default function OrderHistoryPage() {
                                 ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
                                     status === '배정완료' ? 'bg-blue-100 text-blue-800' :
                                         status === '입금확인' ? 'bg-green-100 text-green-800' :
-                                            'bg-yellow-100 text-yellow-800'}`}>
+                                            status === '미입금' ? 'bg-pink-100 text-pink-800' :
+                                                'bg-yellow-100 text-yellow-800'}`}>
                                 {status}
                             </span>
                         </div>
@@ -703,8 +723,13 @@ export default function OrderHistoryPage() {
                             </div>
                         </div>
                         <div className={styles.orderCardActions}>
-                            {status === '주문신청' && (
-                                <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                            {(status === '주문신청' || status === '미입금') && (
+                                <>
+                                    <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                    {status === '주문신청' && (
+                                        <Button className="flex-1" size="sm" style={{ backgroundColor: '#fce7f3', color: '#be185d', border: '1px solid #fbcfe8' }} onClick={() => handleMarkNotPaid(o.id)} disabled={isProcessing}>미입금</Button>
+                                    )}
+                                </>
                             )}
                             {status === '입금확인' && (
                                 <>
@@ -804,11 +829,12 @@ export default function OrderHistoryPage() {
                                 <td className="text-center">₩{o.amount?.toLocaleString()}</td>
                                 <td className="text-center">
                                     <div className="flex flex-col items-center">
-                                        <span className={`px-2 py-1 rounded text-xs 
+                                        <span className={`px-2 py-1 rounded text-xs
                                             ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
                                                 status === '배정완료' ? 'bg-blue-100 text-blue-800' :
                                                     status === '입금확인' ? 'bg-green-100 text-green-800' :
-                                                        'bg-yellow-100 text-yellow-800'}`}>
+                                                        status === '미입금' ? 'bg-pink-100 text-pink-800' :
+                                                            'bg-yellow-100 text-yellow-800'}`}>
                                             {status}
                                         </span>
                                     </div>
@@ -822,8 +848,13 @@ export default function OrderHistoryPage() {
                                 </td>
                                 <td className="text-center">
                                     <div className="flex flex-col gap-1 items-center">
-                                        {status === '주문신청' && (
-                                            <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                        {(status === '주문신청' || status === '미입금') && (
+                                            <>
+                                                <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                                {status === '주문신청' && (
+                                                    <Button size="sm" className="w-20 text-pink-700 border-pink-200 bg-pink-50 hover:bg-pink-100" variant="outline" onClick={() => handleMarkNotPaid(o.id)} disabled={isProcessing}>미입금</Button>
+                                                )}
+                                            </>
                                         )}
                                         {status === '입금확인' && (
                                             <>
