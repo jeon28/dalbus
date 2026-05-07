@@ -716,8 +716,9 @@ export default function OrderHistoryPage() {
                                     <span className={styles.priceInfo}>₩{o.amount?.toLocaleString()}</span>
                                 </div>
                                 {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
-                                    <div className="text-sm font-bold text-gray-800 bg-secondary px-2 py-1 rounded">
-                                        {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                    <div className="text-xs font-bold text-gray-800 bg-secondary px-2 py-1 rounded leading-tight">
+                                        <div className="text-gray-500 font-normal">{o.order_accounts[0].accounts?.login_id || 'ID미상'}</div>
+                                        <div>배정 {o.order_accounts[0].slot_number + 1}번</div>
                                     </div>
                                 )}
                             </div>
@@ -841,8 +842,9 @@ export default function OrderHistoryPage() {
                                 </td>
                                 <td className="text-center font-medium">
                                     {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
-                                        <div className="text-sm whitespace-nowrap">
-                                            {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                        <div className="text-xs leading-tight">
+                                            <div className="text-gray-400 font-normal truncate max-w-[120px] mx-auto">{o.order_accounts[0].accounts?.login_id || 'ID미상'}</div>
+                                            <div className="font-bold text-gray-700">배정 {o.order_accounts[0].slot_number + 1}번</div>
                                         </div>
                                     )}
                                 </td>
