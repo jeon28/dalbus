@@ -21,6 +21,7 @@ export interface User {
     phone?: string;
     birth_date?: string;
     role?: string;
+    signup_method?: string | null;
 }
 
 interface ServiceContextType {
@@ -118,7 +119,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     const fetchUserProfile = useCallback(async (userId: string) => {
         const { data: profile } = await supabase
             .from('profiles')
-            .select('name, email, phone, birth_date, role')
+            .select('name, email, phone, birth_date, role, signup_method')
             .eq('id', userId)
             .single();
 
@@ -141,7 +142,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     email: profile?.email || session.user.email || '',
                     phone: profile?.phone || '',
                     birth_date: profile?.birth_date || session.user.user_metadata.birthdate || '',
-                    role: profile?.role
+                    role: profile?.role,
+                    signup_method: profile?.signup_method ?? null,
                 };
                 safeSetUser(userObj);
                 localStorage.setItem('dalbus-user', JSON.stringify(userObj));
@@ -177,7 +179,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 email: profile.email || user.email,
                 phone: profile.phone || '',
                 birth_date: profile.birth_date || '',
-                role: profile.role
+                role: profile.role,
+                signup_method: profile.signup_method ?? user.signup_method,
             };
             safeSetUser(userObj);
             localStorage.setItem('dalbus-user', JSON.stringify(userObj));
@@ -193,11 +196,10 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         const isCompletePage = pathname === '/signup/complete';
 
         if (user && !isPublicPath && !isCompletePage) {
-            // Check if profile is incomplete
             const isProfileIncomplete = !user.phone || !user.birth_date;
-            
-            if (isProfileIncomplete) {
-                console.log('ServiceContext: Redirecting to profile completion');
+            const isSocialUser = user.signup_method && user.signup_method !== 'email';
+
+            if (isProfileIncomplete && isSocialUser) {
                 router.replace('/signup/complete');
             }
         }
