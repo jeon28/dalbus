@@ -5,7 +5,7 @@ export const tidalService = {
   async getAllAccounts(options: { showInactive?: boolean; showDeleted?: boolean } = {}) {
     const { showInactive, showDeleted } = options;
     
-    const query = supabaseAdmin
+    let query = supabaseAdmin
       .from('tidal_accounts')
       .select(`
         *,
@@ -25,8 +25,13 @@ export const tidalService = {
           )
         )
       `)
-      .neq('status', 'disabled')
       .order('created_at', { ascending: false });
+
+    if (showDeleted) {
+      query = query.eq('status', 'deleted');
+    } else {
+      query = query.neq('status', 'disabled').neq('status', 'deleted');
+    }
 
     const { data, error } = await query;
     if (error) throw error;
