@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
             profiles(name, email, phone),
             products(name),
             product_plans(duration_months),
-            order_accounts(id, account_id, slot_number, tidal_id, accounts(login_id))
+            order_accounts(id, account_id, slot_number, tidal_id, accounts(login_id)),
+            tidal_assignments(id, slot_number, tidal_id, is_active, is_deleted, tidal_accounts:account_id(login_id))
         `, { count: 'exact' });
 
     // Status filter logic

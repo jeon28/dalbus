@@ -58,6 +58,7 @@ interface Order {
     assignment_status?: string;
     payment_status?: string;
     order_accounts?: OrderAccount[];
+    tidal_assignments?: TidalAssignment[];
     related_order_id?: string;
     depositor_name?: string;
     end_date?: string;
@@ -75,6 +76,15 @@ interface OrderAccount {
     accounts?: Account;
     orders?: Order;
     is_active?: boolean;
+}
+
+interface TidalAssignment {
+    id: string;
+    slot_number: number;
+    tidal_id?: string;
+    is_active?: boolean;
+    is_deleted?: boolean;
+    tidal_accounts?: { login_id: string } | { login_id: string }[];
 }
 
 interface Account {
@@ -566,6 +576,17 @@ export default function OrderHistoryPage() {
         }
     };
 
+    const getAssignmentLabel = (o: Order): string | null => {
+        const oa = o.order_accounts?.[0];
+        if (oa?.accounts?.login_id) return `${oa.accounts.login_id}-${oa.slot_number + 1}`;
+        const ta = o.tidal_assignments?.find(t => !t.is_deleted && t.is_active !== false);
+        if (ta) {
+            const acc = Array.isArray(ta.tidal_accounts) ? ta.tidal_accounts[0] : ta.tidal_accounts;
+            if (acc?.login_id) return `${acc.login_id}-${ta.slot_number + 1}`;
+        }
+        return null;
+    };
+
     const markAsCompleted = async (orderId: string) => {
         if (isProcessing || !confirm('작업완료 하시겠습니까 ?')) return;
         setIsProcessing(true);
@@ -715,9 +736,9 @@ export default function OrderHistoryPage() {
                                     <span className="text-[10px] text-gray-400">기간: {o.product_plans?.duration_months || '-'}개월</span>
                                     <span className={styles.priceInfo}>₩{o.amount?.toLocaleString()}</span>
                                 </div>
-                                {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                {(status === '배정완료' || status === '작업완료') && getAssignmentLabel(o) && (
                                     <div className="text-sm font-bold text-gray-800 bg-secondary px-2 py-1 rounded">
-                                        {o.order_accounts[0].accounts?.login_id || 'ID미상'}-{o.order_accounts[0].slot_number + 1}
+                                        {getAssignmentLabel(o)}
                                     </div>
                                 )}
                             </div>
@@ -743,7 +764,10 @@ export default function OrderHistoryPage() {
                                     <Button size="sm" variant="ghost" className="px-2" onClick={() => handleUnassign(o)} disabled={isProcessing}>취소</Button>
                                 </>
                             )}
-                            {o.order_accounts?.length === 0 && (
+                            {status === '작업완료' && (
+                                <Button className="flex-1 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일 재발송</Button>
+                            )}
+                            {o.order_accounts?.length === 0 && !o.tidal_assignments?.length && (
                                 <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                             )}
                         </div>
@@ -840,9 +864,9 @@ export default function OrderHistoryPage() {
                                     </div>
                                 </td>
                                 <td className="text-center font-medium">
-                                    {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                    {(status === '배정완료' || status === '작업완료') && getAssignmentLabel(o) && (
                                         <div className="text-sm font-bold text-gray-700">
-                                            {o.order_accounts[0].accounts?.login_id || 'ID미상'}-{o.order_accounts[0].slot_number + 1}
+                                            {getAssignmentLabel(o)}
                                         </div>
                                     )}
                                 </td>
@@ -868,7 +892,10 @@ export default function OrderHistoryPage() {
                                                 <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)} disabled={isProcessing}>배정취소</Button>
                                             </>
                                         )}
-                                        {o.order_accounts?.length === 0 && (
+                                        {status === '작업완료' && (
+                                            <Button size="sm" variant="outline" className="w-20 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일재발송</Button>
+                                        )}
+                                        {o.order_accounts?.length === 0 && !o.tidal_assignments?.length && (
                                             <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                                         )}
                                     </div>
