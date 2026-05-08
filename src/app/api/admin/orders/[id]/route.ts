@@ -60,6 +60,11 @@ export async function DELETE(
         }
 
         if (hardDelete) {
+            // Nullify order_id on tidal_assignments (FK constraint) and remove order_accounts before deleting order
+            await Promise.all([
+                supabaseAdmin.from('tidal_assignments').update({ order_id: null }).eq('order_id', orderId),
+                supabaseAdmin.from('order_accounts').delete().eq('order_id', orderId),
+            ]);
             const { error } = await supabaseAdmin.from('orders').delete().eq('id', orderId);
             if (error) throw error;
         } else {
