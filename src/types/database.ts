@@ -526,12 +526,13 @@ export interface Database {
         Row: {
           amount: number
           assigned_at: string | null
-          assignment_status: 'waiting' | 'assigned' | 'expired' | 'replaced'
+          assignment_status: 'waiting' | 'assigned' | 'expired' | 'replaced' | 'completed'
           created_at: string
           id: string
+          is_deleted: boolean
           order_number: string
           paid_at: string | null
-          payment_status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded'
+          payment_status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'not_paid'
           plan_id: string
           portone_payment_id: string | null
           product_id: string
@@ -542,12 +543,13 @@ export interface Database {
         Insert: {
           amount: number
           assigned_at?: string | null
-          assignment_status?: 'waiting' | 'assigned' | 'expired' | 'replaced'
+          assignment_status?: 'waiting' | 'assigned' | 'expired' | 'replaced' | 'completed'
           created_at?: string
           id?: string
+          is_deleted?: boolean
           order_number?: string
           paid_at?: string | null
-          payment_status?: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded'
+          payment_status?: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'not_paid'
           plan_id: string
           portone_payment_id?: string | null
           product_id: string
@@ -558,12 +560,13 @@ export interface Database {
         Update: {
           amount?: number
           assigned_at?: string | null
-          assignment_status?: 'waiting' | 'assigned' | 'expired' | 'replaced'
+          assignment_status?: 'waiting' | 'assigned' | 'expired' | 'replaced' | 'completed'
           created_at?: string
           id?: string
+          is_deleted?: boolean
           order_number?: string
           paid_at?: string | null
-          payment_status?: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded'
+          payment_status?: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'not_paid'
           plan_id?: string
           portone_payment_id?: string | null
           product_id?: string

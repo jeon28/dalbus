@@ -96,7 +96,8 @@ export async function DELETE(req: NextRequest) {
             .select('id')
             .eq('payment_status', 'pending')
             .neq('assignment_status', 'assigned')
-            .neq('assignment_status', 'completed');
+            .neq('assignment_status', 'completed')
+            .neq('is_deleted', true);
 
         if (fetchError) throw fetchError;
         if (!pendingOrders || pendingOrders.length === 0) {
