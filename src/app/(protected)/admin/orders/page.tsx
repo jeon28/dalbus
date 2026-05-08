@@ -767,29 +767,29 @@ export default function OrderHistoryPage() {
             <table className={styles.table}>
                 <thead>
                     <tr>
-                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '110px' }}>
                             <div className="flex items-center justify-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
-                        <th className="text-center" style={{ width: '60px' }}>구분</th>
-                        <th className="text-center" style={{ width: '70px' }}>회원</th>
+                        <th className="text-center" style={{ width: '55px' }}>구분</th>
+                        <th className="text-center" style={{ width: '65px' }}>회원</th>
                         <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '90px' }}>
                             <div className="flex items-center justify-center">고객명 {getSortIcon('name')}</div>
                         </th>
-                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '110px' }}>
+                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '120px' }}>
                             <div className="flex items-center justify-center">연락처 {getSortIcon('phone')}</div>
                         </th>
-                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '130px' }}>
+                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '150px' }}>
                             <div className="flex items-center justify-center">이메일 {getSortIcon('email')}</div>
                         </th>
-                        <th className="text-center" style={{ width: '40px' }}>기간</th>
-                        <th className="text-center" style={{ width: '90px' }}>금액</th>
-                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                        <th className="text-center" style={{ width: '50px' }}>기간</th>
+                        <th className="text-center" style={{ width: '85px' }}>금액</th>
+                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '90px' }}>
                             <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
                         </th>
-                        <th className="text-center" style={{ width: '120px' }}>
+                        <th className="text-center" style={{ width: '90px' }}>
                             <div className="flex items-center justify-center">배정번호</div>
                         </th>
-                        <th className="text-center" style={{ width: '80px' }}>
+                        <th className="text-center" style={{ width: '95px' }}>
                             <div className="flex items-center justify-center">관리</div>
                         </th>
                     </tr>
