@@ -517,23 +517,6 @@ export default function OrderHistoryPage() {
         }
     };
 
-    const handleMarkNotPaid = async (orderId: string) => {
-        if (isProcessing || !confirm('미입금 처리하시겠습니까?')) return;
-        setIsProcessing(true);
-        try {
-            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payment_status: 'not_paid' })
-            });
-            if (!res.ok) throw new Error('Update failed');
-            fetchOrders();
-        } catch {
-            alert('미입금 처리 실패');
-        } finally {
-            setIsProcessing(false);
-        }
-    };
 
     const handleRevertPayment = async (orderId: string) => {
         if (isProcessing || !confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
@@ -655,10 +638,10 @@ export default function OrderHistoryPage() {
     const handleDeleteUnpaidOrders = async () => {
         const unpaidCount = orders.filter(o => getOrderStatus(o) === '주문신청').length;
         if (unpaidCount === 0) {
-            alert('삭제할 미입금 주문이 없습니다.');
+            alert('삭제할 주문신청 주문이 없습니다.');
             return;
         }
-        if (isProcessing || !confirm(`미입금(주문신청) 상태의 주문 ${unpaidCount}건을 삭제하시겠습니까?\n배정된 계정이 없는 주문만 삭제됩니다.`)) return;
+        if (isProcessing || !confirm(`주문신청 상태의 주문 ${unpaidCount}건을 삭제하시겠습니까?\n배정된 계정이 없는 주문만 삭제됩니다.`)) return;
 
         setIsProcessing(true);
         try {

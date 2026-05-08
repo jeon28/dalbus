@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         } else if (status === '입금확인') {
             query = query.eq('payment_status', 'paid').neq('assignment_status', 'assigned').neq('assignment_status', 'completed');
         } else if (status === '주문신청') {
-            query = query.in('payment_status', ['pending', 'not_paid']);
+            query = query.eq('payment_status', 'pending');
         }
     }
 
@@ -94,7 +94,7 @@ export async function DELETE(req: NextRequest) {
         const { data: pendingOrders, error: fetchError } = await supabaseAdmin
             .from('orders')
             .select('id')
-            .in('payment_status', ['pending', 'not_paid'])
+            .eq('payment_status', 'pending')
             .neq('assignment_status', 'assigned')
             .neq('assignment_status', 'completed');
 
