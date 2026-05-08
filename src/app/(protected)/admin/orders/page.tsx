@@ -60,6 +60,7 @@ interface Order {
     order_accounts?: OrderAccount[];
     tidal_assignments?: TidalAssignment[];
     related_order_id?: string;
+    is_deleted?: boolean;
     depositor_name?: string;
     end_date?: string;
 }
@@ -112,11 +113,6 @@ export default function OrderHistoryPage() {
 
     const statuses = [
         {
-            value: "미입금",
-            label: "미입금",
-            icon: Circle,
-        },
-        {
             value: "주문신청",
             label: "주문신청",
             icon: Circle,
@@ -135,6 +131,11 @@ export default function OrderHistoryPage() {
             value: "작업완료",
             label: "작업완료",
             icon: HelpCircle,
+        },
+        {
+            value: "삭제됨",
+            label: "삭제됨",
+            icon: Trash2,
         },
     ]
 
@@ -225,10 +226,10 @@ export default function OrderHistoryPage() {
     }, [isAdmin, isHydrated, fetchOrders, router]);
 
     const getOrderStatus = (order: Order) => {
+        if (order.is_deleted) return '삭제됨';
         if (order.assignment_status === 'completed') return '작업완료';
         if (order.assignment_status === 'assigned') return '배정완료';
         if (order.payment_status === 'paid') return '입금확인';
-        if (order.payment_status === 'not_paid') return '미입금';
         return '주문신청';
     };
 
@@ -618,31 +619,34 @@ export default function OrderHistoryPage() {
     };
 
     const handleDeleteOrder = async (order: Order) => {
-        if (order.order_accounts && order.order_accounts.length > 0) {
-            alert('배정된 계정이 있는 주문은 삭제할 수 없습니다. 먼저 배정 취소를 해주세요.');
-            return;
-        }
-
-        if (isProcessing || !confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'}) 내역을 삭제하시겠습니까?`)) {
-            return;
-        }
-
+        if (isProcessing || !confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'})을 삭제하시겠습니까?\n삭제된 주문은 [삭제됨] 필터에서 확인할 수 있습니다.`)) return;
         setIsProcessing(true);
         try {
-            const res = await apiFetch(`/api/admin/orders/${order.id}`, {
-                method: 'DELETE'
-            });
-
+            const res = await apiFetch(`/api/admin/orders/${order.id}`, { method: 'DELETE' });
             if (!res.ok) {
                 const data = await res.json();
                 throw new Error(data.error || '삭제 실패');
             }
-
-            alert('삭제되었습니다.');
             fetchOrders();
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-            alert(message);
+            alert(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleHardDeleteOrder = async (order: Order) => {
+        if (isProcessing || !confirm(`주문번호 ${order.order_number}을 완전 삭제하시겠습니까?\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) return;
+        setIsProcessing(true);
+        try {
+            const res = await apiFetch(`/api/admin/orders/${order.id}?hard=true`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || '완전삭제 실패');
+            }
+            fetchOrders();
+        } catch (error: unknown) {
+            alert(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
         } finally {
             setIsProcessing(false);
         }
@@ -706,7 +710,7 @@ export default function OrderHistoryPage() {
                                 ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
                                     status === '배정완료' ? 'bg-blue-100 text-blue-800' :
                                         status === '입금확인' ? 'bg-green-100 text-green-800' :
-                                            status === '미입금' ? 'bg-pink-100 text-pink-800' :
+                                            status === '삭제됨' ? 'bg-red-100 text-red-700' :
                                                 'bg-yellow-100 text-yellow-800'}`}>
                                 {status}
                             </span>
@@ -744,12 +748,10 @@ export default function OrderHistoryPage() {
                             </div>
                         </div>
                         <div className={styles.orderCardActions}>
-                            {(status === '주문신청' || status === '미입금') && (
+                            {status === '주문신청' && (
                                 <>
                                     <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
-                                    {status === '주문신청' && (
-                                        <Button className="flex-1" size="sm" style={{ backgroundColor: '#fce7f3', color: '#be185d', border: '1px solid #fbcfe8' }} onClick={() => handleMarkNotPaid(o.id)} disabled={isProcessing}>미입금</Button>
-                                    )}
+                                    <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                                 </>
                             )}
                             {status === '입금확인' && (
@@ -767,8 +769,8 @@ export default function OrderHistoryPage() {
                             {status === '작업완료' && (
                                 <Button className="flex-1 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일 재발송</Button>
                             )}
-                            {o.order_accounts?.length === 0 && !o.tidal_assignments?.length && (
-                                <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                            {status === '삭제됨' && (
+                                <Button className="flex-1 text-xs text-red-600 border-red-200 hover:bg-red-50" size="sm" variant="outline" onClick={() => handleHardDeleteOrder(o)} disabled={isProcessing}>완전삭제</Button>
                             )}
                         </div>
                     </div>
@@ -857,7 +859,7 @@ export default function OrderHistoryPage() {
                                             ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
                                                 status === '배정완료' ? 'bg-blue-100 text-blue-800' :
                                                     status === '입금확인' ? 'bg-green-100 text-green-800' :
-                                                        status === '미입금' ? 'bg-pink-100 text-pink-800' :
+                                                        status === '삭제됨' ? 'bg-red-100 text-red-700' :
                                                             'bg-yellow-100 text-yellow-800'}`}>
                                             {status}
                                         </span>
@@ -872,12 +874,10 @@ export default function OrderHistoryPage() {
                                 </td>
                                 <td className="text-center">
                                     <div className="flex flex-col gap-1 items-center">
-                                        {(status === '주문신청' || status === '미입금') && (
+                                        {status === '주문신청' && (
                                             <>
                                                 <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
-                                                {status === '주문신청' && (
-                                                    <Button size="sm" className="w-20 text-pink-700 border-pink-200 bg-pink-50 hover:bg-pink-100" variant="outline" onClick={() => handleMarkNotPaid(o.id)} disabled={isProcessing}>미입금</Button>
-                                                )}
+                                                <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                                             </>
                                         )}
                                         {status === '입금확인' && (
@@ -895,8 +895,8 @@ export default function OrderHistoryPage() {
                                         {status === '작업완료' && (
                                             <Button size="sm" variant="outline" className="w-20 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일재발송</Button>
                                         )}
-                                        {o.order_accounts?.length === 0 && !o.tidal_assignments?.length && (
-                                            <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                                        {status === '삭제됨' && (
+                                            <Button size="sm" variant="outline" className="w-20 text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleHardDeleteOrder(o)} disabled={isProcessing}>완전삭제</Button>
                                         )}
                                     </div>
                                 </td>
@@ -934,10 +934,6 @@ export default function OrderHistoryPage() {
                             <Button onClick={exportToExcel} variant="outline" size="sm" className="shrink-0 h-9">
                                 <Download className="mr-1 h-4 w-4" />
                                 <span className="hidden sm:inline">엑셀</span>
-                            </Button>
-                            <Button onClick={handleDeleteUnpaidOrders} variant="outline" size="sm" className="shrink-0 h-9 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600" disabled={isProcessing}>
-                                <Trash2 className="mr-1 h-4 w-4" />
-                                <span className="hidden sm:inline">미입금 삭제</span>
                             </Button>
                         </div>
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">

@@ -31,17 +31,20 @@ export async function GET(req: NextRequest) {
         `, { count: 'exact' });
 
     // Status filter logic
-    if (status) {
+    if (status === '삭제됨') {
+        query = query.eq('is_deleted', true);
+    } else {
+        // Always exclude soft-deleted orders unless explicitly requesting deleted view
+        query = query.neq('is_deleted', true);
+
         if (status === '작업완료') {
             query = query.eq('assignment_status', 'completed');
         } else if (status === '배정완료') {
             query = query.eq('assignment_status', 'assigned');
         } else if (status === '입금확인') {
             query = query.eq('payment_status', 'paid').neq('assignment_status', 'assigned').neq('assignment_status', 'completed');
-        } else if (status === '미입금') {
-            query = query.eq('payment_status', 'not_paid');
         } else if (status === '주문신청') {
-            query = query.eq('payment_status', 'pending');
+            query = query.in('payment_status', ['pending', 'not_paid']);
         }
     }
 
