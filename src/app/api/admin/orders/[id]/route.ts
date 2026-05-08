@@ -42,13 +42,17 @@ export async function DELETE(
     const hardDelete = url.searchParams.get('hard') === 'true';
 
     try {
-        // Check for active assignments (both legacy and tidal)
-        const [{ data: oa }, { data: ta }] = await Promise.all([
-            supabaseAdmin.from('order_accounts').select('id').eq('order_id', orderId),
+        // Check for active assignments
+        const [{ data: order }, { data: ta }] = await Promise.all([
+            supabaseAdmin.from('orders').select('assignment_status').eq('id', orderId).single(),
             supabaseAdmin.from('tidal_assignments').select('id').eq('order_id', orderId).not('is_deleted', 'is', true).eq('is_active', true),
         ]);
 
-        if ((oa && oa.length > 0) || (ta && ta.length > 0)) {
+        const hasActiveAssignment =
+            (order?.assignment_status === 'assigned' || order?.assignment_status === 'completed') ||
+            (ta && ta.length > 0);
+
+        if (hasActiveAssignment) {
             return NextResponse.json(
                 { error: '배정된 계정이 있는 주문은 삭제할 수 없습니다. 먼저 배정 취소를 해주세요.' },
                 { status: 400 }
