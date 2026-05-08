@@ -37,6 +37,24 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    // Block deletion if active (non-soft-deleted) orders reference this plan
+    const { data: activeOrders } = await supabaseAdmin
+        .from('orders')
+        .select('id')
+        .eq('plan_id', id)
+        .neq('is_deleted', true)
+        .limit(1);
+
+    if (activeOrders && activeOrders.length > 0) {
+        return NextResponse.json(
+            { error: '주문이 존재하는 요금제는 삭제할 수 없습니다. 주문내역에서 먼저 삭제 후 시도하세요.' },
+            { status: 400 }
+        );
+    }
+
+    // DB FK is ON DELETE SET NULL — soft-deleted orders referencing this plan
+    // will have plan_id automatically nullified by the database on delete.
     const { error } = await supabaseAdmin
         .from('product_plans')
         .delete()

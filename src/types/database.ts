@@ -533,7 +533,7 @@ export interface Database {
           order_number: string
           paid_at: string | null
           payment_status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'not_paid'
-          plan_id: string
+          plan_id: string | null
           portone_payment_id: string | null
           product_id: string
           user_id: string
@@ -550,7 +550,7 @@ export interface Database {
           order_number?: string
           paid_at?: string | null
           payment_status?: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'not_paid'
-          plan_id: string
+          plan_id?: string | null
           portone_payment_id?: string | null
           product_id: string
           user_id: string
@@ -567,7 +567,7 @@ export interface Database {
           order_number?: string
           paid_at?: string | null
           payment_status?: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'not_paid'
-          plan_id?: string
+          plan_id?: string | null
           portone_payment_id?: string | null
           product_id?: string
           user_id?: string
