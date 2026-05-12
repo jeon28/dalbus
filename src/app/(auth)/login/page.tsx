@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
@@ -13,6 +13,15 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+
+    // 이미 로그인된 경우 홈으로 리다이렉트
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                window.location.replace('/');
+            }
+        });
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -95,7 +104,7 @@ export default function LoginPage() {
                 provider,
                 options: {
                     redirectTo: `${window.location.origin}/signup/complete`,
-                    queryParams: provider === 'google' ? { prompt: 'select_account' } : undefined,
+                    queryParams: provider === 'google' ? { prompt: 'select_account' } : { prompt: 'login' },
                 }
             });
             if (error) throw error;
