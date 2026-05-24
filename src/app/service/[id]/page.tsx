@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/lib/supabase';
 import { addDays, format, parseISO } from 'date-fns';
+import DOMPurify from 'dompurify';
+import { toast } from 'sonner';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -24,13 +27,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         price: number;
         duration_months: number;
         discount_rate: number;
-    }
-
-    interface BankAccount {
-        id: string;
-        bank_name: string;
-        account_number: string;
-        account_holder: string;
     }
 
     interface Product {
@@ -67,11 +63,9 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
     const [product, setProduct] = useState<Product | null>(null);
     const [plans, setPlans] = useState<Plan[]>([]);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
     const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [selectedBankId, setSelectedBankId] = useState('');
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
     const [selectedOrder, setSelectedOrder] = useState<ExtensionOrder | null>(null);
     const [lookupLoading, setLookupLoading] = useState(false);
@@ -119,15 +113,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     }
                 }
 
-                // Fetch bank accounts
-                const bankRes = await apiFetch('/api/public/banks');
-                if (bankRes.ok) {
-                    const banksData = await bankRes.json();
-                    setBankAccounts(banksData);
-                    if (banksData.length > 0) {
-                        setSelectedBankId(banksData[0].id);
-                    }
-                }
             } catch (err) {
                 console.error('Failed to fetch product data:', err);
             }
@@ -203,7 +188,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
     const handleLookup = useCallback(async () => {
         if (!guestInfo.tidalId) {
-            alert('Tidal ID를 입력해주세요.');
+            toast.error('Tidal ID를 입력해주세요.');
             return;
         }
 
@@ -245,21 +230,21 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!guestInfo.name || !guestInfo.phone || !guestInfo.email || !guestInfo.depositor) {
-            alert('주문 정보를 모두 입력해주세요.');
+            toast.error('주문 정보를 모두 입력해주세요.');
             return;
         }
         if (!emailRegex.test(guestInfo.email)) {
-            alert('올바른 이메일 형식이 아닙니다. (예: name@example.com)');
+            toast.error('올바른 이메일 형식이 아닙니다. (예: name@example.com)');
             return;
         }
         if (!user && (!agreements.privacy || !agreements.terms)) {
-            alert('필수 약관에 동의해주세요.');
+            toast.error('필수 약관에 동의해주세요.');
             return;
         }
 
         const selectedPlan = plans.find(p => p.duration_months === selectedPeriod);
         if (!selectedPlan) {
-            alert('선택한 기간에 해당하는 요금제 정보를 찾을 수 없습니다.');
+            toast.error('선택한 기간에 해당하는 요금제 정보를 찾을 수 없습니다.');
             return;
         }
 
@@ -302,34 +287,28 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             if (!response.ok || result.error) {
                 const errorMsg = result.error || 'Failed to create order';
                 console.error('Error creating order:', errorMsg);
-                alert('주문 생성 실패: ' + errorMsg);
+                toast.error('주문 생성 실패: ' + errorMsg);
                 setLoading(false);
             } else {
-                const selectedBank = bankAccounts.find(b => b.id === selectedBankId);
-                const bankStr = selectedBank ? `${selectedBank.bank_name} ${selectedBank.account_number} (${selectedBank.account_holder})` : '';
-
-                const params = new URLSearchParams({
-                    service: product.name,
-                    price: amount.toString(),
-                    period: selectedPeriod.toString(),
-                    depositor: guestInfo.depositor,
-                    bank: bankStr,
-                    name: guestInfo.name,
-                    phone: guestInfo.phone,
-                    email: guestInfo.email
-                });
-
-                router.push(`/public/checkout/success?${params.toString()}`);
+                // 주문 ID(UUID) 기반으로 결제 안내 페이지 이동
+                // 계좌·매칭코드·만료시간은 success 페이지에서 API로 재조회 (sessionStorage 평문 저장 X)
+                const orderId = result?.order?.id;
+                if (!orderId) {
+                    toast.error('주문 처리 중 오류가 발생했습니다. (주문 ID 누락)');
+                    setLoading(false);
+                    return;
+                }
+                router.push(`/public/checkout/success?orderId=${encodeURIComponent(orderId)}`);
             }
         } catch (err) {
             console.error('Order creation process failed:', err);
-            alert('주문 처리 중 오류가 발생했습니다.');
+            toast.error('주문 처리 중 오류가 발생했습니다.');
             setLoading(false);
         }
     };
 
 
-    if (!product) return <div className="container py-20 text-center">Loading...</div>;
+    if (!product) return <PageLoading />;
 
     const handleSelectOrderForExtension = (order: ExtensionOrder) => {
         setSelectedOrder(order);
@@ -369,7 +348,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 {(product.detail_content || product.description) && (
                     <div
                         className="glass p-6 rounded-xl mb-8 animate-fade-in text-sm leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: product.detail_content || product.description || '' }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.detail_content || product.description || '') }}
                     />
                 )}
 
@@ -620,20 +599,16 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             </div>
                         </RadioGroup>
 
-                        <select
-                            className="w-full p-3 rounded-md border border-input bg-background mb-3 text-sm focus:ring-2 focus:ring-primary outline-none"
-                            value={selectedBankId}
-                            onChange={(e) => setSelectedBankId(e.target.value)}
-                        >
-                            {bankAccounts.map(bank => (
-                                <option key={bank.id} value={bank.id}>
-                                    {bank.bank_name} {bank.account_number} 예금주: {bank.account_holder}
-                                </option>
-                            ))}
-                            {bankAccounts.length === 0 && (
-                                <option disabled>등록된 결제 계좌가 없습니다.</option>
-                            )}
-                        </select>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                            <p className="text-sm font-semibold text-blue-900 mb-1">
+                                결제하기 버튼을 누르시면 입금 계좌를 안내해드립니다
+                            </p>
+                            <ul className="text-xs text-blue-700 space-y-0.5 list-disc pl-4">
+                                <li>주문별 고유 입금 코드가 발급됩니다</li>
+                                <li>안내된 계좌로 정확한 금액을 입금해주세요</li>
+                                <li>48시간 내 미입금 시 주문이 자동 취소됩니다</li>
+                            </ul>
+                        </div>
 
                         <Input
                             placeholder="입금자명을 입력해 주세요. (필수)"

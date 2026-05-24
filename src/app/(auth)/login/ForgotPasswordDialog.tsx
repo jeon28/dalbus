@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { toast } from 'sonner';
 
 export function ForgotPasswordDialog() {
     const [open, setOpen] = useState(false);
@@ -118,7 +119,7 @@ export function ForgotPasswordDialog() {
             });
             const data = await res.json();
             if (res.ok) {
-                alert('비밀번호가 성공적으로 변경되었습니다. 다시 로그인해 주세요.');
+                toast.success('비밀번호가 성공적으로 변경되었습니다. 다시 로그인해 주세요.');
                 setOpen(false);
                 resetState();
             } else {

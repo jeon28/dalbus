@@ -41,7 +41,7 @@ export default function PriceComparison() {
                                 <div className="grid place-items-center rounded-full bg-primary p-3 transition-transform group-hover:scale-110">
                                     <Check className="h-6 w-6 text-primary-foreground" />
                                 </div>
-                                <CardTitle className="text-xl font-bold text-primary">달버스 (Dalbus)</CardTitle>
+                                <CardTitle className="text-xl font-bold text-primary">달버스</CardTitle>
                                 <div className="text-4xl font-bold text-primary">₩4,900<span className="text-sm font-normal text-primary/70">/월</span></div>
                                 <p className="text-xs text-muted-foreground">6개월권 약 ₩30,000</p>
                             </CardHeader>

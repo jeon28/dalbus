@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import styles from './mypage.module.css';
+import { toast } from 'sonner';
+import { PageLoading } from '@/components/ui/PageLoading';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface UserSubscription {
     service_id: string;
@@ -206,6 +209,10 @@ export default function MyPage() {
     }, [isHydrated, user, user?.id, fetchData]); // Only depend on user.id to avoid reference-related loops
 
     const [isEditing, setIsEditing] = useState(false);
+    const [visiblePws, setVisiblePws] = useState<Record<string, boolean>>({});
+
+    const togglePw = (orderId: string) =>
+        setVisiblePws(prev => ({ ...prev, [orderId]: !prev[orderId] }));
 
     const handleUpdateProfile = async () => {
         if (!user) return;
@@ -224,10 +231,10 @@ export default function MyPage() {
             if (error) throw error;
             await refreshUser();
             setIsEditing(false);
-            alert('개인정보가 수정되었습니다.');
+            toast.success('개인정보가 수정되었습니다.');
         } catch (error) {
             console.error('Profile update error:', error);
-            alert('수정 중 오류가 발생했습니다.');
+            toast.error('수정 중 오류가 발생했습니다.');
         } finally {
             setUpdating(false);
         }
@@ -252,7 +259,7 @@ export default function MyPage() {
         }
     }, [isHydrated, user, router]);
 
-    if (!isHydrated || loading) return <div className="container py-20 text-center">Loading...</div>;
+    if (!isHydrated || loading) return <PageLoading />;
 
     if (!user) return null;
 
@@ -389,9 +396,23 @@ export default function MyPage() {
                                             <span className="text-xs text-muted-foreground">ID:</span>
                                             <span className="font-bold">{sub.account_id}</span>
                                         </div>
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between items-center">
                                             <span className="text-xs text-muted-foreground">PW:</span>
-                                            <span className="font-bold">{sub.account_pw}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-bold tracking-widest">
+                                                    {visiblePws[sub.order_id] ? sub.account_pw : '●●●●●●'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => togglePw(sub.order_id)}
+                                                    className="text-muted-foreground hover:text-foreground transition-colors"
+                                                    aria-label={visiblePws[sub.order_id] ? '비밀번호 숨기기' : '비밀번호 보기'}
+                                                >
+                                                    {visiblePws[sub.order_id]
+                                                        ? <EyeOff className="h-3.5 w-3.5" />
+                                                        : <Eye className="h-3.5 w-3.5" />}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                     <Button

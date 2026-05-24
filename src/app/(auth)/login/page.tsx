@@ -7,6 +7,7 @@ import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import styles from './auth.module.css';
 import { ForgotPasswordDialog } from './ForgotPasswordDialog';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
     const [id, setId] = useState('');
@@ -27,7 +28,7 @@ export default function LoginPage() {
         e.preventDefault();
 
         if (!id || !password) {
-            alert('아이디(이메일)와 비밀번호를 입력해주세요.');
+            toast.error('아이디(이메일)와 비밀번호를 입력해주세요.');
             return;
         }
 
@@ -49,11 +50,11 @@ export default function LoginPage() {
             if (!response.ok) {
                 console.warn('Login: API error', data.error);
                 if (data.error === 'USER_NOT_FOUND') {
-                    alert('❌ 가입되지 않은 이메일입니다.\n\n회원가입을 먼저 진행해주세요.');
+                    toast.error('가입되지 않은 이메일입니다. 회원가입을 먼저 진행해주세요.');
                 } else if (data.error === 'INVALID_PASSWORD') {
-                    alert('❌ 비밀번호가 일치하지 않습니다.\n\n비밀번호를 다시 확인해주세요.');
+                    toast.error('비밀번호가 일치하지 않습니다. 다시 확인해주세요.');
                 } else {
-                    alert(`❌ 로그인 실패: ${data.message || data.error || '알 수 없는 오류'}`);
+                    toast.error(`로그인 실패: ${data.message || data.error || '알 수 없는 오류'}`);
                 }
                 setIsLoading(false);
                 return;
@@ -81,7 +82,7 @@ export default function LoginPage() {
                 window.location.replace(targetUrl);
             } else {
                 console.warn('Login: No session in response');
-                alert('로그인 성공했으나 세션 정보가 없습니다.');
+                toast.error('로그인 성공했으나 세션 정보가 없습니다.');
                 setIsLoading(false);
             }
 
@@ -92,7 +93,7 @@ export default function LoginPage() {
                 return;
             }
             console.error('Login: Fetch error', error);
-            alert('로그인 요청 중 오류가 발생했습니다. (네트워크 상태를 확인해주세요)');
+            toast.error('로그인 요청 중 오류가 발생했습니다. 네트워크 상태를 확인해주세요.');
             setIsLoading(false);
         }
     };
@@ -110,7 +111,7 @@ export default function LoginPage() {
             if (error) throw error;
         } catch (error) {
             console.error('Social Login Error:', error);
-            alert(`${provider === 'google' ? 'Google' : 'Kakao'} 로그인 중 오류가 발생했습니다.`);
+            toast.error(`${provider === 'google' ? 'Google' : 'Kakao'} 로그인 중 오류가 발생했습니다.`);
             setIsLoading(false);
         }
     };
@@ -119,7 +120,7 @@ export default function LoginPage() {
     return (
         <main className={styles.main}>
             <div className={`${styles.card} glass animate-fade-in`}>
-                <h1 className={styles.title}>Welcome to <span>Dalbus</span></h1>
+                <h1 className={styles.title}>달버스 <span>로그인</span></h1>
 
                 <div className={styles.socialGroup}>
                     <button

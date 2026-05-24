@@ -6,9 +6,9 @@ export default function Footer() {
             <div className="container flex flex-col gap-4 py-10 md:h-24 md:flex-row md:py-0 items-center justify-between">
                 <div className="flex flex-col gap-2 md:gap-0">
                     <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
-                        Built by{" "}
+                        © 2025{" "}
                         <span className="font-medium underline underline-offset-4">
-                            Dalbus Team
+                            달버스
                         </span>
                         . All rights reserved.
                     </p>

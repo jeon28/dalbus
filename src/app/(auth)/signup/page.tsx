@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Lock, Mail, User, Phone, Calendar } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import styles from '../login/auth.module.css';
+import { toast } from 'sonner';
 
 export default function SignupPage() {
     const [formData, setFormData] = useState({
@@ -123,7 +124,7 @@ export default function SignupPage() {
             if (data.available) {
                 setEmailChecked(true);
                 setErrors(prev => ({ ...prev, id: '' }));
-                alert('✓ ' + data.message);
+                toast.success(data.message);
                 // Move to next field (name)
                 nameRef.current?.focus();
             } else {
@@ -255,12 +256,12 @@ export default function SignupPage() {
         if (error) {
             // 이미 가입된 이메일인 경우 특별 처리
             if (error.message.includes('already registered') || error.message.includes('already exists')) {
-                alert('⚠️ 이미 가입된 이메일입니다.\n로그인 페이지로 이동하세요.');
+                toast.error('이미 가입된 이메일입니다. 로그인 페이지로 이동합니다.');
                 router.push('/login');
             } else if (error.message.includes('rate limit')) {
-                alert('⚠️ 이메일 전송 한도 초과\n\nSupabase 설정에서 "Email Confirmation"을 비활성화하거나\n잠시 후 다시 시도해주세요.');
+                toast.error('이메일 전송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
             } else {
-                alert('❌ 회원가입 실패: ' + error.message);
+                toast.error('회원가입 실패: ' + error.message);
             }
             setLoading(false);
             return;
@@ -271,11 +272,11 @@ export default function SignupPage() {
             // 별도의 upsert 로직을 제거하여 RLS 위반 문제를 방지합니다.
 
             if (data.session) {
-                alert('회원가입이 완료되었습니다! 자동으로 로그인합니다.');
+                toast.success('회원가입이 완료되었습니다! 자동으로 로그인합니다.');
                 // session exists, so user is already logged in (auto-confirm enabled)
                 window.location.replace('/');
             } else {
-                alert('회원가입 요청이 완료되었습니다.\n이메일 인증이 필요한 경우 메일을 확인해주세요.\n그렇지 않으면 바로 로그인하실 수 있습니다.');
+                toast.success('회원가입이 완료되었습니다. 이메일 인증이 필요한 경우 메일을 확인해주세요.');
                 router.push('/login');
             }
         }
@@ -295,7 +296,7 @@ export default function SignupPage() {
             if (error) throw error;
         } catch (error) {
             console.error('Social Login Error:', error);
-            alert(`${provider === 'google' ? 'Google' : 'Kakao'} 연동 중 오류가 발생했습니다.`);
+            toast.error(`${provider === 'google' ? 'Google' : 'Kakao'} 연동 중 오류가 발생했습니다.`);
             setLoading(false);
         }
     };
@@ -304,7 +305,7 @@ export default function SignupPage() {
     return (
         <main className={styles.main}>
             <div className={`${styles.card} glass animate-fade-in`}>
-                <h1 className={styles.title}>Join <span>Dalbus</span></h1>
+                <h1 className={styles.title}>달버스 <span>회원가입</span></h1>
 
                 <div className={styles.socialGroup}>
                     <button

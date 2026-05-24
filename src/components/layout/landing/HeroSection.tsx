@@ -8,7 +8,7 @@ export default function HeroSection() {
                 <div className="flex flex-col items-center space-y-6 text-center">
                     <div className="space-y-4">
                         <h1 className="text-2xl font-medium tracking-tight sm:text-3xl text-muted-foreground">
-                            지속적 으로 안정적인
+                            지속적으로 안정적인
                         </h1>
                         <div className="flex flex-col space-y-2 items-center">
                             <span className="text-4xl font-bold tracking-tighter sm:text-6xl md:text-7xl">

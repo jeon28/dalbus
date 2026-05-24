@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
+import { PageLoading } from '@/components/ui/PageLoading';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Image from 'next/image';
@@ -61,13 +62,7 @@ export default function ProductsPage() {
         fetchProducts();
     }, []);
 
-    if (isLoading) {
-        return (
-            <div className="container py-12 flex justify-center items-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-        );
-    }
+    if (isLoading) return <PageLoading />;
 
     return (
         <div className="container py-12">

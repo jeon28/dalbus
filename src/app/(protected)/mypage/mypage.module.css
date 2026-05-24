@@ -10,7 +10,7 @@
     align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.4);
     position: sticky;
-    top: 56px;
+    top: var(--header-height);
     z-index: 40;
 }
 

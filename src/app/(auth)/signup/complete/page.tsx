@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { User, Phone, Calendar, CheckCircle } from 'lucide-react';
 import styles from '../../login/auth.module.css';
+import { toast } from 'sonner';
 
 export default function SignupCompletePage() {
     const router = useRouter();
@@ -190,16 +191,16 @@ export default function SignupCompletePage() {
 
             if (error) {
                 console.error('Profile update error:', error);
-                alert('프로필 업데이트 중 오류가 발생했습니다. 다시 시도해주세요.');
+                toast.error('프로필 업데이트 중 오류가 발생했습니다. 다시 시도해주세요.');
                 setLoading(false);
                 return;
             }
 
-            alert('회원가입이 완료되었습니다! 서비스를 이용해 주세요.');
+            toast.success('회원가입이 완료되었습니다! 서비스를 이용해 주세요.');
             window.location.replace('/');
         } catch (error) {
             console.error('Submit error:', error);
-            alert('오류가 발생했습니다. 다시 시도해주세요.');
+            toast.error('오류가 발생했습니다. 다시 시도해주세요.');
             setLoading(false);
         }
     };
@@ -208,8 +209,9 @@ export default function SignupCompletePage() {
         return (
             <main className={styles.main}>
                 <div className={`${styles.card} glass animate-fade-in`}>
-                    <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                        <p style={{ color: '#64748b' }}>로딩 중...</p>
+                    <div className="flex flex-col items-center gap-3 py-10">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                        <p className="text-sm text-muted-foreground">로딩 중...</p>
                     </div>
                 </div>
             </main>

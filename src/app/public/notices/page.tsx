@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { apiFetch } from '@/lib/api';
+import { PageLoading } from '@/components/ui/PageLoading';
 import { Badge } from "@/components/ui/badge";
 
 interface Notice {
@@ -55,13 +56,7 @@ export default function NoticesPage() {
         };
     }, []);
 
-    if (loading) {
-        return (
-            <div className="container py-20 flex justify-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-            </div>
-        );
-    }
+    if (loading) return <PageLoading />;
 
     return (
         <div className="container mx-auto py-12 px-4 max-w-4xl">

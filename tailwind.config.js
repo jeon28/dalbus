@@ -13,6 +13,9 @@ module.exports = {
             },
         },
         extend: {
+            fontFamily: {
+                sans: ["var(--font-inter)", "var(--font-noto-sans-kr)", "sans-serif"],
+            },
             gridTemplateColumns: {
                 '13': 'repeat(13, minmax(0, 1fr))',
                 '14': 'repeat(14, minmax(0, 1fr))',
