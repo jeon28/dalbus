@@ -281,8 +281,6 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
 
     const logout = useCallback(async () => {
         try {
-            console.log('ServiceContext: Starting logout...');
-
             // 1. Clear local UI state immediately
             safeSetUser(null);
             setIsAdmin(false);
@@ -294,7 +292,6 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 console.error('ServiceContext: Supabase signOut error', error);
             }
 
-            console.log('ServiceContext: Logout successful');
         } catch (error) {
             console.error('ServiceContext: Unexpected logout error', error);
         } finally {

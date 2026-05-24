@@ -86,9 +86,9 @@ export default function QnAPage() {
     */
 
     return (
-        <div className="container py-12 max-w-4xl mx-auto">
+        <div className="container py-12 px-4 max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold">Q&A 게시판</h1>
+                <h1 className="text-3xl sm:text-4xl font-bold">Q&A 게시판</h1>
                 <Link href="/public/qna/write">
                     <Button>문의하기</Button>
                 </Link>
@@ -105,7 +105,7 @@ export default function QnAPage() {
                 <label htmlFor="excludeSecret" className="text-sm text-gray-600 cursor-pointer">비밀글 제외</label>
             </div>
 
-            <div className="bg-white rounded-lg shadow border overflow-hidden">
+            <div className="glass rounded-xl overflow-hidden">
                 <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 text-gray-700 font-medium border-b">
                         <tr>

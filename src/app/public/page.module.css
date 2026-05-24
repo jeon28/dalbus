@@ -13,7 +13,7 @@
 
 .logo {
     font-size: 1.4rem;
-    font-weight: 950;
+    font-weight: 900;
     letter-spacing: -0.5px;
     text-transform: uppercase;
     display: flex;
@@ -61,7 +61,7 @@
 
 .hero h2 {
     font-size: 2.8rem;
-    font-weight: 950;
+    font-weight: 900;
     line-height: 1.1;
     margin-bottom: 20px;
     letter-spacing: -1px;
@@ -120,7 +120,7 @@
 
 .serviceName {
     font-size: 1.5rem;
-    font-weight: 950;
+    font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 2px;
     color: #000;
@@ -160,7 +160,7 @@
 
 .price {
     font-size: 1.4rem;
-    font-weight: 950;
+    font-weight: 900;
     color: var(--primary);
 }
 

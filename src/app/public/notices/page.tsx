@@ -61,7 +61,7 @@ export default function NoticesPage() {
     return (
         <div className="container mx-auto py-12 px-4 max-w-4xl">
             <div className="text-center mb-12">
-                <h1 className="text-3xl font-bold mb-4">공지사항</h1>
+                <h1 className="text-3xl sm:text-5xl font-bold mb-4">공지사항</h1>
                 <p className="text-muted-foreground">달버스의 새로운 소식과 안내를 확인하세요.</p>
             </div>
 

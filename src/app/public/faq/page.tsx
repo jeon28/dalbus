@@ -13,15 +13,8 @@ interface FAQ {
     sort_order: number;
 }
 
-interface FAQCategory {
-    id: string;
-    name: string;
-    sort_order: number;
-}
-
 export default function FAQPage() {
     const [faqs, setFaqs] = useState<FAQ[]>([]);
-    const [categories, setCategories] = useState<FAQCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [openId, setOpenId] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -31,23 +24,16 @@ export default function FAQPage() {
 
         const fetchData = async () => {
             try {
-                const [faqRes, catRes] = await Promise.all([
-                    apiFetch('/api/public/faqs'),
-                    apiFetch('/api/public/faq-categories')
-                ]);
+                const faqRes = await apiFetch('/api/public/faqs');
 
-                if (!faqRes.ok || !catRes.ok) {
+                if (!faqRes.ok) {
                     throw new Error('Failed to fetch data');
                 }
 
-                const [faqData, catData] = await Promise.all([
-                    faqRes.json(),
-                    catRes.json()
-                ]);
+                const faqData = await faqRes.json();
 
                 if (isMounted) {
                     setFaqs(faqData);
-                    setCategories(catData);
                 }
             } catch (error) {
                 const err = error as Error;
@@ -73,24 +59,34 @@ export default function FAQPage() {
         };
     }, []);
 
+    const CATEGORY_ORDER = ['general', 'payment', 'account', 'refund'];
+    const CATEGORY_LABELS: Record<string, string> = {
+        general: '일반',
+        payment: '결제',
+        account: '계정',
+        refund: '환불',
+    };
+
+    const uniqueCategories = CATEGORY_ORDER.filter(c =>
+        faqs.some(f => f.category === c)
+    );
+
     const filteredFaqs = activeCategory === 'all'
         ? faqs
         : faqs.filter(f => f.category === activeCategory);
-
-    const categoryTabs = ['all', ...categories.map(c => c.name)];
 
     if (loading) return <PageLoading />;
 
     return (
         <div className="container mx-auto py-12 px-4 max-w-4xl">
             <div className="text-center mb-12">
-                <h1 className="text-3xl font-bold mb-4">자주 묻는 질문</h1>
+                <h1 className="text-3xl sm:text-5xl font-bold mb-4">자주 묻는 질문</h1>
                 <p className="text-muted-foreground">궁금하신 점을 카테고리별로 확인해 보세요.</p>
             </div>
 
             {/* Category Tabs */}
             <div className="flex flex-wrap justify-center gap-2 mb-10">
-                {categoryTabs.map((cat) => (
+                {['all', ...uniqueCategories].map((cat) => (
                     <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
@@ -99,7 +95,7 @@ export default function FAQPage() {
                             : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                             }`}
                     >
-                        {cat === 'all' ? '전체' : cat}
+                        {cat === 'all' ? '전체' : (CATEGORY_LABELS[cat] ?? cat)}
                     </button>
                 ))}
             </div>

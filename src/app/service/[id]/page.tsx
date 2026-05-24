@@ -8,9 +8,9 @@ import { apiFetch } from '@/lib/api';
 import styles from './service.module.css';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/lib/supabase';
 import { addDays, format, parseISO } from 'date-fns';
+import { ArrowLeft } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { toast } from 'sonner';
 import { PageLoading } from '@/components/ui/PageLoading';
@@ -330,7 +330,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         <main className={styles.main}>
             <header className={`${styles.header} glass`}>
                 <div className="container relative flex flex-col items-center w-full">
-                    <button className={styles.backBtn} onClick={() => router.back()} style={{ position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)' }}>←</button>
+                    <button onClick={() => router.back()} className="absolute left-0 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-black/5 transition-colors" aria-label="뒤로가기"><ArrowLeft className="h-5 w-5" /></button>
                     <div className={styles.headerBrand}>
                         {product.image_url ? (
                             <div className="relative w-12 h-12 mr-2">
@@ -592,12 +592,12 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
                     <h3 className="text-xl font-bold text-center mt-8">결제 수단</h3>
                     <div className="glass p-4 rounded-xl">
-                        <RadioGroup defaultValue="bank" className="mb-4">
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="bank" id="bank" />
-                                <Label htmlFor="bank">무통장 입금</Label>
-                            </div>
-                        </RadioGroup>
+                        <div className="flex items-center gap-2 mb-4 px-1">
+                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+                                <span className="w-2 h-2 rounded-full bg-primary inline-block" />
+                                무통장 입금
+                            </span>
+                        </div>
 
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                             <p className="text-sm font-semibold text-blue-900 mb-1">

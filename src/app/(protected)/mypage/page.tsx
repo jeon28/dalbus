@@ -115,7 +115,6 @@ export default function MyPage() {
         // Rate limit: don't fetch more than once every 5 seconds
         const now = Date.now();
         if (now - lastFetchTimeRef.current < 5000) {
-            console.log('MyPage: Fetch debounced to prevent loop');
             return;
         }
 
@@ -124,7 +123,6 @@ export default function MyPage() {
         setLoading(true);
 
         try {
-            console.log('MyPage: Starting data fetch for user:', user.id);
 
             const res = await apiFetch('/api/user/mypage', {
                 cache: 'no-store'

@@ -65,7 +65,7 @@ export default function ProductsPage() {
     if (isLoading) return <PageLoading />;
 
     return (
-        <div className="container py-12">
+        <div className="container py-12 px-4 max-w-4xl mx-auto">
             <div className="flex flex-col items-center mb-12 text-center text-zinc-900">
                 <p className="max-w-[700px] text-muted-foreground md:text-xl">
                     달버스에서 제공하는 프리미엄 구독 서비스를 놀라운 가격에 만나보세요.
