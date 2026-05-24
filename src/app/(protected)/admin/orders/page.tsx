@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
-import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import * as XLSX from 'xlsx';
 import { addDays, differenceInMonths, format, parseISO } from 'date-fns';
@@ -58,7 +58,9 @@ interface Order {
     assignment_status?: string;
     payment_status?: string;
     order_accounts?: OrderAccount[];
+    tidal_assignments?: TidalAssignment[];
     related_order_id?: string;
+    is_deleted?: boolean;
     depositor_name?: string;
     end_date?: string;
 }
@@ -75,6 +77,15 @@ interface OrderAccount {
     accounts?: Account;
     orders?: Order;
     is_active?: boolean;
+}
+
+interface TidalAssignment {
+    id: string;
+    slot_number: number;
+    tidal_id?: string;
+    is_active?: boolean;
+    is_deleted?: boolean;
+    tidal_accounts?: { login_id: string } | { login_id: string }[];
 }
 
 interface Account {
@@ -120,6 +131,11 @@ export default function OrderHistoryPage() {
             value: "작업완료",
             label: "작업완료",
             icon: HelpCircle,
+        },
+        {
+            value: "삭제됨",
+            label: "삭제됨",
+            icon: Trash2,
         },
     ]
 
@@ -210,10 +226,11 @@ export default function OrderHistoryPage() {
     }, [isAdmin, isHydrated, fetchOrders, router]);
 
     const getOrderStatus = (order: Order) => {
+        if (order.is_deleted) return '삭제됨';
         if (order.assignment_status === 'completed') return '작업완료';
-        if (order.assignment_status === 'assigned') return '배정완료'; // Linked
+        if (order.assignment_status === 'assigned') return '배정완료';
         if (order.payment_status === 'paid') return '입금확인';
-        return '주문신청'; // Pending payment
+        return '주문신청';
     };
 
     const exportToExcel = () => {
@@ -500,6 +517,7 @@ export default function OrderHistoryPage() {
         }
     };
 
+
     const handleRevertPayment = async (orderId: string) => {
         if (isProcessing || !confirm('입금 확인을 취소하고 "주문신청" 상태로 되돌리시겠습니까?')) return;
         setIsProcessing(true);
@@ -542,6 +560,17 @@ export default function OrderHistoryPage() {
         }
     };
 
+    const getAssignmentLabel = (o: Order): string | null => {
+        const oa = o.order_accounts?.[0];
+        if (oa?.accounts?.login_id) return `${oa.accounts.login_id}-${oa.slot_number + 1}`;
+        const ta = o.tidal_assignments?.find(t => !t.is_deleted && t.is_active !== false);
+        if (ta) {
+            const acc = Array.isArray(ta.tidal_accounts) ? ta.tidal_accounts[0] : ta.tidal_accounts;
+            if (acc?.login_id) return `${acc.login_id}-${ta.slot_number + 1}`;
+        }
+        return null;
+    };
+
     const markAsCompleted = async (orderId: string) => {
         if (isProcessing || !confirm('작업완료 하시겠습니까 ?')) return;
         setIsProcessing(true);
@@ -573,30 +602,59 @@ export default function OrderHistoryPage() {
     };
 
     const handleDeleteOrder = async (order: Order) => {
-        if (order.order_accounts && order.order_accounts.length > 0) {
-            alert('배정된 계정이 있는 주문은 삭제할 수 없습니다. 먼저 배정 취소를 해주세요.');
-            return;
-        }
-
-        if (isProcessing || !confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'}) 내역을 삭제하시겠습니까?`)) {
-            return;
-        }
-
+        if (isProcessing || !confirm(`주문번호 ${order.order_number} (${order.profiles?.name || order.buyer_name || '비회원'})을 삭제하시겠습니까?\n삭제된 주문은 [삭제됨] 필터에서 확인할 수 있습니다.`)) return;
         setIsProcessing(true);
         try {
-            const res = await apiFetch(`/api/admin/orders/${order.id}`, {
-                method: 'DELETE'
-            });
-
+            const res = await apiFetch(`/api/admin/orders/${order.id}`, { method: 'DELETE' });
             if (!res.ok) {
                 const data = await res.json();
                 throw new Error(data.error || '삭제 실패');
             }
-
-            alert('삭제되었습니다.');
             fetchOrders();
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+            alert(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleHardDeleteOrder = async (order: Order) => {
+        if (isProcessing || !confirm(`주문번호 ${order.order_number}을 완전 삭제하시겠습니까?\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) return;
+        setIsProcessing(true);
+        try {
+            const res = await apiFetch(`/api/admin/orders/${order.id}?hard=true`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || '완전삭제 실패');
+            }
+            fetchOrders();
+        } catch (error: unknown) {
+            alert(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleDeleteUnpaidOrders = async () => {
+        const unpaidCount = orders.filter(o => getOrderStatus(o) === '주문신청').length;
+        if (unpaidCount === 0) {
+            alert('삭제할 주문신청 주문이 없습니다.');
+            return;
+        }
+        if (isProcessing || !confirm(`주문신청 상태의 주문 ${unpaidCount}건을 삭제하시겠습니까?\n배정된 계정이 없는 주문만 삭제됩니다.`)) return;
+
+        setIsProcessing(true);
+        try {
+            const res = await apiFetch('/api/admin/orders', { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || '삭제 실패');
+            }
+            const result = await res.json();
+            alert(`${result.deleted}건이 삭제되었습니다.`);
+            fetchOrders();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '오류가 발생했습니다.';
             alert(message);
         } finally {
             setIsProcessing(false);
@@ -635,7 +693,8 @@ export default function OrderHistoryPage() {
                                 ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
                                     status === '배정완료' ? 'bg-blue-100 text-blue-800' :
                                         status === '입금확인' ? 'bg-green-100 text-green-800' :
-                                            'bg-yellow-100 text-yellow-800'}`}>
+                                            status === '삭제됨' ? 'bg-red-100 text-red-700' :
+                                                'bg-yellow-100 text-yellow-800'}`}>
                                 {status}
                             </span>
                         </div>
@@ -664,16 +723,19 @@ export default function OrderHistoryPage() {
                                     <span className="text-[10px] text-gray-400">기간: {o.product_plans?.duration_months || '-'}개월</span>
                                     <span className={styles.priceInfo}>₩{o.amount?.toLocaleString()}</span>
                                 </div>
-                                {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
+                                {(status === '배정완료' || status === '작업완료') && getAssignmentLabel(o) && (
                                     <div className="text-sm font-bold text-gray-800 bg-secondary px-2 py-1 rounded">
-                                        {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                        {getAssignmentLabel(o)}
                                     </div>
                                 )}
                             </div>
                         </div>
                         <div className={styles.orderCardActions}>
                             {status === '주문신청' && (
-                                <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                <>
+                                    <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                    <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                                </>
                             )}
                             {status === '입금확인' && (
                                 <>
@@ -687,8 +749,11 @@ export default function OrderHistoryPage() {
                                     <Button size="sm" variant="ghost" className="px-2" onClick={() => handleUnassign(o)} disabled={isProcessing}>취소</Button>
                                 </>
                             )}
-                            {o.order_accounts?.length === 0 && (
-                                <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                            {status === '작업완료' && (
+                                <Button className="flex-1 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일 재발송</Button>
+                            )}
+                            {status === '삭제됨' && (
+                                <Button className="flex-1 text-xs text-red-600 border-red-200 hover:bg-red-50" size="sm" variant="outline" onClick={() => handleHardDeleteOrder(o)} disabled={isProcessing}>완전삭제</Button>
                             )}
                         </div>
                     </div>
@@ -702,29 +767,29 @@ export default function OrderHistoryPage() {
             <table className={styles.table}>
                 <thead>
                     <tr>
-                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                        <th onClick={() => handleSort('created_at')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '110px' }}>
                             <div className="flex items-center justify-center">날짜/주문번호 {getSortIcon('created_at')}</div>
                         </th>
-                        <th className="text-center" style={{ width: '60px' }}>구분</th>
-                        <th className="text-center" style={{ width: '70px' }}>회원</th>
+                        <th className="text-center" style={{ width: '55px' }}>구분</th>
+                        <th className="text-center" style={{ width: '65px' }}>회원</th>
                         <th onClick={() => handleSort('name')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '90px' }}>
                             <div className="flex items-center justify-center">고객명 {getSortIcon('name')}</div>
                         </th>
-                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '110px' }}>
+                        <th onClick={() => handleSort('phone')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '120px' }}>
                             <div className="flex items-center justify-center">연락처 {getSortIcon('phone')}</div>
                         </th>
-                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '130px' }}>
+                        <th onClick={() => handleSort('email')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '150px' }}>
                             <div className="flex items-center justify-center">이메일 {getSortIcon('email')}</div>
                         </th>
-                        <th className="text-center" style={{ width: '40px' }}>기간</th>
-                        <th className="text-center" style={{ width: '90px' }}>금액</th>
-                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '100px' }}>
+                        <th className="text-center" style={{ width: '50px' }}>기간</th>
+                        <th className="text-center" style={{ width: '85px' }}>금액</th>
+                        <th onClick={() => handleSort('status')} className="cursor-pointer hover:bg-gray-50 transition-colors text-center" style={{ width: '90px' }}>
                             <div className="flex items-center justify-center">상태 {getSortIcon('status')}</div>
                         </th>
-                        <th className="text-center" style={{ width: '120px' }}>
+                        <th className="text-center" style={{ width: '90px' }}>
                             <div className="flex items-center justify-center">배정번호</div>
                         </th>
-                        <th className="text-center" style={{ width: '80px' }}>
+                        <th className="text-center" style={{ width: '95px' }}>
                             <div className="flex items-center justify-center">관리</div>
                         </th>
                     </tr>
@@ -773,26 +838,30 @@ export default function OrderHistoryPage() {
                                 <td className="text-center">₩{o.amount?.toLocaleString()}</td>
                                 <td className="text-center">
                                     <div className="flex flex-col items-center">
-                                        <span className={`px-2 py-1 rounded text-xs 
+                                        <span className={`px-2 py-1 rounded text-xs
                                             ${status === '작업완료' ? 'bg-gray-100 text-gray-800' :
                                                 status === '배정완료' ? 'bg-blue-100 text-blue-800' :
                                                     status === '입금확인' ? 'bg-green-100 text-green-800' :
-                                                        'bg-yellow-100 text-yellow-800'}`}>
+                                                        status === '삭제됨' ? 'bg-red-100 text-red-700' :
+                                                            'bg-yellow-100 text-yellow-800'}`}>
                                             {status}
                                         </span>
                                     </div>
                                 </td>
                                 <td className="text-center font-medium">
-                                    {(status === '배정완료' || status === '작업완료') && o.order_accounts?.[0] && (
-                                        <div className="text-sm whitespace-nowrap">
-                                            {o.order_accounts[0].accounts?.login_id || 'ID미상'} - {o.order_accounts[0].slot_number + 1}
+                                    {(status === '배정완료' || status === '작업완료') && getAssignmentLabel(o) && (
+                                        <div className="text-sm font-bold text-gray-700">
+                                            {getAssignmentLabel(o)}
                                         </div>
                                     )}
                                 </td>
                                 <td className="text-center">
                                     <div className="flex flex-col gap-1 items-center">
                                         {status === '주문신청' && (
-                                            <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                            <>
+                                                <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                                <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                                            </>
                                         )}
                                         {status === '입금확인' && (
                                             <>
@@ -806,8 +875,11 @@ export default function OrderHistoryPage() {
                                                 <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)} disabled={isProcessing}>배정취소</Button>
                                             </>
                                         )}
-                                        {o.order_accounts?.length === 0 && (
-                                            <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
+                                        {status === '작업완료' && (
+                                            <Button size="sm" variant="outline" className="w-20 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일재발송</Button>
+                                        )}
+                                        {status === '삭제됨' && (
+                                            <Button size="sm" variant="outline" className="w-20 text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleHardDeleteOrder(o)} disabled={isProcessing}>완전삭제</Button>
                                         )}
                                     </div>
                                 </td>

@@ -20,6 +20,7 @@ interface UserSubscription {
     account_pw: string;
     status: string;
     order_id: string;
+    order_number: string;
     slot_number?: number;
 }
 
@@ -54,6 +55,7 @@ interface SupabaseAccountAssignment {
     start_date: string | null;
     end_date: string | null;
     orders: {
+        order_number?: string;
         product_id: string;
         products: {
             name: string;
@@ -157,6 +159,7 @@ export default function MyPage() {
                             account_pw: acc.tidal_password || acc.account_pw || '정보 없음',
                             status: '이용 중',
                             order_id: acc.order_id,
+                            order_number: (acc as unknown as { order_number?: string }).order_number || acc.orders?.order_number || '',
                             slot_number: acc.slot_number
                         }));
                         setSubscriptions(enrichedSubs);
@@ -172,7 +175,8 @@ export default function MyPage() {
                                 account_id: '정보 확인 중',
                                 account_pw: '정보 확인 중',
                                 status: '이용 중',
-                                order_id: item.id
+                                order_id: item.id,
+                                order_number: item.order_number || ''
                             }));
                         setSubscriptions(activeSubs);
                     }
@@ -376,8 +380,8 @@ export default function MyPage() {
                                     <div className="text-sm space-y-1 text-muted-foreground">
                                         <p>기간: {sub.start_date} ~ {sub.end_date} ({sub.duration})</p>
                                         <p>만료일: {sub.end_date}</p>
-                                        {sub.slot_number !== undefined && (
-                                            <p className="font-bold text-primary">배정 슬롯: #{sub.slot_number + 1}</p>
+                                        {sub.order_number && (
+                                            <p className="text-muted-foreground">주문번호: {sub.order_number.replace(/^DAL-/, '')}</p>
                                         )}
                                     </div>
                                     <div className="bg-white/50 p-3 rounded-lg text-sm font-mono space-y-1 border border-white/20">

@@ -26,11 +26,17 @@ export async function GET(req: NextRequest) {
             profiles(name, email, phone),
             products(name),
             product_plans(duration_months),
-            order_accounts(id, account_id, slot_number, tidal_id, accounts(login_id))
+            order_accounts(id, account_id, slot_number, tidal_id, accounts(login_id)),
+            tidal_assignments(id, slot_number, tidal_id, is_active, is_deleted, tidal_accounts:account_id(login_id))
         `, { count: 'exact' });
 
     // Status filter logic
-    if (status) {
+    if (status === '삭제됨') {
+        query = query.eq('is_deleted', true);
+    } else {
+        // Always exclude soft-deleted orders unless explicitly requesting deleted view
+        query = query.neq('is_deleted', true);
+
         if (status === '작업완료') {
             query = query.eq('assignment_status', 'completed');
         } else if (status === '배정완료') {
@@ -38,7 +44,7 @@ export async function GET(req: NextRequest) {
         } else if (status === '입금확인') {
             query = query.eq('payment_status', 'paid').neq('assignment_status', 'assigned').neq('assignment_status', 'completed');
         } else if (status === '주문신청') {
-            query = query.neq('payment_status', 'paid');
+            query = query.eq('payment_status', 'pending');
         }
     }
 
@@ -74,4 +80,58 @@ export async function GET(req: NextRequest) {
             totalPages: Math.ceil((count || 0) / limit)
         }
     });
+}
+
+// DELETE: Bulk delete unpaid (pending) orders with no assignments
+export async function DELETE(req: NextRequest) {
+    const session = await getServerSession(req);
+    if (!session || !isAdmin(session)) {
+        return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
+
+    try {
+        // Fetch all pending orders that have no tidal_assignments
+        const { data: pendingOrders, error: fetchError } = await supabaseAdmin
+            .from('orders')
+            .select('id')
+            .eq('payment_status', 'pending')
+            .neq('assignment_status', 'assigned')
+            .neq('assignment_status', 'completed')
+            .neq('is_deleted', true);
+
+        if (fetchError) throw fetchError;
+        if (!pendingOrders || pendingOrders.length === 0) {
+            return NextResponse.json({ deleted: 0 });
+        }
+
+        const allIds = pendingOrders.map(o => o.id);
+
+        // Exclude any that have tidal_assignments (safety check)
+        const { data: assigned, error: assignError } = await supabaseAdmin
+            .from('tidal_assignments')
+            .select('order_id')
+            .in('order_id', allIds)
+            .not('is_deleted', 'is', true);
+
+        if (assignError) throw assignError;
+
+        const assignedOrderIds = new Set((assigned || []).map(a => a.order_id));
+        const deletableIds = allIds.filter(id => !assignedOrderIds.has(id));
+
+        if (deletableIds.length === 0) {
+            return NextResponse.json({ deleted: 0 });
+        }
+
+        const { error: deleteError } = await supabaseAdmin
+            .from('orders')
+            .delete()
+            .in('id', deletableIds);
+
+        if (deleteError) throw deleteError;
+
+        return NextResponse.json({ deleted: deletableIds.length });
+    } catch (error) {
+        const e = error as Error;
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
 }

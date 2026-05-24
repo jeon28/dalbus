@@ -32,36 +32,45 @@ export async function GET(
     }
 }
 
-// DELETE: Hard Delete history
+// DELETE: Soft-delete by default; hard delete with ?hard=true
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: orderId } = await params;
+    const url = new URL(request.url);
+    const hardDelete = url.searchParams.get('hard') === 'true';
 
     try {
-        // 1. Check if the order has any assignments
-        const { data: assignments, error: assignError } = await supabaseAdmin
-            .from('order_accounts')
-            .select('id')
-            .eq('order_id', orderId);
+        // Check for active assignments
+        const [{ data: order }, { data: ta }] = await Promise.all([
+            supabaseAdmin.from('orders').select('assignment_status').eq('id', orderId).single(),
+            supabaseAdmin.from('tidal_assignments').select('id').eq('order_id', orderId).not('is_deleted', 'is', true).eq('is_active', true),
+        ]);
 
-        if (assignError) throw assignError;
+        const hasActiveAssignment =
+            (order?.assignment_status === 'assigned' || order?.assignment_status === 'completed') ||
+            (ta && ta.length > 0);
 
-        if (assignments && assignments.length > 0) {
+        if (hasActiveAssignment) {
             return NextResponse.json(
                 { error: '배정된 계정이 있는 주문은 삭제할 수 없습니다. 먼저 배정 취소를 해주세요.' },
                 { status: 400 }
             );
         }
 
-        // 2. Delete the order
-        const { error: deleteError } = await supabaseAdmin
-            .from('orders')
-            .delete()
-            .eq('id', orderId);
-
-        if (deleteError) throw deleteError;
+        if (hardDelete) {
+            // Nullify order_id on tidal_assignments (FK constraint) and remove order_accounts before deleting order
+            await Promise.all([
+                supabaseAdmin.from('tidal_assignments').update({ order_id: null }).eq('order_id', orderId),
+                supabaseAdmin.from('order_accounts').delete().eq('order_id', orderId),
+            ]);
+            const { error } = await supabaseAdmin.from('orders').delete().eq('id', orderId);
+            if (error) throw error;
+        } else {
+            const { error } = await supabaseAdmin.from('orders').update({ is_deleted: true }).eq('id', orderId);
+            if (error) throw error;
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

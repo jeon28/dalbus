@@ -44,22 +44,14 @@ export async function GET(req: NextRequest) {
         const orderIds = orders?.map(o => o.id) || [];
         let assignments: Record<string, unknown>[] = [];
         
-        // Only fetch if we have something to match against
-        if (orderIds.length > 0 || userEmail) {
-            let assignmentsQuery = supabaseAdmin
-                .from('order_accounts')
-                .select('*, order_id, orders(product_id, products(name), product_plans(duration_months))')
-                .eq('is_deleted', false);
+        if (orderIds.length > 0) {
+            const { data, error: assignmentError } = await supabaseAdmin
+                .from('tidal_assignments')
+                .select('*, order_id, order_number, orders(order_number, product_id, products(name), product_plans(duration_months))')
+                .not('is_deleted', 'is', true)
+                .eq('is_active', true)
+                .in('order_id', orderIds);
 
-            if (orderIds.length > 0 && userEmail) {
-                assignmentsQuery = assignmentsQuery.or(`order_id.in.(${orderIds.join(',')}),buyer_email.eq.${userEmail}`);
-            } else if (orderIds.length > 0) {
-                assignmentsQuery = assignmentsQuery.in('order_id', orderIds);
-            } else if (userEmail) {
-                assignmentsQuery = assignmentsQuery.eq('buyer_email', userEmail);
-            }
-
-            const { data, error: assignmentError } = await assignmentsQuery;
             if (assignmentError) {
                 console.error('[DEBUG] Assignment Fetch Error:', assignmentError);
                 throw assignmentError;

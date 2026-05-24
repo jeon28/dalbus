@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from '@/lib/supabase';
+import { addDays, format, parseISO } from 'date-fns';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -45,6 +46,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         id: string;
         order_number: string;
         end_date: string | null;
+        tidal_id: string | null;
         buyer_name: string | null;
         buyer_phone: string | null;
         buyer_email: string | null;
@@ -53,10 +55,21 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         };
     }
 
+    interface UserTidalAccount {
+        orderId: string;
+        orderNumber: string;
+        tidalId: string;
+        endDate: string | null;
+        buyerName: string | null;
+        buyerPhone: string | null;
+        buyerEmail: string | null;
+    }
+
     const [product, setProduct] = useState<Product | null>(null);
     const [plans, setPlans] = useState<Plan[]>([]);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+    const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
     const [selectedBankId, setSelectedBankId] = useState('');
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
@@ -65,6 +78,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [lookupResults, setLookupResults] = useState<ExtensionOrder[]>([]);
     const [lookupMessage, setLookupMessage] = useState('');
     const [userEmails, setUserEmails] = useState<string[]>([]);
+    const [userTidalAccounts, setUserTidalAccounts] = useState<UserTidalAccount[]>([]);
 
     const [guestInfo, setGuestInfo] = useState({
         name: '',
@@ -101,7 +115,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     if (prodData.product_plans && prodData.product_plans.length > 0) {
                         const sortedPlans = [...prodData.product_plans].sort((a, b) => a.duration_months - b.duration_months);
                         setPlans(sortedPlans);
-                        setSelectedPeriod(sortedPlans[0].duration_months);
+                        setSelectedPeriod(sortedPlans[sortedPlans.length - 1].duration_months);
                     }
                 }
 
@@ -148,36 +162,44 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             }));
 
             // Fetch all unique buyer_emails from previous orders
-            const fetchUniqueEmails = async () => {
+            const fetchUserOrderInfo = async () => {
                 const { data, error } = await supabase
                     .from('orders')
                     .select('buyer_email')
                     .eq('user_id', user.id);
-                
+
                 if (!error && data) {
                     const emails = new Set<string>();
                     if (user.email) emails.add(user.email);
                     data.forEach(o => {
                         if (o.buyer_email) emails.add(o.buyer_email);
                     });
-                    
-                    const uniqueEmails = Array.from(emails);
-                    setUserEmails(uniqueEmails);
-                    
-                    // If multiple emails but current email is empty, pre-fill with first one
-                    if (uniqueEmails.length > 0 && !guestInfo.email) {
-                        setGuestInfo(prev => ({ ...prev, email: uniqueEmails[0] }));
-                    }
+                    setUserEmails(Array.from(emails));
                 } else {
                     setUserEmails(user.email ? [user.email] : []);
                 }
             };
-            fetchUniqueEmails();
+            fetchUserOrderInfo();
         } else {
             setUserEmails([]);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
+
+    // Fetch user's tidal accounts for this product (for EXT tab)
+    useEffect(() => {
+        if (!user || !id) return;
+
+        const fetchUserTidalAccounts = async () => {
+            const res = await apiFetch(`/api/user/tidal-accounts?productId=${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setUserTidalAccounts(data.accounts || []);
+            }
+        };
+
+        fetchUserTidalAccounts();
+    }, [user, id]);
 
     const handleLookup = useCallback(async () => {
         if (!guestInfo.tidalId) {
@@ -193,14 +215,14 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         try {
             const res = await apiFetch('/api/orders/lookup', {
                 method: 'POST',
-                body: JSON.stringify({ tidalId: guestInfo.tidalId })
+                body: JSON.stringify({ tidalId: guestInfo.tidalId, productId: id })
             });
             const data = await res.json();
 
             if (res.ok) {
-                const filtered = (data.orders || []).filter((o: ExtensionOrder) => o.products?.name === product?.name);
-                setLookupResults(filtered);
-                if (filtered.length === 0) {
+                const orders = data.orders || [];
+                setLookupResults(orders);
+                if (orders.length === 0) {
                     setLookupMessage('연장 가능한 주문 내역이 없습니다.');
                 }
             } else {
@@ -212,14 +234,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         } finally {
             setLookupLoading(false);
         }
-    }, [guestInfo.tidalId, product?.name]);
-
-    // Auto lookup when tidalId is pre-filled and mode is EXT
-    useEffect(() => {
-        if (orderMode === 'EXT' && guestInfo.tidalId && product && lookupResults.length === 0 && !lookupLoading && !selectedOrder) {
-            handleLookup();
-        }
-    }, [orderMode, guestInfo.tidalId, product, handleLookup, lookupLoading, lookupResults.length, selectedOrder]);
+    }, [guestInfo.tidalId, id]);
 
     const toggleAllAgreements = (checked: boolean) => {
         setAgreements({ all: checked, privacy: checked, terms: checked });
@@ -277,7 +292,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 body: JSON.stringify({
                     orderData,
                     product_name: product.name,
-                    plan_name: selectedPlan.duration_months + '개월'
+                    plan_name: selectedPlan.duration_months + '개월',
+                    extend_tidal_id: orderMode === 'EXT' ? (selectedOrder?.tidal_id || null) : null
                 })
             });
 
@@ -374,11 +390,20 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     <h3 className="text-lg font-bold mb-3">이용 기간 선택</h3>
                     <div className={styles.optionList}>
                         {plans.length > 0 ? (
-                            plans.map((plan) => (
+                            plans
+                                .filter(plan => isPlanExpanded || selectedPeriod === plan.duration_months)
+                                .map((plan) => (
                                 <div
                                     key={plan.id}
                                     className={`${styles.optionItem} ${selectedPeriod === plan.duration_months ? styles.active : ''} glass`}
-                                    onClick={() => setSelectedPeriod(plan.duration_months)}
+                                    onClick={() => {
+                                        if (selectedPeriod === plan.duration_months) {
+                                            setIsPlanExpanded(v => !v);
+                                        } else {
+                                            setSelectedPeriod(plan.duration_months);
+                                            setIsPlanExpanded(false);
+                                        }
+                                    }}
                                 >
                                     <span>
                                         {plan.duration_months}개월
@@ -388,7 +413,12 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                             </span>
                                         )}
                                     </span>
-                                    <span>{plan.price.toLocaleString()}원</span>
+                                    <span className="flex items-center gap-2">
+                                        {plan.price.toLocaleString()}원
+                                        {selectedPeriod === plan.duration_months && !isPlanExpanded && (
+                                            <span className="text-[10px] text-slate-400">▼ 변경</span>
+                                        )}
+                                    </span>
                                 </div>
                             ))
                         ) : (
@@ -424,45 +454,84 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     </h3>
 
                     {orderMode === 'EXT' && !selectedOrder && (
-                        <div className="glass p-5 rounded-xl space-y-4 border border-primary/20 bg-primary/5">
-                            <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
-                            <div className="space-y-4">
-                                <Input
-                                    placeholder="구매 시 사용한 Tidal ID (예: tidalid@hifitidal.com)"
-                                    value={guestInfo.tidalId}
-                                    onChange={(e) => setGuestInfo({ ...guestInfo, tidalId: e.target.value })}
-                                />
-                                <button
-                                    className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
-                                    onClick={handleLookup}
-                                    disabled={lookupLoading}
-                                >
-                                    {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
-                                </button>
-                            </div>
-
-                            {lookupMessage && <p className="text-xs text-center text-red-500 mt-2">{lookupMessage}</p>}
-
-                            {lookupResults.length > 0 && (
-                                <div className="mt-4 space-y-2">
-                                    <p className="text-xs font-bold text-muted-foreground mb-2">연장 가능한 내역 ({lookupResults.length})</p>
-                                    {lookupResults.map((o) => (
-                                        <div
-                                            key={o.id}
-                                            className="p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
-                                            onClick={() => handleSelectOrderForExtension(o)}
+                        <div className="glass p-5 rounded-xl space-y-3 border border-primary/20 bg-primary/5">
+                            {user ? (
+                                // 로그인: 배정된 Tidal ID 목록 직접 표시
+                                userTidalAccounts.length > 0 ? (
+                                    <>
+                                        <p className="text-xs text-center text-slate-500">연장할 구독을 선택하세요.</p>
+                                        {userTidalAccounts.map((acc) => (
+                                            <div
+                                                key={acc.tidalId}
+                                                className="flex items-center justify-between p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
+                                                onClick={() => handleSelectOrderForExtension({
+                                                    id: acc.orderId,
+                                                    order_number: acc.orderNumber,
+                                                    end_date: acc.endDate,
+                                                    tidal_id: acc.tidalId,
+                                                    buyer_name: acc.buyerName,
+                                                    buyer_phone: acc.buyerPhone,
+                                                    buyer_email: acc.buyerEmail,
+                                                    products: { name: product?.name || '' }
+                                                })}
+                                            >
+                                                <div>
+                                                    <p className="text-sm font-bold text-primary">{acc.tidalId}</p>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        종료일: {acc.endDate || '정보없음'}
+                                                    </p>
+                                                </div>
+                                                <span className="text-xs text-primary font-bold shrink-0 ml-2">선택하기 →</span>
+                                            </div>
+                                        ))}
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-center text-muted-foreground py-4">
+                                        배정된 계정 정보가 없습니다.
+                                    </p>
+                                )
+                            ) : (
+                                // 비로그인: Tidal ID 직접 입력 후 조회
+                                <>
+                                    <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
+                                    <div className="space-y-4">
+                                        <Input
+                                            placeholder="구매 시 사용한 Tidal ID (예: tidalid@hifitidal.com)"
+                                            value={guestInfo.tidalId}
+                                            onChange={(e) => setGuestInfo({ ...guestInfo, tidalId: e.target.value })}
+                                        />
+                                        <button
+                                            className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
+                                            onClick={handleLookup}
+                                            disabled={lookupLoading}
                                         >
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm font-bold">{o.products?.name}</span>
-                                                <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">{o.order_number}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <span className="text-xs text-muted-foreground">만료일: {o.end_date || '정보없음'}</span>
-                                                <span className="text-xs text-primary font-bold">선택하기 →</span>
-                                            </div>
+                                            {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
+                                        </button>
+                                    </div>
+
+                                    {lookupMessage && <p className="text-xs text-center text-red-500 mt-2">{lookupMessage}</p>}
+
+                                    {lookupResults.length > 0 && (
+                                        <div className="mt-2 space-y-2">
+                                            <p className="text-xs font-bold text-muted-foreground">연장 가능한 내역 ({lookupResults.length})</p>
+                                            {lookupResults.map((o) => (
+                                                <div
+                                                    key={o.id}
+                                                    className="flex items-center justify-between p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
+                                                    onClick={() => handleSelectOrderForExtension(o)}
+                                                >
+                                                    <div>
+                                                        <p className="text-sm font-bold text-primary">{o.tidal_id || o.order_number}</p>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                            종료일: {o.end_date || '정보없음'}
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-xs text-primary font-bold shrink-0 ml-2">선택하기 →</span>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
@@ -470,17 +539,31 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     {(orderMode === 'NEW' || selectedOrder) && (
                         <div className="space-y-4">
                             {selectedOrder && (
-                                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 mb-4 flex justify-between items-center">
-                                    <div>
-                                        <p className="text-xs text-primary font-bold">선택된 연장 대상</p>
-                                        <p className="text-sm font-medium">{product.name} ({selectedOrder.order_number})</p>
+                                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 mb-4">
+                                    <div className="flex justify-between items-start">
+                                        <div className="space-y-0.5">
+                                            {selectedOrder.tidal_id && (
+                                                <p className="text-base font-bold text-primary">{selectedOrder.tidal_id}</p>
+                                            )}
+                                            <p className="text-xs text-primary font-bold">선택된 연장 대상</p>
+                                            <p className="text-sm font-medium">{product.name} ({selectedOrder.order_number})</p>
+                                            {selectedOrder.end_date && (() => {
+                                                const newEndDate = format(addDays(parseISO(selectedOrder.end_date), selectedPeriod * 30), 'yyyy-MM-dd');
+                                                return (
+                                                    <>
+                                                        <p className="text-xs text-muted-foreground">현재 만료일: {selectedOrder.end_date}</p>
+                                                        <p className="text-xs"><span className="font-bold text-primary">연장후 만료일: {newEndDate}</span></p>
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                        <button
+                                            className="text-xs text-muted-foreground underline shrink-0 ml-2"
+                                            onClick={() => setSelectedOrder(null)}
+                                        >
+                                            변경
+                                        </button>
                                     </div>
-                                    <button
-                                        className="text-xs text-muted-foreground underline"
-                                        onClick={() => setSelectedOrder(null)}
-                                    >
-                                        변경
-                                    </button>
                                 </div>
                             )}
                             <Input
@@ -603,7 +686,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
                 <button
                     className={`${styles.submitBtn} w-full mt-8 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl`}
-                    disabled={loading || (!user && (!agreements.privacy || !agreements.terms))}
+                    disabled={loading || (orderMode === 'EXT' && !selectedOrder) || (!user && (!agreements.privacy || !agreements.terms))}
                     onClick={handleSubscribe}
                 >
                     {loading ? '처리 중...' : '구독하기'}

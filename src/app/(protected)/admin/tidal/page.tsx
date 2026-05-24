@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogFooter,
@@ -30,6 +31,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
 
 interface Assignment {
     id: string;
@@ -159,10 +161,17 @@ function TidalAccountsContent() {
     });
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
+    // Deleted group edit state
+    const [isEditDeletedGroupOpen, setIsEditDeletedGroupOpen] = useState(false);
+    const [editDeletedGroup, setEditDeletedGroup] = useState<Account | null>(null);
+    const [editDeletedGroupForm, setEditDeletedGroupForm] = useState({ login_id: '', payment_email: '', payment_day: 1, memo: '' });
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
+    const [emailTemplates, setEmailTemplates] = useState<{id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[]}[]>([]);
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
+    const [isTemplateEditOpen, setIsTemplateEditOpen] = useState(false);
     const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
     
     // Quick Edit Feature State
@@ -357,6 +366,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         if (isHydrated && isAdmin) {
             fetchAccounts();
             fetchPendingOrders();
+            apiFetch('/api/admin/email-templates').then(res => {
+                if (res.ok) res.json().then((data: {key: string, name: string, subject?: string, content?: string}[]) => {
+                    setEmailTemplates(data);
+                    const firstNonLegacy = data.find(t => !t.key.startsWith('LEGACY'));
+                    if (firstNonLegacy) setSelectedTemplateKey(firstNonLegacy.key);
+                });
+            });
         }
     }, [isAdmin, isHydrated, fetchAccounts, fetchPendingOrders]);
 
@@ -879,6 +895,69 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         }
     };
 
+    const handleEditDeletedGroup = async () => {
+        if (!editDeletedGroup || !editDeletedGroupForm.login_id.trim()) return;
+        try {
+            const res = await apiFetch(`/api/admin/accounts/${editDeletedGroup.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    login_id: editDeletedGroupForm.login_id.trim(),
+                    payment_email: editDeletedGroupForm.payment_email.trim(),
+                    payment_day: editDeletedGroupForm.payment_day,
+                    memo: editDeletedGroupForm.memo.trim(),
+                })
+            });
+            if (res.status === 409) {
+                alert('이미 사용 중인 그룹 ID입니다.');
+                return;
+            }
+            if (!res.ok) throw new Error('수정 실패');
+            setIsEditDeletedGroupOpen(false);
+            fetchAccounts();
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleRestoreDeletedGroup = async (acc: Account) => {
+        if (!confirm(`"${acc.login_id}" 그룹을 재등록(복원)하시겠습니까?`)) return;
+        try {
+            const res = await apiFetch(`/api/admin/accounts/${acc.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'available' })
+            });
+            if (!res.ok) throw new Error('재등록 실패');
+            fetchAccounts();
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
+    const handleEditAndRestoreDeletedGroup = async () => {
+        if (!editDeletedGroup || !editDeletedGroupForm.login_id.trim()) return;
+        try {
+            const res = await apiFetch(`/api/admin/accounts/${editDeletedGroup.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    login_id: editDeletedGroupForm.login_id.trim(),
+                    payment_email: editDeletedGroupForm.payment_email.trim(),
+                    payment_day: editDeletedGroupForm.payment_day,
+                    memo: editDeletedGroupForm.memo.trim(),
+                    status: 'available',
+                })
+            });
+            if (res.status === 409) { alert('이미 사용 중인 그룹 ID입니다.'); return; }
+            if (!res.ok) throw new Error('재등록 실패');
+            setIsEditDeletedGroupOpen(false);
+            fetchAccounts();
+        } catch (error) {
+            alert('실패: ' + (error instanceof Error ? error.message : String(error)));
+        }
+    };
+
     const exportToExcel = () => {
         const excelData: Record<string, string | number>[] = [];
         const flatData = getFlatAssignments();
@@ -1093,7 +1172,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             const res = await apiFetch('/api/admin/tidal/notify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ recipients, messageTemplate: notificationMessage })
+                body: JSON.stringify({ recipients, messageTemplate: notificationMessage, templateKey: selectedTemplateKey })
             });
 
             if (res.ok) {
@@ -2076,6 +2155,69 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </div>
                     </div>
                 )}
+
+                {/* Deleted Groups Section */}
+                    {showDeletedOnly && (
+                        <div className="mt-8">
+                            <h3 className="text-sm font-bold text-red-600 mb-3 flex items-center gap-2">
+                                <Trash2 size={14} /> 삭제된 그룹
+                            </h3>
+                            {accounts.filter(acc => (acc as unknown as { status?: string }).status === 'deleted').length === 0 ? (
+                                <p className="text-xs text-gray-400 text-center py-6">삭제된 그룹이 없습니다.</p>
+                            ) : (
+                                <div className="bg-white rounded-xl border border-red-100 overflow-hidden">
+                                    <table className="w-full text-xs min-w-[600px]">
+                                        <thead>
+                                            <tr className="bg-red-50 border-b text-gray-500">
+                                                <th className="p-3 text-left">그룹 ID</th>
+                                                <th className="p-3 text-left">결제 계정</th>
+                                                <th className="p-3 text-center">결제일</th>
+                                                <th className="p-3 text-left">메모</th>
+                                                <th className="p-3 text-center">관리</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {accounts
+                                                .filter(acc => (acc as unknown as { status?: string }).status === 'deleted')
+                                                .map(acc => (
+                                                    <tr key={acc.id} className="hover:bg-red-50/30">
+                                                        <td className="p-3 font-bold text-red-700">{acc.login_id}</td>
+                                                        <td className="p-3 text-gray-500">{(acc as unknown as { payment_email?: string }).payment_email || '-'}</td>
+                                                        <td className="p-3 text-gray-500 text-center">{(acc as unknown as { payment_day?: number }).payment_day || '-'}</td>
+                                                        <td className="p-3 text-gray-400">{acc.memo || '-'}</td>
+                                                        <td className="p-3 text-center flex items-center gap-1 justify-center">
+                                                            <Button
+                                                                size="sm" variant="ghost"
+                                                                className="h-7 px-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 text-xs"
+                                                                onClick={() => {
+                                                                    setEditDeletedGroup(acc);
+                                                                    setEditDeletedGroupForm({
+                                                                        login_id: acc.login_id || '',
+                                                                        payment_email: (acc as unknown as { payment_email?: string }).payment_email || '',
+                                                                        payment_day: (acc as unknown as { payment_day?: number }).payment_day || 1,
+                                                                        memo: acc.memo || '',
+                                                                    });
+                                                                    setIsEditDeletedGroupOpen(true);
+                                                                }}
+                                                            >
+                                                                수정
+                                                            </Button>
+                                                            <Button
+                                                                size="sm" variant="ghost"
+                                                                className="h-7 px-2 text-green-600 hover:text-green-800 hover:bg-green-50 text-xs"
+                                                                onClick={() => handleRestoreDeletedGroup(acc)}
+                                                            >
+                                                                재등록
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
             </div>
 
             {/* ... Modal Code (Assign/Add/Move) remains same ... */}
@@ -2141,6 +2283,66 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         </div>
                     )}
                     <DialogFooter><Button onClick={handleUpdateMasterAccount}>수정 완료</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Deleted Group Modal */}
+            <Dialog open={isEditDeletedGroupOpen} onOpenChange={setIsEditDeletedGroupOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>삭제된 그룹 수정</DialogTitle>
+                        <DialogDescription className="text-xs text-gray-500">정보를 수정한 후 재등록 버튼으로 복원할 수 있습니다.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="del_login_id" className="text-right text-sm">그룹 ID <span className="text-red-500">*</span></Label>
+                            <Input
+                                id="del_login_id"
+                                value={editDeletedGroupForm.login_id}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, login_id: e.target.value }))}
+                                className="col-span-3"
+                                placeholder="예: TG003"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="del_payment_email" className="text-right text-sm">결제 계정</Label>
+                            <Input
+                                id="del_payment_email"
+                                value={editDeletedGroupForm.payment_email}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, payment_email: e.target.value }))}
+                                className="col-span-3"
+                                placeholder="payment@email.com"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="del_payment_day" className="text-right text-sm">결제일</Label>
+                            <Input
+                                id="del_payment_day"
+                                type="number" min="1" max="31"
+                                value={editDeletedGroupForm.payment_day}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, payment_day: parseInt(e.target.value) || 1 }))}
+                                className="col-span-3"
+                                placeholder="1~31"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="del_memo" className="text-right text-sm">메모</Label>
+                            <Input
+                                id="del_memo"
+                                value={editDeletedGroupForm.memo}
+                                onChange={(e) => setEditDeletedGroupForm(f => ({ ...f, memo: e.target.value }))}
+                                className="col-span-3"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditDeletedGroupOpen(false)}>취소</Button>
+                        <Button variant="outline" className="text-green-700 border-green-300 hover:bg-green-50"
+                            onClick={handleEditAndRestoreDeletedGroup}
+                            disabled={!editDeletedGroupForm.login_id.trim()}
+                        >수정 후 재등록</Button>
+                        <Button onClick={handleEditDeletedGroup} disabled={!editDeletedGroupForm.login_id.trim()}>수정 완료</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -2276,50 +2478,52 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </DialogContent>
             </Dialog>
             <Dialog open={isNotifyModalOpen} onOpenChange={setIsNotifyModalOpen}>
-                <DialogContent className="max-w-xl">
+                <DialogContent className="max-w-[640px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>만료 알림 메세지 발송</DialogTitle>
+                        <DialogTitle>만료 알림 메세지 발송 ({selectedAssignmentIds.size}명)</DialogTitle>
                     </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
-                            <p className="font-bold mb-1">💡 안내</p>
-                            <p>전체 {selectedAssignmentIds.size}명의 회원에게 메일을 발송합니다.</p>
-                            <p>치환 코드: <b>{'{buyer_name}'}, {'{tidal_id}'}, {'{end_date}'}</b></p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex justify-between items-center">
-                                <span>발신 명단 ({selectedAssignmentIds.size})</span>
-                                <Button variant="ghost" size="sm" onClick={() => setSelectedAssignmentIds(new Set())} className="h-6 px-2 text-[10px]">전체 삭제</Button>
-                            </Label>
-                            <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 border rounded-md max-h-40 overflow-y-auto">
-                                {Array.from(selectedAssignmentIds).map(id => {
-                                    const item = getFlattenedAssignments().find(a => a.id === id);
-                                    if (!item) return null;
-                                    const bName = item.assignment.buyer_name || item.assignment.orders?.buyer_name || '고객';
-                                    const tId = item.assignment.tidal_id || '알 수 없음';
-                                    const eDate = item.assignment.end_date ? format(parseISO(item.assignment.end_date), 'yy/MM/dd') : '알 수 없음';
-                                    return (
-                                        <div key={id} className="flex items-center justify-between gap-1 bg-white border border-gray-200 px-2 py-1.5 rounded shadow-sm text-[11px] group hover:border-orange-300">
-                                            <span className="text-gray-600 truncate">{bName} / {eDate} / {tId}</span>
-                                            <button
-                                                onClick={() => handleToggleSelection(id)}
-                                                className="p-1 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors flex-shrink-0"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
+                    <div className="py-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <Select value={selectedTemplateKey} onValueChange={setSelectedTemplateKey}>
+                                    <SelectTrigger className="h-10 border-slate-200">
+                                        <SelectValue placeholder="템플릿 선택" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {emailTemplates.filter(t => !t.key.startsWith('LEGACY')).map(t => (
+                                            <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
+                            <Button type="button" variant="outline" size="sm" className="h-10 px-3 text-xs shrink-0"
+                                onClick={() => setIsTemplateEditOpen(true)}
+                                disabled={!selectedTemplateKey}
+                            >
+                                메일 수정하기
+                            </Button>
                         </div>
-                        <div className="space-y-2">
-                            <Label>메세지 내용 (메일 본문)</Label>
-                            <textarea
-                                className="w-full h-80 p-3 text-sm border rounded-md focus:ring-2 focus:ring-primary outline-none whitespace-pre-wrap"
-                                value={notificationMessage}
-                                onChange={(e) => setNotificationMessage(e.target.value)}
-                            />
-                        </div>
+
+                        {(() => {
+                            const tmpl = emailTemplates.find(t => t.key === selectedTemplateKey);
+                            const sampleId = Array.from(selectedAssignmentIds)[0];
+                            const sample = sampleId ? getFlattenedAssignments().find(a => a.id === sampleId) : null;
+                            const buyerName = sample?.assignment.buyer_name || sample?.assignment.orders?.buyer_name || '홍길동';
+                            const tidalId = sample?.assignment.tidal_id || 'sample@tidal.com';
+                            const endDate = sample?.assignment.end_date || '2027.05.02';
+                            const html = tmpl?.content
+                                ? tmpl.content.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).replace(/{end_date}/g, endDate).replace(/{message}/g, notificationMessage)
+                                : '<div style="padding:24px;color:#999;font-family:sans-serif;text-align:center">템플릿을 선택하면 미리보기가 표시됩니다.</div>';
+                            return (
+                                <div className="border rounded-xl overflow-hidden shadow-sm">
+                                    <div className="bg-slate-100 px-3 py-1.5 text-[10px] text-slate-500 font-mono border-b flex items-center justify-between">
+                                        <span>미리보기 — {sample ? `${buyerName} / ${tidalId} / ${endDate}` : '샘플 데이터'}</span>
+                                        {tmpl?.subject && <span className="text-slate-400">제목: {tmpl.subject}</span>}
+                                    </div>
+                                    <iframe srcDoc={html} className="w-full h-80 bg-white" sandbox="allow-same-origin" />
+                                </div>
+                            );
+                        })()}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsNotifyModalOpen(false)}>취소</Button>
@@ -2329,6 +2533,20 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <EmailTemplateModal
+                isOpen={isTemplateEditOpen}
+                onClose={() => setIsTemplateEditOpen(false)}
+                template={emailTemplates.find(t => t.key === selectedTemplateKey) as any ?? null}
+                onSave={() => {
+                    setIsTemplateEditOpen(false);
+                    apiFetch('/api/admin/email-templates').then(res => {
+                        if (res.ok) res.json().then((data: {id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[]}[]) => {
+                            setEmailTemplates(data);
+                        });
+                    });
+                }}
+            />
 
 
             {/* Memo Modal */}

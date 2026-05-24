@@ -52,27 +52,32 @@ export default function SignupCompletePage() {
             if (!mounted) return;
             setUserId(userId);
 
-            // Pre-fill name from Google metadata if available
-            const googleName = metadata?.full_name || metadata?.name || '';
-
-            // Check if profile already has phone (meaning already completed)
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('name, phone, birth_date')
+                .select('name, phone, birth_date, signup_method')
                 .eq('id', userId)
                 .single();
 
             if (!mounted) return;
 
+            // Email users: redirect to mypage if info is complete, or home if not (they shouldn't be here)
+            const isEmailUser = !profile?.signup_method || profile.signup_method === 'email';
+            if (isEmailUser) {
+                window.location.replace(profile?.phone && profile?.birth_date ? '/mypage' : '/');
+                return;
+            }
+
+            // Social users: redirect home if already completed
             if (profile?.phone && profile?.birth_date) {
-                // Already completed, go home
                 window.location.replace('/');
                 return;
             }
 
+            // Social user with incomplete profile — show the form
+            const socialName = metadata?.full_name || metadata?.name || '';
             setFormData(prev => ({
                 ...prev,
-                name: profile?.name || googleName || ''
+                name: profile?.name || socialName || ''
             }));
 
             setChecking(false);
