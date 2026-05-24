@@ -604,7 +604,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                 결제하기 버튼을 누르시면 입금 계좌를 안내해드립니다
                             </p>
                             <ul className="text-xs text-blue-700 space-y-0.5 list-disc pl-4">
-                                <li>주문별 고유 입금 코드가 발급됩니다</li>
                                 <li>안내된 계좌로 정확한 금액을 입금해주세요</li>
                                 <li>48시간 내 미입금 시 주문이 자동 취소됩니다</li>
                             </ul>

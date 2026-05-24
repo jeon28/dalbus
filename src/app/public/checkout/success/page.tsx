@@ -16,7 +16,6 @@ interface PaymentInfo {
     amount: number;
     payment_status: string;
     depositor_name: string;
-    match_code: string | null;
     payment_due_at: string | null;
     buyer_name: string | null;
     buyer_email: string | null;
@@ -126,13 +125,10 @@ function SuccessContent() {
         fetchPaymentInfo();
     }, [orderId]);
 
-    // 입금자 표시 문구: 이름 + 매칭코드 권장 형태
+    // 입금자명: 사용자가 입력한 값 그대로 사용
     const recommendedDepositor = useMemo(() => {
         if (!paymentInfo) return '';
-        const base = paymentInfo.depositor_name || paymentInfo.buyer_name || '';
-        const code = paymentInfo.match_code || '';
-        if (!base) return code;
-        return code ? `${base}${code}` : base;
+        return paymentInfo.depositor_name || paymentInfo.buyer_name || '';
     }, [paymentInfo]);
 
     // === Guest signup form state (기존 기능 유지) ===
@@ -332,12 +328,9 @@ function SuccessContent() {
                                 </span>
                                 <CopyButton value={recommendedDepositor} label="입금자명" />
                             </div>
-                            {paymentInfo.match_code && (
-                                <p className="text-[11px] text-amber-700 mt-2 leading-relaxed">
-                                    뒤 4자리 <strong>{paymentInfo.match_code}</strong>는 이 주문의 고유 코드입니다.
-                                    빠뜨리시면 입금 확인이 지연될 수 있습니다.
-                                </p>
-                            )}
+                            <p className="text-[11px] text-amber-700 mt-2 leading-relaxed">
+                                입금자명이 다르면 입금 확인이 지연될 수 있습니다.
+                            </p>
                         </div>
 
                         {/* 토스 송금 바로가기 (모바일 전용) */}

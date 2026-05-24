@@ -51,15 +51,12 @@ export async function POST(req: NextRequest) {
         };
 
         // 2. Insert order into Supabase
+        //    bank_accounts join 은 PostgREST schema cache 의존성이 있어 안정성을 위해 분리
+        //    계좌 정보는 결제 안내 페이지에서 /api/orders/[id]/payment-info 로 별도 조회
         const { data: order, error: insertError } = await supabaseAdmin
             .from('orders')
             .insert([normalizedOrderData])
-            .select(`
-                *,
-                assigned_bank_account:bank_accounts!assigned_bank_account_id (
-                    id, bank_name, account_number, account_holder
-                )
-            `)
+            .select('*')
             .single();
 
 
