@@ -46,9 +46,9 @@ export async function POST(req: NextRequest) {
                 productName: product_name,
                 planName: plan_name,
                 amount: orderData.amount,
-                buyerName: orderData.buyer_name,
-                buyerPhone: orderData.buyer_phone,
-                depositorName: orderData.depositor_name,
+                buyerName: normalizedOrderData.buyer_name,
+                buyerPhone: normalizedOrderData.buyer_phone,
+                depositorName: normalizedOrderData.depositor_name,
                 orderType: normalizedOrderData.order_type,
                 extendTidalId: extend_tidal_id || null
             };

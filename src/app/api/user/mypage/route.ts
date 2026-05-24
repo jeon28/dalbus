@@ -17,6 +17,12 @@ export async function GET(req: NextRequest) {
         const userEmail = user.email;
         console.log(`[DEBUG] MyPage API Request - UserID: ${user.id}, Email: ${userEmail}`);
 
+        // 이메일 정규식 검증 + 소문자 정규화 (방어적 코딩)
+        const EMAIL_REGEX = /^[\w.+\-]+@[\w.\-]+\.[A-Za-z]{2,}$/;
+        const safeEmail = userEmail && EMAIL_REGEX.test(userEmail)
+            ? userEmail.toLowerCase().trim()
+            : null;
+
         // 3. Fetch Data for the User
         // 3.1 Fetch Orders (by user_id OR buyer_email)
         const { data: orders, error: orderError } = await supabaseAdmin
@@ -32,7 +38,7 @@ export async function GET(req: NextRequest) {
                 products(name),
                 product_plans(duration_months)
             `)
-            .or(`user_id.eq.${user.id}${userEmail ? `,buyer_email.eq.${userEmail}` : ''}`)
+            .or(`user_id.eq.${user.id}${safeEmail ? `,buyer_email.eq.${safeEmail}` : ''}`)
             .order('created_at', { ascending: false });
 
         if (orderError) {
@@ -57,6 +63,22 @@ export async function GET(req: NextRequest) {
                 throw assignmentError;
             }
             assignments = data || [];
+        }
+
+        // 3.3 legacy_tidal_assignments: order_id FK 없음 → buyer_email로 조회
+        if (safeEmail) {
+            const { data: legacyData, error: legacyError } = await supabaseAdmin
+                .from('legacy_tidal_assignments')
+                .select('*')
+                .eq('buyer_email', safeEmail)
+                .eq('is_active', true)
+                .eq('is_deleted', false);
+
+            if (legacyError) {
+                console.error('[DEBUG] Legacy Assignment Fetch Error:', legacyError);
+                throw legacyError;
+            }
+            assignments = [...assignments, ...(legacyData || [])];
         }
 
         console.log(`[DEBUG] MyPage API Success - Found ${orders?.length || 0} orders and ${assignments.length} assignments`);

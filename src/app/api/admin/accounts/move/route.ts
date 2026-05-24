@@ -38,7 +38,8 @@ export async function POST(req: NextRequest) {
             .from(assignmentTable)
             .select('*', { count: 'exact', head: true })
             .eq('account_id', target_account_id)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .eq('is_deleted', false);
 
         const { data: targetAccount, error: targetError } = await supabaseAdmin
             .from('tidal_accounts')

@@ -39,7 +39,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ acc
         let finalType = type;
 
         if (finalSlotNumber === undefined || finalSlotNumber === null) {
-            finalSlotNumber = currentAssignments?.length || 0;
+            // 불연속 슬롯 상태에서도 가장 작은 빈 번호를 탐색
+            const usedSlots = new Set(currentAssignments?.map(a => a.slot_number) ?? []);
+            let candidate = 0;
+            while (usedSlots.has(candidate)) candidate++;
+            finalSlotNumber = candidate;
         }
 
         if (!finalType) {

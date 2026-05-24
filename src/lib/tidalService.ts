@@ -50,7 +50,10 @@ export const tidalService = {
         return {
             ...account,
             order_accounts: filteredAssignments, // Compatibility mapping
-            used_slots: filteredAssignments.filter((oa) => oa.is_active !== false && oa.is_deleted !== true).length
+            // 보기 모드(showDeleted/showInactive)와 무관하게 실제 active 배정 수를 반영
+            used_slots: (account.tidal_assignments || []).filter(
+                (oa: AssignmentRow) => oa.is_active !== false && oa.is_deleted !== true
+            ).length
         };
     });
   },

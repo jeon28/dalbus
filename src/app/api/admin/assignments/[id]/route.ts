@@ -118,16 +118,21 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         // 3. Re-index remaining slots
         await reindexSlots(assignment.account_id, 'tidal_assignments', 'tidal_accounts');
 
-        // 5. Update Order Status logic
-        // If it was an active assignment, we might want to set order to 'waiting' if we are "Unassigning".
-        // But if we are deleting history, order might be old.
-        // For now, if order_id exists, we set it to 'waiting' if it was paid?
-        // Let's keep existing logic: Reset order status.
+        // 5. Update Order Status: 남은 active 배정이 없을 때만 'waiting'으로 복원
         if (assignment.order_id) {
-            await supabaseAdmin
-                .from('orders')
-                .update({ assignment_status: 'waiting', assigned_at: null })
-                .eq('id', assignment.order_id);
+            const { count: remaining } = await supabaseAdmin
+                .from('tidal_assignments')
+                .select('id', { count: 'exact', head: true })
+                .eq('order_id', assignment.order_id)
+                .eq('is_active', true)
+                .eq('is_deleted', false);
+
+            if (!remaining || remaining === 0) {
+                await supabaseAdmin
+                    .from('orders')
+                    .update({ assignment_status: 'waiting', assigned_at: null })
+                    .eq('id', assignment.order_id);
+            }
         }
 
         return NextResponse.json({ success: true });

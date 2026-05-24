@@ -181,6 +181,7 @@ export function LegacyTidalContent({
     const [, setResizingCol] = useState<string | null>(null);
 
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [extendMsgCopied, setExtendMsgCopied] = useState(false);
 
     const handleMasterIdClick = (e: React.MouseEvent, id: string | null | undefined) => {
         if (!id || id === '-') return;

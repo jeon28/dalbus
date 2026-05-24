@@ -39,30 +39,35 @@ export async function GET(
             if (error.code === 'PGRST116') {
                 // Fallback: If no direct match, look for ANY active assignment for this buyer
                 const { data: order } = await supabaseAdmin.from('orders').select('buyer_email, buyer_phone').eq('id', id).single();
-                if (order && (order.buyer_email || order.buyer_phone)) {
-                    let query = supabaseAdmin.from('order_accounts').select(`
-                        *,
-                        accounts (
-                            id,
-                            login_id,
-                            max_slots,
-                            used_slots,
-                            memo
-                        ),
-                        orders (
-                            id,
-                            depositor_name,
-                            buyer_email,
-                            buyer_phone,
-                            product_plans ( duration_months )
-                        )
-                    `);
-                    if (order.buyer_email) query = query.eq('buyer_email', order.buyer_email);
-                    if (order.buyer_phone) query = query.eq('buyer_phone', order.buyer_phone);
+                if (order) {
+                    const orConditions: string[] = [];
+                    if (order.buyer_email) orConditions.push(`buyer_email.eq.${order.buyer_email}`);
+                    if (order.buyer_phone) orConditions.push(`buyer_phone.eq.${order.buyer_phone}`);
 
-                    const { data: fallbackData } = await query.limit(1).maybeSingle();
-                    if (fallbackData) {
-                        return NextResponse.json({ assignment: fallbackData, isFallback: true });
+                    if (orConditions.length > 0) {
+                        let query = supabaseAdmin.from('order_accounts').select(`
+                            *,
+                            accounts (
+                                id,
+                                login_id,
+                                max_slots,
+                                used_slots,
+                                memo
+                            ),
+                            orders (
+                                id,
+                                depositor_name,
+                                buyer_email,
+                                buyer_phone,
+                                product_plans ( duration_months )
+                            )
+                        `);
+                        query = query.or(orConditions.join(','));
+
+                        const { data: fallbackData } = await query.limit(1).maybeSingle();
+                        if (fallbackData) {
+                            return NextResponse.json({ assignment: fallbackData, isFallback: true });
+                        }
                     }
                 }
                 return NextResponse.json({ assignment: null });

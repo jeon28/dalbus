@@ -30,6 +30,11 @@ export async function reindexSlots(
         return (a.slot_number ?? 0) - (b.slot_number ?? 0);
     });
 
+    // master가 없으면 0번 슬롯을 master로 승격 (hard delete 후 복구)
+    if (sorted.length > 0 && sorted[0].type !== 'master') {
+        sorted[0] = { ...sorted[0], type: 'master' };
+    }
+
     // 3. Final sequential re-indexing starting from 0
     // Only update if slot_number or type actually changed to avoid unnecessary DB triggers (updated_at)
     for (let i = 0; i < sorted.length; i++) {

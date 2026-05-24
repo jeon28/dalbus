@@ -5,7 +5,7 @@ export const legacyTidalService = {
   async getAllAccounts(options: { showInactive?: boolean; showDeleted?: boolean } = {}) {
     const { showInactive, showDeleted } = options;
     
-    const query = supabaseAdmin
+    let query = supabaseAdmin
       .from('legacy_tidal_accounts')
       .select(`
         *,
@@ -14,8 +14,13 @@ export const legacyTidalService = {
           updated_at
         )
       `)
-      .neq('status', 'disabled')
       .order('created_at', { ascending: false });
+
+    if (showDeleted) {
+      query = query.eq('status', 'deleted');
+    } else {
+      query = query.neq('status', 'disabled').neq('status', 'deleted');
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -42,7 +47,10 @@ export const legacyTidalService = {
         return {
             ...account,
             order_accounts: filteredAssignments, // Compatibility mapping
-            used_slots: filteredAssignments.filter((oa) => oa.is_active !== false && oa.is_deleted !== true).length
+            // 보기 모드(showDeleted/showInactive)와 무관하게 실제 active 배정 수를 반영
+            used_slots: (account.legacy_tidal_assignments || []).filter(
+                (oa: AssignmentRow) => oa.is_active !== false && oa.is_deleted !== true
+            ).length
         };
     });
   },

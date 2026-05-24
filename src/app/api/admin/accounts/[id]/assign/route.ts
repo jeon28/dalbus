@@ -122,8 +122,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (fetchError) throw fetchError;
 
         if (finalSlotNumber === undefined || finalSlotNumber === null) {
-            // Pick next available
-            finalSlotNumber = currentAssignments?.length || 0;
+            // 비삭제 항목 수를 기준으로 다음 슬롯 결정
+            // (reindexSlots가 0-based 연속 정렬을 보장하므로 비삭제 개수 = 다음 번호)
+            finalSlotNumber = currentAssignments?.filter(a => !a.is_deleted).length || 0;
         }
 
         if (!finalType) {
