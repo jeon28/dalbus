@@ -466,8 +466,8 @@ export default function MyPage() {
                                                     order.assignment_status === 'expired' ? 'bg-red-100 text-red-700' :
                                                         'bg-gray-100 text-gray-700'
                                                 }`}>
-                                                {order.assignment_status === 'completed' ? '완료' :
-                                                    order.assignment_status === 'assigned' ? '완료' :
+                                                {order.assignment_status === 'completed' ? '이용중' :
+                                                    order.assignment_status === 'assigned' ? '이용중' :
                                                         order.assignment_status === 'waiting' ? '대기' :
                                                             order.assignment_status === 'expired' ? '중단' :
                                                                 order.assignment_status === 'pending' ? '입금대기' : order.assignment_status}
