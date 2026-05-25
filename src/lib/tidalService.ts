@@ -28,7 +28,8 @@ export const tidalService = {
       .order('created_at', { ascending: false });
 
     if (showDeleted) {
-      query = query.eq('status', 'deleted');
+      // 삭제 데이터 보기: 계정은 disabled 제외 모두 포함, 배정만 is_deleted=true 필터
+      query = query.neq('status', 'disabled');
     } else {
       query = query.neq('status', 'disabled').neq('status', 'deleted');
     }
