@@ -12,6 +12,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     const { id } = await params;
 
+    // orders 테이블의 외래키 참조를 먼저 NULL로 해제
+    await supabaseAdmin
+        .from('orders')
+        .update({ assigned_bank_account_id: null })
+        .eq('assigned_bank_account_id', id);
+
     const { error } = await supabaseAdmin
         .from('bank_accounts')
         .delete()
