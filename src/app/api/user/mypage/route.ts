@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
                 product_plans(duration_months)
             `)
             .or(`user_id.eq.${user.id}${safeEmail ? `,buyer_email.eq.${safeEmail}` : ''}`)
+            .not('is_deleted', 'is', true)
             .order('created_at', { ascending: false });
 
         if (orderError) {
