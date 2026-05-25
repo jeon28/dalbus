@@ -463,12 +463,14 @@ export default function MyPage() {
                                         <td className="py-4 px-4">
                                             <span className={`px-2 py-1 rounded text-[10px] font-bold ${order.assignment_status === 'completed' || order.assignment_status === 'assigned' ? 'bg-green-100 text-green-700' :
                                                 order.assignment_status === 'waiting' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-gray-100 text-gray-700'
+                                                    order.assignment_status === 'expired' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-700'
                                                 }`}>
                                                 {order.assignment_status === 'completed' ? '완료' :
                                                     order.assignment_status === 'assigned' ? '완료' :
                                                         order.assignment_status === 'waiting' ? '대기' :
-                                                            order.assignment_status === 'pending' ? '입금대기' : order.assignment_status}
+                                                            order.assignment_status === 'expired' ? '중단' :
+                                                                order.assignment_status === 'pending' ? '입금대기' : order.assignment_status}
                                             </span>
                                         </td>
                                     </tr>

@@ -227,6 +227,7 @@ export default function OrderHistoryPage() {
 
     const getOrderStatus = (order: Order) => {
         if (order.is_deleted) return '삭제됨';
+        if (order.assignment_status === 'expired') return '중단';
         if (order.assignment_status === 'completed') return '작업완료';
         if (order.assignment_status === 'assigned') return '배정완료';
         if (order.payment_status === 'paid') return '입금확인';

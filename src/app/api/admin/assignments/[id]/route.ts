@@ -57,7 +57,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 .from(assignmentTable)
                 .update(oaUpdates)
                 .eq('id', id)
-                .select('account_id') // Fetch account_id to update slots
+                .select('account_id, order_id') // Fetch account_id (slots) and order_id (status sync)
                 .single();
 
             if (oaError) throw oaError;
@@ -66,6 +66,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             const shouldReindex = type !== undefined || is_active !== undefined || body.is_deleted !== undefined;
             if (shouldReindex && updatedData) {
                 await reindexSlots(updatedData.account_id, 'tidal_assignments', 'tidal_accounts');
+            }
+
+            // 3. Sync orders.assignment_status when is_active toggled (종료/복구)
+            if (is_active !== undefined && updatedData?.order_id) {
+                const { count: remaining } = await supabaseAdmin
+                    .from('tidal_assignments')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('order_id', updatedData.order_id)
+                    .eq('is_active', true)
+                    .eq('is_deleted', false);
+
+                if (is_active === false && (!remaining || remaining === 0)) {
+                    // 종료: 남은 활성 배정이 없으면 주문 상태를 'expired'로
+                    await supabaseAdmin
+                        .from('orders')
+                        .update({ assignment_status: 'expired', assigned_at: null })
+                        .eq('id', updatedData.order_id);
+                } else if (is_active === true) {
+                    // 복구: 주문 상태를 'assigned'로 복원
+                    await supabaseAdmin
+                        .from('orders')
+                        .update({ assignment_status: 'assigned' })
+                        .eq('id', updatedData.order_id);
+                }
             }
         }
 
