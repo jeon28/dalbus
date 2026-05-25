@@ -65,21 +65,7 @@ export async function GET(req: NextRequest) {
             assignments = data || [];
         }
 
-        // 3.3 legacy_tidal_assignments: order_id FK 없음 → buyer_email로 조회
-        if (safeEmail) {
-            const { data: legacyData, error: legacyError } = await supabaseAdmin
-                .from('legacy_tidal_assignments')
-                .select('*')
-                .eq('buyer_email', safeEmail)
-                .eq('is_active', true)
-                .eq('is_deleted', false);
-
-            if (legacyError) {
-                console.error('[DEBUG] Legacy Assignment Fetch Error:', legacyError);
-                throw legacyError;
-            }
-            assignments = [...assignments, ...(legacyData || [])];
-        }
+        // legacy_tidal_assignments는 마이페이지에 노출하지 않음 (관리자 전용)
 
         console.log(`[DEBUG] MyPage API Success - Found ${orders?.length || 0} orders and ${assignments.length} assignments`);
 
