@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession, isAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = await getServerSession(req);
+    if (!session || !isAdmin(session)) {
+        return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
+
     const { id } = await params;
 
     const { error } = await supabaseAdmin

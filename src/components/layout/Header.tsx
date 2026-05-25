@@ -3,31 +3,66 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useServices } from '@/lib/ServiceContext';
+import { useEffect, useState } from "react";
+
+interface NavSettings {
+    menu_services_enabled: boolean;
+    menu_notices_enabled: boolean;
+    menu_faq_enabled: boolean;
+    menu_qna_enabled: boolean;
+}
 
 export default function Header() {
     const { user, isAdmin, logout } = useServices();
+    const [navSettings, setNavSettings] = useState<NavSettings>({
+        menu_services_enabled: true,
+        menu_notices_enabled: true,
+        menu_faq_enabled: true,
+        menu_qna_enabled: true,
+    });
+
+    useEffect(() => {
+        fetch('/api/public/settings')
+            .then(r => r.json())
+            .then(data => {
+                setNavSettings({
+                    menu_services_enabled: data.menu_services_enabled !== 'false',
+                    menu_notices_enabled: data.menu_notices_enabled !== 'false',
+                    menu_faq_enabled: data.menu_faq_enabled !== 'false',
+                    menu_qna_enabled: data.menu_qna_enabled !== 'false',
+                });
+            })
+            .catch(() => {});
+    }, []);
 
     return (
         <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex h-14 items-center justify-between gap-4">
                 <div className="flex items-center gap-4 md:gap-8 flex-1 overflow-hidden">
                     <Link href="/" className="flex items-center space-x-2 shrink-0">
-                        <span className="font-bold">Dalbus</span>
+                        <span className="font-bold">DALBUS</span>
                     </Link>
                     <nav className="flex items-center space-x-4 md:space-x-6 text-[13px] md:text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-hide">
-                        <Link href="/public/products" className="transition-colors hover:text-foreground/80 text-foreground/60">
-                            서비스
-                        </Link>
-                        <Link href="/public/notices" className="transition-colors hover:text-foreground/80 text-foreground/60">
-                            공지사항
-                        </Link>
-                        <Link href="/public/faq" className="transition-colors hover:text-foreground/80 text-foreground/60">
-                            FAQ
-                        </Link>
-                        <Link href="/public/qna" className="transition-colors hover:text-foreground/80 text-foreground/60">
-                            Q&A
-                        </Link>
-
+                        {navSettings.menu_services_enabled && (
+                            <Link href="/public/products" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                                서비스
+                            </Link>
+                        )}
+                        {navSettings.menu_notices_enabled && (
+                            <Link href="/public/notices" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                                공지사항
+                            </Link>
+                        )}
+                        {navSettings.menu_faq_enabled && (
+                            <Link href="/public/faq" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                                FAQ
+                            </Link>
+                        )}
+                        {navSettings.menu_qna_enabled && (
+                            <Link href="/public/qna" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                                Q&A
+                            </Link>
+                        )}
                     </nav>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

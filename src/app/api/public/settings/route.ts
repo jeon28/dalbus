@@ -8,7 +8,7 @@ export async function GET() {
         const { data: settings, error } = await supabase
             .from('site_settings')
             .select('key, value')
-            .in('key', ['menu_faq_enabled', 'menu_qna_enabled']);
+            .in('key', ['menu_services_enabled', 'menu_notices_enabled', 'menu_faq_enabled', 'menu_qna_enabled']);
 
         if (error) throw error;
 

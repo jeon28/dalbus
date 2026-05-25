@@ -39,6 +39,15 @@ export default function AdminPage() {
         admin_phone: ''
     });
     const [originalSettings, setOriginalSettings] = useState(settings);
+
+    // Menu Visibility State
+    const [menuSettings, setMenuSettings] = useState({
+        menu_services_enabled: 'true',
+        menu_notices_enabled: 'true',
+        menu_faq_enabled: 'true',
+        menu_qna_enabled: 'true',
+    });
+    const [originalMenuSettings, setOriginalMenuSettings] = useState(menuSettings);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [newBank, setNewBank] = useState({ bank_name: '', account_number: '', account_holder: '' });
 
@@ -64,6 +73,14 @@ export default function AdminPage() {
             const data = await res.json();
             setSettings(data);
             setOriginalSettings(data);
+            const ms = {
+                menu_services_enabled: data.menu_services_enabled ?? 'true',
+                menu_notices_enabled: data.menu_notices_enabled ?? 'true',
+                menu_faq_enabled: data.menu_faq_enabled ?? 'true',
+                menu_qna_enabled: data.menu_qna_enabled ?? 'true',
+            };
+            setMenuSettings(ms);
+            setOriginalMenuSettings(ms);
         }
     };
 
@@ -131,7 +148,46 @@ export default function AdminPage() {
     const handleDeleteBank = async (id: string) => {
         if (!confirm('삭제하시겠습니까?')) return;
         const res = await apiFetch(`/api/admin/bank-accounts/${id}`, { method: 'DELETE' });
-        if (res.ok) fetchBankAccounts();
+        if (res.ok) {
+            fetchBankAccounts();
+        } else {
+            const data = await res.json().catch(() => ({}));
+            alert('삭제 실패: ' + (data.error || '서버 오류가 발생했습니다.'));
+        }
+    };
+
+    const handleSaveMenuSettings = async () => {
+        const updates: Record<string, string> = {};
+        (Object.keys(menuSettings) as Array<keyof typeof menuSettings>).forEach(key => {
+            if (menuSettings[key] !== originalMenuSettings[key]) {
+                updates[key] = menuSettings[key];
+            }
+        });
+
+        if (Object.keys(updates).length === 0) {
+            alert('변경사항이 없습니다.');
+            return;
+        }
+
+        const res = await apiFetch('/api/admin/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+
+        if (res.ok) {
+            alert('메뉴 설정이 저장되었습니다.');
+            setOriginalMenuSettings(prev => ({ ...prev, ...updates }));
+        } else {
+            alert('저장 실패. 다시 시도해주세요.');
+        }
+    };
+
+    const toggleMenu = (key: keyof typeof menuSettings) => {
+        setMenuSettings(prev => ({
+            ...prev,
+            [key]: prev[key] === 'false' ? 'true' : 'false'
+        }));
     };
 
     useEffect(() => {
@@ -224,6 +280,42 @@ export default function AdminPage() {
                         * 대시보드는 현황을 요약하여 보여줍니다. 상세 관리는 상단 메뉴 또는 사이드바를 이용해 주세요.
                     </p>
                 </div>
+
+                {/* Menu Visibility Settings */}
+                <section className="mb-8">
+                    <h3 className="text-lg font-bold mb-4">메뉴 표시 설정</h3>
+                    <div className="glass p-6 rounded-xl shadow-sm">
+                        <p className="text-sm text-gray-500 mb-5">헤더 네비게이션에 표시할 메뉴를 선택하세요.</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                            {([
+                                { key: 'menu_services_enabled', label: '서비스' },
+                                { key: 'menu_notices_enabled', label: '공지사항' },
+                                { key: 'menu_faq_enabled', label: 'FAQ' },
+                                { key: 'menu_qna_enabled', label: 'Q&A' },
+                            ] as { key: keyof typeof menuSettings; label: string }[]).map(({ key, label }) => {
+                                const isOn = menuSettings[key] !== 'false';
+                                return (
+                                    <div key={key} className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-white">
+                                        <span className="text-sm font-medium text-gray-700">{label}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleMenu(key)}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isOn ? 'bg-black' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${isOn ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                        <span className={`text-xs font-semibold ${isOn ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {isOn ? '표시' : '숨김'}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <Button onClick={handleSaveMenuSettings} className="w-full bg-black text-white hover:bg-gray-800">
+                            메뉴 설정 저장
+                        </Button>
+                    </div>
+                </section>
 
                 <div className="grid lg:grid-cols-2 gap-8">
                     {/* Admin Account Settings */}
