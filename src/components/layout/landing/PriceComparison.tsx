@@ -51,8 +51,12 @@ export default function PriceComparison() {
                                     <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 6개월 / 12개월 선택 가능</li>
                                     <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 장기간 안정적 이용</li>
                                 </ul>
-                                <div className="mt-2 text-sm font-bold text-primary flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                    서비스 신청하기 →
+                                <div className="mt-4 w-full">
+                                    <div className="relative w-full bg-primary text-primary-foreground font-bold py-3 px-6 rounded-xl text-center text-sm shadow-lg transition-all duration-200 group-hover:shadow-primary/40 group-hover:shadow-xl group-hover:scale-105 flex items-center justify-center gap-2">
+                                        <span className="animate-pulse inline-block w-2 h-2 rounded-full bg-green-300"></span>
+                                        지금 바로 신청하기
+                                        <span className="text-base">→</span>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
