@@ -63,7 +63,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
     const [product, setProduct] = useState<Product | null>(null);
     const [plans, setPlans] = useState<Plan[]>([]);
-    const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+    const [selectedPeriod, setSelectedPeriod] = useState<number>(12);
     const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
@@ -109,7 +109,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     if (prodData.product_plans && prodData.product_plans.length > 0) {
                         const sortedPlans = [...prodData.product_plans].sort((a, b) => a.duration_months - b.duration_months);
                         setPlans(sortedPlans);
-                        setSelectedPeriod(sortedPlans[sortedPlans.length - 1].duration_months);
+                        const prefer12 = sortedPlans.find(p => p.duration_months === 12);
+                        setSelectedPeriod(prefer12 ? 12 : sortedPlans[sortedPlans.length - 1].duration_months);
                     }
                 }
 
@@ -385,7 +386,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                     }}
                                 >
                                     <span>
-                                        {plan.duration_months}개월
+                                        {plan.duration_months === 25 ? '24개월 +1개월' : `${plan.duration_months}개월`}
                                         {plan.discount_rate > 0 && (
                                             <span className="ml-1 text-[10px] text-green-600 font-normal">
                                                 ({plan.discount_rate}% 할인)
