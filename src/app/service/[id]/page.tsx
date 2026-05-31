@@ -14,6 +14,7 @@ import { ArrowLeft } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { toast } from 'sonner';
 import { PageLoading } from '@/components/ui/PageLoading';
+import { formatPhoneInput } from '@/lib/utils';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -564,7 +565,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                 placeholder="휴대폰번호를 입력해 주세요."
                                 value={guestInfo.phone}
                                 readOnly={!!user}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: e.target.value })}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: formatPhoneInput(e.target.value) })}
                             />
                             {user && userEmails.length > 1 ? (
                                 <select
