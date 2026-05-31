@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { User, Phone, Calendar, CheckCircle } from 'lucide-react';
 import styles from '../../login/auth.module.css';
 import { toast } from 'sonner';
+import { formatPhoneInput } from '@/lib/utils';
 
 export default function SignupCompletePage() {
     const router = useRouter();
@@ -145,7 +146,8 @@ export default function SignupCompletePage() {
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
+        const { name } = e.target;
+        const value = name === 'phone' ? formatPhoneInput(e.target.value) : e.target.value;
         setFormData(prev => ({ ...prev, [name]: value }));
 
         if (errors[name as keyof typeof errors]) {

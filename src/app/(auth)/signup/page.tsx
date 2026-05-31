@@ -8,6 +8,7 @@ import { Eye, EyeOff, Lock, Mail, User, Phone, Calendar } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import styles from '../login/auth.module.css';
 import { toast } from 'sonner';
+import { formatPhoneInput } from '@/lib/utils';
 
 export default function SignupPage() {
     const [formData, setFormData] = useState({
@@ -187,7 +188,8 @@ export default function SignupPage() {
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
+        const { name } = e.target;
+        const value = name === 'phone' ? formatPhoneInput(e.target.value) : e.target.value;
         setFormData(prev => ({ ...prev, [name]: value }));
 
         // Reset email check if email field changes

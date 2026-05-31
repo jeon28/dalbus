@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import styles from './mypage.module.css';
 import { toast } from 'sonner';
+import { formatPhoneInput } from '@/lib/utils';
 import { PageLoading } from '@/components/ui/PageLoading';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -345,7 +346,7 @@ export default function MyPage() {
                                     id="phone"
                                     type="tel"
                                     value={profileForm.phone}
-                                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                                    onChange={(e) => setProfileForm({ ...profileForm, phone: formatPhoneInput(e.target.value) })}
                                 />
                             </div>
                             <div className="flex gap-2 pt-2">
