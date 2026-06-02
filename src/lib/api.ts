@@ -61,6 +61,12 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
 
+            // 관리자 비밀번호 게이트(Quick Access)로 진입한 경우 토큰을 함께 전송
+            const quickToken = typeof window !== 'undefined' ? sessionStorage.getItem('quick-token') : null;
+            if (quickToken) {
+                xhr.setRequestHeader('X-Quick-Token', quickToken);
+            }
+
             // Default JSON content-type for requests with body
             if (body && !init?.headers) {
                 xhr.setRequestHeader('Content-Type', 'application/json');

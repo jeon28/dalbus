@@ -40,6 +40,9 @@ interface ServiceContextType {
 
 const ServiceContext = createContext<ServiceContextType | undefined>(undefined);
 
+// 관리자 비밀번호 게이트(Quick Access) 토큰 보유 여부 — 비밀번호로 진입한 관리자도 admin으로 인정
+const hasQuickToken = () => typeof window !== 'undefined' && !!sessionStorage.getItem('quick-token');
+
 interface ProductResponse {
     id: string;
     name: string;
@@ -147,10 +150,10 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 };
                 safeSetUser(userObj);
                 localStorage.setItem('dalbus-user', JSON.stringify(userObj));
-                setIsAdmin(profile?.role === 'admin');
+                setIsAdmin(profile?.role === 'admin' || hasQuickToken());
             } else {
                 safeSetUser(null);
-                setIsAdmin(false);
+                setIsAdmin(hasQuickToken());
                 localStorage.removeItem('dalbus-user');
             }
         } catch (error) {
@@ -159,7 +162,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                 console.error('Failed to initialize auth:', error);
             }
             safeSetUser(null);
-            setIsAdmin(false);
+            setIsAdmin(hasQuickToken());
             localStorage.removeItem('dalbus-user');
         } finally {
             if (isMounted.current) setIsHydrated(true);
@@ -221,7 +224,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
             try {
                 if (event === 'SIGNED_OUT') {
                     safeSetUser(null);
-                    setIsAdmin(false);
+                    setIsAdmin(hasQuickToken());
                     localStorage.removeItem('dalbus-user');
                 } else if (session?.user) {
                     const profile = await fetchUserProfile(session.user.id);
@@ -238,10 +241,10 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                     };
                     safeSetUser(userObj);
                     localStorage.setItem('dalbus-user', JSON.stringify(userObj));
-                    setIsAdmin(profile?.role === 'admin');
+                    setIsAdmin(profile?.role === 'admin' || hasQuickToken());
                 } else {
                     safeSetUser(null);
-                    setIsAdmin(false);
+                    setIsAdmin(hasQuickToken());
                     localStorage.removeItem('dalbus-user');
                 }
             } catch (error) {
@@ -301,7 +304,10 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     }, [safeSetUser]);
 
     const loginAdmin = useCallback(() => setIsAdmin(true), []);
-    const logoutAdmin = useCallback(() => setIsAdmin(false), []);
+    const logoutAdmin = useCallback(() => {
+        if (typeof window !== 'undefined') sessionStorage.removeItem('quick-token');
+        setIsAdmin(false);
+    }, []);
 
     // Memoize the context value to avoid unnecessary re-renders of consuming components
     const contextValue = React.useMemo(() => ({
