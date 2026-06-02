@@ -4,17 +4,20 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import styles from '../admin.module.css'; // Reusing admin styles
 import { useRouter } from 'next/navigation';
-import { 
-    Trash2, 
-    FileText, 
-    Search, 
-    Download, 
-    ChevronLeft, 
-    ChevronRight, 
-    ChevronsLeft, 
+import {
+    Trash2,
+    FileText,
+    Search,
+    Download,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
     ChevronsRight,
-    ChevronDown, 
-    ChevronUp 
+    ChevronDown,
+    ChevronUp,
+    Monitor,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
@@ -69,6 +72,27 @@ interface MemberAccount {
     } | null;
 }
 
+interface MypageSub {
+    service_name: string;
+    duration: string;
+    start_date: string;
+    end_date: string;
+    account_id: string;
+    account_pw: string;
+    order_number: string;
+    order_id: string;
+}
+
+interface MypageOrder {
+    id: string;
+    order_number: string;
+    product_name: string;
+    plan_name: string;
+    amount: number;
+    created_at: string;
+    assignment_status: string;
+}
+
 export default function MemberListPage() {
     const { isAdmin } = useServices();
     const router = useRouter();
@@ -98,6 +122,14 @@ export default function MemberListPage() {
     const [loadingAccounts, setLoadingAccounts] = useState(false);
     const [assignInput, setAssignInput] = useState("");
     const [assigning, setAssigning] = useState(false);
+
+    // MyPage Preview Modal State (회원이 보는 마이페이지 그대로)
+    const [isMypageOpen, setIsMypageOpen] = useState(false);
+    const [loadingMypage, setLoadingMypage] = useState(false);
+    const [mypageProfile, setMypageProfile] = useState<{ name?: string; email?: string; phone?: string | null; birth_date?: string | null } | null>(null);
+    const [mypageSubs, setMypageSubs] = useState<MypageSub[]>([]);
+    const [mypageOrders, setMypageOrders] = useState<MypageOrder[]>([]);
+    const [visiblePws, setVisiblePws] = useState<Record<string, boolean>>({});
 
     // Resizing logic
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -316,6 +348,67 @@ export default function MemberListPage() {
             setAssigning(false);
         }
     };
+
+    // 회원이 보는 마이페이지 미리보기
+    const handleOpenMypage = async (member: Member) => {
+        setSelectedMember(member);
+        setIsMypageOpen(true);
+        setLoadingMypage(true);
+        setMypageProfile(null);
+        setMypageSubs([]);
+        setMypageOrders([]);
+        setVisiblePws({});
+
+        type ProdRel = { name?: string } | null;
+        type PlanRel = { duration_months?: number } | null;
+        interface RawOrder { id: string; order_number: string; amount: number; created_at: string; assignment_status: string; products?: ProdRel; product_plans?: PlanRel; }
+        interface RawAssign { id: string; order_id?: string | null; order_number?: string | null; tidal_id?: string | null; tidal_password?: string | null; account_pw?: string | null; account_id?: string | null; start_date?: string | null; end_date?: string | null; orders?: { order_number?: string | null; products?: ProdRel; product_plans?: PlanRel } | null; }
+
+        try {
+            const res = await apiFetch(`/api/admin/members/${member.id}/mypage`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '불러오기 실패');
+
+            setMypageProfile(data.profile || null);
+
+            const subs: MypageSub[] = (data.assignments as RawAssign[] || []).map((a) => ({
+                service_name: a.orders?.products?.name || 'Service',
+                duration: a.orders?.product_plans?.duration_months ? `${a.orders.product_plans.duration_months}개월` : '-',
+                start_date: a.start_date || '-',
+                end_date: a.end_date || '-',
+                account_id: a.tidal_id || a.account_id || '정보 없음',
+                account_pw: a.tidal_password || a.account_pw || '정보 없음',
+                order_number: a.orders?.order_number || a.order_number || '',
+                order_id: a.order_id || a.id,
+            }));
+            setMypageSubs(subs);
+
+            const ords: MypageOrder[] = (data.orders as RawOrder[] || []).map((o) => ({
+                id: o.id,
+                order_number: o.order_number,
+                product_name: o.products?.name || 'Service',
+                plan_name: o.product_plans?.duration_months ? `${o.product_plans.duration_months}개월` : '-',
+                amount: o.amount,
+                created_at: o.created_at,
+                assignment_status: o.assignment_status,
+            }));
+            setMypageOrders(ords);
+        } catch (error) {
+            alert('❌ ' + (error instanceof Error ? error.message : '마이페이지 정보를 불러오지 못했습니다.'));
+            setIsMypageOpen(false);
+        } finally {
+            setLoadingMypage(false);
+        }
+    };
+
+    const orderStatusLabel = (s: string) => {
+        if (s === 'completed') return '이용중';
+        if (s === 'assigned') return '배정완료';
+        if (s === 'waiting') return '대기중';
+        return s || '-';
+    };
+
+    const togglePw = (key: string) => setVisiblePws(prev => ({ ...prev, [key]: !prev[key] }));
 
     const handleExportExcel = async () => {
         setLoading(true);
@@ -554,10 +647,13 @@ export default function MemberListPage() {
                                             </td>
                                             <td className="p-3 text-center">
                                                 <div className="flex items-center justify-center gap-1">
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600" onClick={() => openMemoModal(member)}>
+                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-green-600" title="회원 마이페이지 미리보기" onClick={() => handleOpenMypage(member)}>
+                                                        <Monitor className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600" title="메모" onClick={() => openMemoModal(member)}>
                                                         <FileText className="w-4 h-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-red-500" onClick={() => handleDeleteMember(member)}>
+                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-red-500" title="삭제" onClick={() => handleDeleteMember(member)}>
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </div>
@@ -776,6 +872,115 @@ export default function MemberListPage() {
 
                     <DialogFooter>
                         <Button onClick={() => setIsAccountsOpen(false)}>닫기</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* 회원 마이페이지 미리보기 (회원이 보는 그대로, 읽기전용) */}
+            <Dialog open={isMypageOpen} onOpenChange={setIsMypageOpen}>
+                <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>회원 마이페이지 미리보기 - {selectedMember?.name}</DialogTitle>
+                        <DialogDescription>
+                            이 회원이 마이페이지에서 보는 화면입니다. (읽기전용)
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {loadingMypage ? (
+                        <div className="text-center py-12 text-gray-500">로딩 중...</div>
+                    ) : (
+                        <div className="space-y-6 py-2">
+                            {/* 개인정보 */}
+                            <section className="bg-slate-50 border rounded-xl p-5">
+                                <h3 className="text-sm font-bold mb-3 flex items-center gap-2">👤 개인정보</h3>
+                                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                                    <div><span className="text-xs text-gray-400 block">이메일</span>{mypageProfile?.email || '-'}</div>
+                                    <div><span className="text-xs text-gray-400 block">이름</span>{mypageProfile?.name || '-'}</div>
+                                    <div><span className="text-xs text-gray-400 block">생년월일</span>{mypageProfile?.birth_date || '-'}</div>
+                                    <div><span className="text-xs text-gray-400 block">연락처</span>{mypageProfile?.phone || '-'}</div>
+                                </div>
+                            </section>
+
+                            {/* 내 구독 정보 */}
+                            <section>
+                                <h3 className="text-sm font-bold mb-3 flex items-center gap-2">🎧 내 구독 정보</h3>
+                                {mypageSubs.length > 0 ? (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {mypageSubs.map((sub, idx) => (
+                                            <div key={idx} className="bg-primary/5 border border-primary/10 p-4 rounded-xl space-y-2">
+                                                <div className="flex justify-between items-start">
+                                                    <h4 className="font-bold">{sub.service_name}</h4>
+                                                    <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">이용 중</span>
+                                                </div>
+                                                <div className="text-xs space-y-0.5 text-gray-500">
+                                                    <p>기간: {sub.start_date} ~ {sub.end_date} ({sub.duration})</p>
+                                                    <p>만료일: {sub.end_date}</p>
+                                                    {sub.order_number && <p>주문번호: {sub.order_number.replace(/^DAL-/, '')}</p>}
+                                                </div>
+                                                <div className="bg-white/60 p-2.5 rounded-lg text-sm font-mono space-y-1 border">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-xs text-gray-400">ID:</span>
+                                                        <span className="font-bold">{sub.account_id}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-xs text-gray-400">PW:</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold tracking-widest">
+                                                                {visiblePws[sub.order_id] ? sub.account_pw : '●●●●●●'}
+                                                            </span>
+                                                            <button type="button" onClick={() => togglePw(sub.order_id)} className="text-gray-400 hover:text-gray-700">
+                                                                {visiblePws[sub.order_id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-6 text-gray-400 text-sm border rounded-xl">이용 중인 구독이 없습니다.</div>
+                                )}
+                            </section>
+
+                            {/* 주문 이력 */}
+                            <section>
+                                <h3 className="text-sm font-bold mb-3 flex items-center gap-2">🧾 주문 이력</h3>
+                                {mypageOrders.length > 0 ? (
+                                    <div className="overflow-x-auto border rounded-xl">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left">주문번호</th>
+                                                    <th className="px-3 py-2 text-left">상품</th>
+                                                    <th className="px-3 py-2 text-center">기간</th>
+                                                    <th className="px-3 py-2 text-right">금액</th>
+                                                    <th className="px-3 py-2 text-center">주문일</th>
+                                                    <th className="px-3 py-2 text-center">상태</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {mypageOrders.map((o) => (
+                                                    <tr key={o.id} className="hover:bg-gray-50">
+                                                        <td className="px-3 py-2">{o.order_number?.replace(/^DAL-/, '') || '-'}</td>
+                                                        <td className="px-3 py-2 text-gray-600">{o.product_name}</td>
+                                                        <td className="px-3 py-2 text-center">{o.plan_name}</td>
+                                                        <td className="px-3 py-2 text-right">₩{o.amount?.toLocaleString()}</td>
+                                                        <td className="px-3 py-2 text-center text-gray-500">{new Date(o.created_at).toLocaleDateString()}</td>
+                                                        <td className="px-3 py-2 text-center">{orderStatusLabel(o.assignment_status)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-6 text-gray-400 text-sm border rounded-xl">주문 이력이 없습니다.</div>
+                                )}
+                            </section>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button onClick={() => setIsMypageOpen(false)}>닫기</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
