@@ -70,9 +70,46 @@ export async function GET(
 
         const allAccounts = assignments || [];
 
-        // 4. Transform data to include product/plan info
+        // 4. 배정이 가리키는 주문을 직접 조회해 상품/개월수를 붙인다
+        //    (강제 연결 등으로 회원 소유 주문이 아니어도 상품명·개월수가 따라오도록)
+        type OrderInfo = {
+            id: string;
+            order_number: string | null;
+            products: { name: string } | { name: string }[] | null;
+            product_plans: { duration_months: number } | { duration_months: number }[] | null;
+        };
+        const ordersById = new Map<string, OrderInfo>();
+        const ordersByNumber = new Map<string, OrderInfo>();
+        const registerOrder = (o: OrderInfo) => {
+            if (o.id) ordersById.set(o.id, o);
+            if (o.order_number) ordersByNumber.set(o.order_number, o);
+        };
+        (orders as OrderInfo[] | null || []).forEach(registerOrder);
+
+        // 멤버 주문에 없는 배정의 order_id / order_number 수집
+        const missingIds = Array.from(new Set(
+            allAccounts.map(a => a.order_id).filter((v): v is string => !!v && !ordersById.has(v))
+        ));
+        const missingNumbers = Array.from(new Set(
+            allAccounts.map(a => a.order_number).filter((v): v is string => !!v && !ordersByNumber.has(v))
+        ));
+
+        if (missingIds.length > 0 || missingNumbers.length > 0) {
+            const orClauses: string[] = [];
+            if (missingIds.length > 0) orClauses.push(`id.in.(${missingIds.join(',')})`);
+            if (missingNumbers.length > 0) orClauses.push(`order_number.in.(${missingNumbers.join(',')})`);
+            const { data: extraOrders } = await supabaseAdmin
+                .from('orders')
+                .select('id, order_number, products ( name ), product_plans ( duration_months )')
+                .or(orClauses.join(','));
+            (extraOrders as OrderInfo[] | null || []).forEach(registerOrder);
+        }
+
         const enrichedAccounts = allAccounts.map(account => {
-            const relatedOrder = (orders || []).find(o => o.id === account.order_id || (account.order_number && o.order_number === account.order_number));
+            const relatedOrder =
+                (account.order_id && ordersById.get(account.order_id)) ||
+                (account.order_number && ordersByNumber.get(account.order_number)) ||
+                null;
             return {
                 ...account,
                 orders: relatedOrder || null
