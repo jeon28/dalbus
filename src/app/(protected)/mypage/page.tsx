@@ -389,6 +389,9 @@ export default function MyPage() {
                                         {sub.order_number && (
                                             <p className="text-muted-foreground">주문번호: {sub.order_number.replace(/^DAL-/, '')}</p>
                                         )}
+                                        {sub.slot_number != null && (
+                                            <p className="text-muted-foreground">배정번호: <span className="font-semibold text-foreground">{sub.slot_number}번</span></p>
+                                        )}
                                     </div>
                                     <div className="bg-white/50 p-3 rounded-lg text-sm font-mono space-y-1 border border-white/20">
                                         <div className="flex justify-between">
