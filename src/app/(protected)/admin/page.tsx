@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useServices } from '@/lib/ServiceContext';
 import { useRouter } from 'next/navigation';
 import styles from './admin.module.css';
@@ -263,15 +264,15 @@ export default function AdminPage() {
                         <p className="text-sm text-gray-500 mb-5">헤더 네비게이션에 표시할 메뉴를 선택하세요.</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                             {([
-                                { key: 'menu_services_enabled', label: '서비스' },
-                                { key: 'menu_notices_enabled', label: '공지사항' },
-                                { key: 'menu_faq_enabled', label: 'FAQ' },
-                                { key: 'menu_qna_enabled', label: 'Q&A' },
-                            ] as { key: keyof typeof menuSettings; label: string }[]).map(({ key, label }) => {
+                                { key: 'menu_services_enabled', label: '서비스 관리', href: '/admin/services' },
+                                { key: 'menu_notices_enabled', label: '공지사항 관리', href: '/admin/notices' },
+                                { key: 'menu_faq_enabled', label: 'FAQ 관리', href: '/admin/faqs' },
+                                { key: 'menu_qna_enabled', label: 'Q&A 관리', href: '/admin/qna' },
+                            ] as { key: keyof typeof menuSettings; label: string; href: string }[]).map(({ key, label, href }) => {
                                 const isOn = menuSettings[key] !== 'false';
                                 return (
                                     <div key={key} className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-white">
-                                        <span className="text-sm font-medium text-gray-700">{label}</span>
+                                        <Link href={href} className="text-sm font-bold text-primary hover:underline">{label}</Link>
                                         <button
                                             type="button"
                                             onClick={() => toggleMenu(key)}

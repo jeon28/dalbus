@@ -7,16 +7,13 @@ export const menuItems = [
     { title: "대시보드", href: "/admin", exact: true },
     { title: "주문내역", href: "/admin/orders" },
     { title: "회원정보", href: "/admin/members" },
-    { title: "서비스 관리", href: "/admin/services" },
-    { title: "공지사항 관리", href: "/admin/notices" },
-    { title: "FAQ 관리", href: "/admin/faqs" },
-    { title: "Q&A 관리", href: "/admin/qna" },
     { title: "Tidal 계정", href: "/admin/tidal" },
     { title: "HifiTidal 관리", href: "/admin/hifitidal" },
     { title: "기존 Tidal 계정", href: "/admin/legacy-tidal" },
     { title: "메일 발송 이력", href: "/admin/mail-history" },
     { title: "메일 템플릿 관리", href: "/admin/email-templates" },
 ];
+// 서비스/공지사항/FAQ/Q&A 관리는 대시보드 '메뉴 표시 설정' 카드의 링크로 이동
 
 export function AdminSidebar() {
     const pathname = usePathname();
