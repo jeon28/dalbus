@@ -96,6 +96,8 @@ export default function MemberListPage() {
     const [memberAccounts, setMemberAccounts] = useState<MemberAccount[]>([]);
     const [isAccountsOpen, setIsAccountsOpen] = useState(false);
     const [loadingAccounts, setLoadingAccounts] = useState(false);
+    const [assignInput, setAssignInput] = useState("");
+    const [assigning, setAssigning] = useState(false);
 
     // Resizing logic
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -271,14 +273,10 @@ export default function MemberListPage() {
         }
     };
 
-    const handleOpenAccounts = async (member: Member) => {
-        setSelectedMember(member);
-        setIsAccountsOpen(true);
+    const loadMemberAccounts = useCallback(async (memberId: string) => {
         setLoadingAccounts(true);
-        setMemberAccounts([]);
-
         try {
-            const res = await apiFetch(`/api/admin/members/${member.id}/accounts`);
+            const res = await apiFetch(`/api/admin/members/${memberId}/accounts`);
             if (!res.ok) throw new Error('Failed to fetch accounts');
             const data = await res.json();
             setMemberAccounts(data);
@@ -287,6 +285,35 @@ export default function MemberListPage() {
             alert('주문 계정 정보를 불러오는데 실패했습니다.');
         } finally {
             setLoadingAccounts(false);
+        }
+    }, []);
+
+    const handleOpenAccounts = async (member: Member) => {
+        setSelectedMember(member);
+        setIsAccountsOpen(true);
+        setMemberAccounts([]);
+        setAssignInput("");
+        await loadMemberAccounts(member.id);
+    };
+
+    const handleForceAssign = async () => {
+        if (!selectedMember || !assignInput.trim() || assigning) return;
+        setAssigning(true);
+        try {
+            const res = await apiFetch(`/api/admin/members/${selectedMember.id}/accounts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignmentNumber: assignInput.trim() })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '연결에 실패했습니다.');
+            alert('✅ ' + (data.message || '연결되었습니다.'));
+            setAssignInput("");
+            await loadMemberAccounts(selectedMember.id);
+        } catch (error) {
+            alert('❌ ' + (error instanceof Error ? error.message : '연결에 실패했습니다.'));
+        } finally {
+            setAssigning(false);
         }
     };
 
@@ -673,6 +700,25 @@ export default function MemberListPage() {
                             이 회원이 주문한 계정 목록입니다.
                         </DialogDescription>
                     </DialogHeader>
+
+                    {/* 배정번호로 강제 연결 */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+                        <span className="text-xs font-semibold text-blue-800 shrink-0">배정번호 강제 지정</span>
+                        <input
+                            type="text"
+                            value={assignInput}
+                            onChange={(e) => setAssignInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleForceAssign(); }}
+                            placeholder="예: TG001-5"
+                            className="flex-1 h-8 px-3 rounded-md border border-blue-200 bg-white text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                        <Button size="sm" onClick={handleForceAssign} disabled={assigning || !assignInput.trim()} className="shrink-0">
+                            {assigning ? '연결 중...' : '이 회원에 연결'}
+                        </Button>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                        배정번호(로그인ID-슬롯)를 입력하면 해당 배정을 이 회원 이메일로 연결합니다.
+                    </p>
 
                     <div className="py-4">
                         {loadingAccounts ? (
