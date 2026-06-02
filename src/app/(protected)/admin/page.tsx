@@ -25,7 +25,7 @@ interface BankAccount {
 }
 
 export default function AdminPage() {
-    const { isAdmin, isHydrated, user } = useServices();
+    const { isAdmin, isHydrated } = useServices();
     const router = useRouter();
 
     const [orders, setOrders] = useState<Order[]>([]);
@@ -191,10 +191,11 @@ export default function AdminPage() {
     };
 
     useEffect(() => {
-        if (isHydrated && !user) {
-            router.push('/login?returnTo=/admin');
+        // 비밀번호 게이트(레이아웃)를 통과하지 못한 경우만 홈으로
+        if (isHydrated && !isAdmin) {
+            router.replace('/');
         }
-    }, [isHydrated, user, router]);
+    }, [isHydrated, isAdmin, router]);
 
     if (!isHydrated) {
         return (
@@ -204,34 +205,8 @@ export default function AdminPage() {
         );
     }
 
-    // 1. 로그인하지 않은 경우 (Guest) -> 렌더링 중단 (useEffect에서 리다이렉트 처리)
-    if (!user) return null;
-
-    // 2. 관리자 권한(role)이 없는 경우 -> 403 Access Denied
-    if (user.role !== 'admin') {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
-                <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-gray-100">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">접근 권한이 없습니다</h2>
-                    <p className="text-gray-500 mb-6">
-                        이 페이지는 관리자 전용입니다.<br />
-                        일반 사용자는 접근할 수 없습니다.
-                    </p>
-                    <Button
-                        onClick={() => window.location.href = '/'}
-                        className="w-full bg-black hover:bg-gray-800 text-white font-bold h-12"
-                    >
-                        메인으로 돌아가기
-                    </Button>
-                </div>
-            </div>
-        );
-    }
+    // 관리자가 아니면 렌더링 중단 (useEffect에서 리다이렉트 처리)
+    if (!isAdmin) return null;
 
     if (loading) return <div className="p-8">Loading...</div>;
 
