@@ -706,9 +706,9 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs leading-relaxed text-blue-800">
-                        <BellRing className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
-                        <span>회원가입하시면 <strong>잔여기간 조회</strong> 및 만료 안내 등 알림 서비스를 보내드립니다.</span>
+                    <div className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
+                        <BellRing className="w-4 h-4 shrink-0 text-blue-500" />
+                        <span>회원가입 시 잔여기간 조회·만료 알림 서비스를 보내드립니다.</span>
                     </div>
 
                     <SignupForm
