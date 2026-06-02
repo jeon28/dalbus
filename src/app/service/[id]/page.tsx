@@ -15,6 +15,9 @@ import DOMPurify from 'dompurify';
 import { toast } from 'sonner';
 import { PageLoading } from '@/components/ui/PageLoading';
 import { formatPhoneInput } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import SignupForm from '@/components/auth/SignupForm';
+import { BellRing } from 'lucide-react';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -88,6 +91,9 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         privacy: false,
         terms: false
     });
+
+    // 비회원 구독 시 회원가입 유도 모달
+    const [signupModalOpen, setSignupModalOpen] = useState(false);
 
     // Unpack params
     useEffect(() => {
@@ -250,9 +256,30 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             return;
         }
 
+        // 비회원이면 주문 진행 전에 회원가입 유도 모달을 띄운다.
+        if (!user) {
+            setSignupModalOpen(true);
+            return;
+        }
+
+        await createOrder();
+    };
+
+    // 실제 주문 생성 + 결제 안내 페이지 이동
+    // userIdOverride: 회원가입 직후 주문을 이어갈 때 새 사용자 ID를 전달
+    const createOrder = async (userIdOverride?: string) => {
+        if (!product) return;
+
+        const selectedPlan = plans.find(p => p.duration_months === selectedPeriod);
+        if (!selectedPlan) {
+            toast.error('선택한 기간에 해당하는 요금제 정보를 찾을 수 없습니다.');
+            return;
+        }
+
         setLoading(true);
 
         const amount = selectedPlan.price;
+        const effectiveUserId = userIdOverride || user?.id || null;
 
         const orderData: Record<string, string | number | boolean | null> = {
             product_id: product.id,
@@ -260,7 +287,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             amount: amount,
             payment_status: 'pending',
             assignment_status: 'waiting',
-            is_guest: !user,
+            is_guest: !effectiveUserId,
             buyer_name: guestInfo.name,
             buyer_phone: guestInfo.phone,
             buyer_email: guestInfo.email,
@@ -269,8 +296,8 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             related_order_id: selectedOrder?.id || null,
         };
 
-        if (user) {
-            orderData.user_id = user.id;
+        if (effectiveUserId) {
+            orderData.user_id = effectiveUserId;
         }
 
         try {
@@ -668,6 +695,36 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     {loading ? '처리 중...' : '구독하기'}
                 </button>
             </div>
+
+            {/* 비회원 → 회원가입 유도 모달 */}
+            <Dialog open={signupModalOpen} onOpenChange={setSignupModalOpen}>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="text-center">달버스 회원가입</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            회원가입 후 주문을 이어가거나 비회원으로 주문할 수 있습니다.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs leading-relaxed text-blue-800">
+                        <BellRing className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+                        <span>회원가입하시면 <strong>잔여기간 조회</strong> 및 만료 안내 등 알림 서비스를 보내드립니다.</span>
+                    </div>
+
+                    <SignupForm
+                        compact
+                        initialValues={{ email: guestInfo.email, name: guestInfo.name, phone: guestInfo.phone }}
+                        onSignupSuccess={(uid) => {
+                            setSignupModalOpen(false);
+                            createOrder(uid);
+                        }}
+                        onGuestContinue={() => {
+                            setSignupModalOpen(false);
+                            createOrder();
+                        }}
+                    />
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }

@@ -101,6 +101,64 @@
     transition: all 0.3s ease;
 }
 
+.guestBtn {
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-top: 8px;
+    border: 1px solid var(--glass-border);
+    background: #ffffff;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.guestBtn:hover:not(:disabled) {
+    background: var(--secondary);
+}
+
+.guestBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 컴팩트(높이 ~20% 축소) — 회원가입 폼 전용 */
+.compact .form {
+    gap: 11px;
+}
+
+.compact .inputGroup {
+    gap: 5px;
+}
+
+.compact .inputGroup input,
+.compact .inputGroup select {
+    padding: 9.5px 15px;
+}
+
+.compact .socialGroup {
+    gap: 9px;
+}
+
+.compact .socialBtn {
+    padding: 9.5px;
+}
+
+.compact .divider {
+    margin: 10px 0 4px 0;
+}
+
+.compact .submitBtn {
+    padding: 9.5px;
+    margin-top: 8px;
+}
+
+.compact .guestBtn {
+    padding: 9.5px;
+    margin-top: 6px;
+}
+
 .footer {
     text-align: center;
     font-size: 0.9rem;
