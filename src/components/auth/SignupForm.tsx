@@ -35,7 +35,7 @@ export default function SignupForm({
     const [formData, setFormData] = useState({
         id: initialValues?.email || '',
         name: initialValues?.name || '',
-        birthYear: '',
+        birthYear: '1990',
         birthMonth: '',
         birthDay: '',
         phone: initialValues?.phone ? formatPhoneInput(initialValues.phone) : '',
