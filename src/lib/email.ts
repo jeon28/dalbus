@@ -309,10 +309,13 @@ interface AssignmentNotificationProps {
     endDate: string;
 }
 
-export const sendAssignmentNotification = async (
-    targetEmail: string,
+/**
+ * 계정 세팅 완료 안내 메일의 제목/본문을 생성한다 (발송하지 않음).
+ * 발송 전 미리보기/편집 용도로 사용한다.
+ */
+export const buildAssignmentNotification = async (
     details: AssignmentNotificationProps
-) => {
+): Promise<{ subject: string; html: string }> => {
     const { buyerName, productName, tidalId, tidalPw, endDate } = details;
 
     // DB 템플릿 시도
@@ -330,7 +333,7 @@ export const sendAssignmentNotification = async (
           <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">계정 세팅 완료 안내</h2>
           <p>안녕하세요, <strong>${buyerName}</strong>님!</p>
           <p>요청하신 <strong>${productName}</strong> 서비스의 계정 세팅이 완료되었습니다.</p>
-          
+
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>Tidal ID:</strong> ${tidalId}</p>
             <p style="margin: 5px 0;"><strong>Tidal PW:</strong> ${tidalPw}</p>
@@ -339,7 +342,7 @@ export const sendAssignmentNotification = async (
 
           <p>지금 바로 로그인하여 서비스를 이용하실 수 있습니다.</p>
           <p>이용 중 궁금하신 점이 있다면 언제든 문의해 주세요.</p>
-          
+
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <p style="font-size: 0.8rem; color: #666;">
             본 메일은 발신전용입니다. 문의사항은 관리자 페이지 또는 고객센터를 이용해 주세요.
@@ -347,9 +350,18 @@ export const sendAssignmentNotification = async (
         </div>
       `;
 
+    return { subject, html };
+};
+
+export const sendAssignmentNotification = async (
+    targetEmail: string,
+    details: AssignmentNotificationProps
+) => {
+    const { subject, html } = await buildAssignmentNotification(details);
+
     return sendEmail({
         recipient_email: targetEmail,
-        recipient_name: buyerName,
+        recipient_name: details.buyerName,
         subject,
         html,
         mailType: '계정 세팅 완료 안내'

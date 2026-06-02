@@ -22,6 +22,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
 import { CheckCircle2, Circle, HelpCircle, Timer, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -181,6 +182,15 @@ export default function OrderHistoryPage() {
     const [newBuyerName, setNewBuyerName] = useState('');
     const [newBuyerEmail, setNewBuyerEmail] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Completion / Resend Email Preview Modal State
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [emailOrderId, setEmailOrderId] = useState<string | null>(null);
+    const [emailMode, setEmailMode] = useState<'complete' | 'resend'>('complete');
+    const [emailRecipient, setEmailRecipient] = useState('');
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailHtml, setEmailHtml] = useState('');
+    const [emailLoading, setEmailLoading] = useState(false);
 
     const fetchOrders = useCallback(async () => {
         setIsLoading(true);
@@ -572,31 +582,70 @@ export default function OrderHistoryPage() {
         return null;
     };
 
-    const markAsCompleted = async (orderId: string) => {
-        if (isProcessing || !confirm('작업완료 하시겠습니까 ?')) return;
+    // 작업완료/메일재발송 버튼 → 발송될 메일을 미리보기 모달로 띄운다
+    const openEmailModal = async (order: Order, mode: 'complete' | 'resend') => {
+        if (isProcessing) return;
+        setEmailOrderId(order.id);
+        setEmailMode(mode);
+        setEmailRecipient(order.profiles?.email || order.buyer_email || '');
+        setEmailSubject('');
+        setEmailHtml('');
+        setEmailLoading(true);
+        setIsEmailModalOpen(true);
+
+        try {
+            const res = await apiFetch(`/api/admin/orders/${order.id}/email-preview`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '미리보기를 불러오지 못했습니다.');
+
+            setEmailSubject(data.subject || '');
+            setEmailHtml(data.html || '');
+            if (data.recipientEmail) setEmailRecipient(data.recipientEmail);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '미리보기를 불러오지 못했습니다.';
+            alert(message);
+            setIsEmailModalOpen(false);
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    // 모달에서 수정한 내용으로 메일 발송 (+ 작업완료 모드면 상태도 완료 처리)
+    const sendCompletionEmail = async (skipEmail = false) => {
+        if (!emailOrderId || isProcessing) return;
         setIsProcessing(true);
         try {
-            const res = await apiFetch(`/api/admin/orders/${orderId}/status`, {
+            const res = await apiFetch(`/api/admin/orders/${emailOrderId}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ assignment_status: 'completed' })
+                body: JSON.stringify({
+                    assignment_status: 'completed',
+                    ...(skipEmail
+                        ? { skipEmail: true }
+                        : { emailSubject, emailHtml })
+                })
             });
 
             if (!res.ok) throw new Error('Update failed');
 
             const result = await res.json();
 
-            if (result.emailSent) {
-                alert('작업이 완료되었으며, 고객에게 안내 메일이 발송되었습니다.');
+            if (skipEmail) {
+                alert('메일 발송 없이 작업 완료 처리되었습니다.');
+            } else if (result.emailSent) {
+                alert(emailMode === 'resend'
+                    ? '고객에게 안내 메일이 재발송되었습니다.'
+                    : '작업이 완료되었으며, 고객에게 안내 메일이 발송되었습니다.');
             } else if (result.emailError) {
                 alert(`작업 완료 처리되었으나 메일 발송에 실패했습니다.\n오류: ${result.emailError}`);
             } else {
-                alert('작어 완료 처리되었습니다.');
+                alert('작업 완료 처리되었습니다.');
             }
 
+            setIsEmailModalOpen(false);
             fetchOrders();
         } catch {
-            alert('상태 변경 실패');
+            alert('처리에 실패했습니다.');
         } finally {
             setIsProcessing(false);
         }
@@ -746,12 +795,12 @@ export default function OrderHistoryPage() {
                             )}
                             {status === '배정완료' && (
                                 <>
-                                    <Button className="flex-1" size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
+                                    <Button className="flex-1" size="sm" variant="outline" onClick={() => openEmailModal(o, 'complete')} disabled={isProcessing}>작업완료</Button>
                                     <Button size="sm" variant="ghost" className="px-2" onClick={() => handleUnassign(o)} disabled={isProcessing}>취소</Button>
                                 </>
                             )}
                             {status === '작업완료' && (
-                                <Button className="flex-1 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" size="sm" variant="outline" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일 재발송</Button>
+                                <Button className="flex-1 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" size="sm" variant="outline" onClick={() => openEmailModal(o, 'resend')} disabled={isProcessing}>메일 재발송</Button>
                             )}
                             {status === '삭제됨' && (
                                 <Button className="flex-1 text-xs text-red-600 border-red-200 hover:bg-red-50" size="sm" variant="outline" onClick={() => handleHardDeleteOrder(o)} disabled={isProcessing}>완전삭제</Button>
@@ -872,12 +921,12 @@ export default function OrderHistoryPage() {
                                         )}
                                         {status === '배정완료' && (
                                             <>
-                                                <Button size="sm" variant="outline" className="w-20" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>작업완료</Button>
+                                                <Button size="sm" variant="outline" className="w-20" onClick={() => openEmailModal(o, 'complete')} disabled={isProcessing}>작업완료</Button>
                                                 <Button size="sm" variant="ghost" className="text-xs text-gray-400 h-7" onClick={() => handleUnassign(o)} disabled={isProcessing}>배정취소</Button>
                                             </>
                                         )}
                                         {status === '작업완료' && (
-                                            <Button size="sm" variant="outline" className="w-20 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => markAsCompleted(o.id)} disabled={isProcessing}>메일재발송</Button>
+                                            <Button size="sm" variant="outline" className="w-20 text-xs text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => openEmailModal(o, 'resend')} disabled={isProcessing}>메일재발송</Button>
                                         )}
                                         {status === '삭제됨' && (
                                             <Button size="sm" variant="outline" className="w-20 text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleHardDeleteOrder(o)} disabled={isProcessing}>완전삭제</Button>
@@ -1334,6 +1383,80 @@ export default function OrderHistoryPage() {
                     <DialogFooter>
                         <Button onClick={confirmMatch} disabled={!selectedAccount || isProcessing}>
                             {isProcessing ? '처리 중...' : '배정 확인'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Completion / Resend Email Preview Modal */}
+            <Dialog open={isEmailModalOpen} onOpenChange={setIsEmailModalOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {emailMode === 'resend' ? '안내 메일 재발송' : '작업완료 안내 메일 발송'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            발송될 메일 내용을 확인하고 필요한 부분을 수정한 뒤 발송하세요.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {emailLoading ? (
+                        <div className="flex justify-center py-16">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                            <div className="space-y-1">
+                                <Label className="text-xs text-gray-500">받는 사람</Label>
+                                <Input value={emailRecipient} readOnly className="h-9 bg-gray-50 text-sm" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs text-gray-500">제목</Label>
+                                <Input
+                                    value={emailSubject}
+                                    onChange={(e) => setEmailSubject(e.target.value)}
+                                    className="h-9 text-sm"
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-gray-500">본문 (HTML)</Label>
+                                    <Textarea
+                                        value={emailHtml}
+                                        onChange={(e) => setEmailHtml(e.target.value)}
+                                        className="h-[320px] text-xs font-mono leading-relaxed"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-gray-500">미리보기</Label>
+                                    <iframe
+                                        title="email-preview"
+                                        srcDoc={emailHtml}
+                                        className="w-full h-[320px] border border-gray-200 rounded-md bg-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-2 sm:gap-2">
+                        {emailMode === 'complete' && (
+                            <Button
+                                variant="ghost"
+                                className="text-gray-500"
+                                onClick={() => sendCompletionEmail(true)}
+                                disabled={isProcessing || emailLoading}
+                            >
+                                메일 없이 완료
+                            </Button>
+                        )}
+                        <Button
+                            onClick={() => sendCompletionEmail(false)}
+                            disabled={isProcessing || emailLoading || !emailSubject || !emailHtml}
+                        >
+                            {isProcessing
+                                ? '발송 중...'
+                                : emailMode === 'resend' ? '메일 재발송' : '발송 및 작업완료'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
