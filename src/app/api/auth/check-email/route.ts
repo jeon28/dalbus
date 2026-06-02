@@ -23,6 +23,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // hifitidal.com 도메인은 내부 계정용이므로 가입 불가
+        if (normalizedEmail.endsWith('@hifitidal.com')) {
+            return NextResponse.json(
+                { available: false, message: '가입할 수 없는 메일입니다.' }
+            );
+        }
+
         // Check if email exists in profiles table
         // Use select and potentially multiple rows to handle cases where duplicates might already exist
         const { data, error } = await supabaseAdmin

@@ -135,6 +135,14 @@ export default function SignupForm({
             return;
         }
 
+        // hifitidal.com 도메인은 내부 계정용이므로 가입 불가
+        if (email.endsWith('@hifitidal.com')) {
+            setEmailChecked(false);
+            setErrors(prev => ({ ...prev, id: '가입할 수 없는 메일입니다.' }));
+            if (!silent) idRef.current?.focus();
+            return;
+        }
+
         setCheckingEmail(true);
         try {
             const response = await apiFetch('/api/auth/check-email', {
