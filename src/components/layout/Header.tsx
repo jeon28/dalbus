@@ -13,7 +13,12 @@ interface NavSettings {
 }
 
 export default function Header() {
-    const { user, isAdmin, logout } = useServices();
+    const { user, isAdmin, logout, logoutAdmin } = useServices();
+
+    const handleAdminLogout = () => {
+        logoutAdmin();
+        window.location.href = '/public';
+    };
     const [navSettings, setNavSettings] = useState<NavSettings>({
         menu_services_enabled: true,
         menu_notices_enabled: true,
@@ -70,7 +75,7 @@ export default function Header() {
                         {user ? (
                             <>
                                 {isAdmin && (
-                                    <Link href="/admin">
+                                    <Link href="/admin/orders">
                                         <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3 font-bold text-primary">관리자</Button>
                                     </Link>
                                 )}
@@ -81,6 +86,21 @@ export default function Header() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => logout()}
+                                    className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3"
+                                >
+                                    로그아웃
+                                </Button>
+                            </>
+                        ) : isAdmin ? (
+                            // 비밀번호 게이트로 진입한 관리자 (Supabase 세션 없음)
+                            <>
+                                <Link href="/admin/orders">
+                                    <Button variant="ghost" size="sm" className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3 font-bold text-primary">관리자</Button>
+                                </Link>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleAdminLogout}
                                     className="h-8 md:h-9 text-xs md:text-sm px-2 md:px-3"
                                 >
                                     로그아웃

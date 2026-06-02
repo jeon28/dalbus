@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useServices } from '@/lib/ServiceContext';
 import { useRouter } from 'next/navigation';
 import styles from './admin.module.css';
@@ -25,7 +26,7 @@ interface BankAccount {
 }
 
 export default function AdminPage() {
-    const { isAdmin, isHydrated, user } = useServices();
+    const { isAdmin, isHydrated } = useServices();
     const router = useRouter();
 
     const [orders, setOrders] = useState<Order[]>([]);
@@ -191,10 +192,11 @@ export default function AdminPage() {
     };
 
     useEffect(() => {
-        if (isHydrated && !user) {
-            router.push('/login?returnTo=/admin');
+        // 비밀번호 게이트(레이아웃)를 통과하지 못한 경우만 홈으로
+        if (isHydrated && !isAdmin) {
+            router.replace('/');
         }
-    }, [isHydrated, user, router]);
+    }, [isHydrated, isAdmin, router]);
 
     if (!isHydrated) {
         return (
@@ -204,34 +206,8 @@ export default function AdminPage() {
         );
     }
 
-    // 1. 로그인하지 않은 경우 (Guest) -> 렌더링 중단 (useEffect에서 리다이렉트 처리)
-    if (!user) return null;
-
-    // 2. 관리자 권한(role)이 없는 경우 -> 403 Access Denied
-    if (user.role !== 'admin') {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
-                <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-gray-100">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">접근 권한이 없습니다</h2>
-                    <p className="text-gray-500 mb-6">
-                        이 페이지는 관리자 전용입니다.<br />
-                        일반 사용자는 접근할 수 없습니다.
-                    </p>
-                    <Button
-                        onClick={() => window.location.href = '/'}
-                        className="w-full bg-black hover:bg-gray-800 text-white font-bold h-12"
-                    >
-                        메인으로 돌아가기
-                    </Button>
-                </div>
-            </div>
-        );
-    }
+    // 관리자가 아니면 렌더링 중단 (useEffect에서 리다이렉트 처리)
+    if (!isAdmin) return null;
 
     if (loading) return <div className="p-8">Loading...</div>;
 
@@ -288,15 +264,15 @@ export default function AdminPage() {
                         <p className="text-sm text-gray-500 mb-5">헤더 네비게이션에 표시할 메뉴를 선택하세요.</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                             {([
-                                { key: 'menu_services_enabled', label: '서비스' },
-                                { key: 'menu_notices_enabled', label: '공지사항' },
-                                { key: 'menu_faq_enabled', label: 'FAQ' },
-                                { key: 'menu_qna_enabled', label: 'Q&A' },
-                            ] as { key: keyof typeof menuSettings; label: string }[]).map(({ key, label }) => {
+                                { key: 'menu_services_enabled', label: '서비스 관리', href: '/admin/services' },
+                                { key: 'menu_notices_enabled', label: '공지사항 관리', href: '/admin/notices' },
+                                { key: 'menu_faq_enabled', label: 'FAQ 관리', href: '/admin/faqs' },
+                                { key: 'menu_qna_enabled', label: 'Q&A 관리', href: '/admin/qna' },
+                            ] as { key: keyof typeof menuSettings; label: string; href: string }[]).map(({ key, label, href }) => {
                                 const isOn = menuSettings[key] !== 'false';
                                 return (
                                     <div key={key} className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-white">
-                                        <span className="text-sm font-medium text-gray-700">{label}</span>
+                                        <Link href={href} className="text-sm font-bold text-primary hover:underline">{label}</Link>
                                         <button
                                             type="button"
                                             onClick={() => toggleMenu(key)}
@@ -314,6 +290,25 @@ export default function AdminPage() {
                         <Button onClick={handleSaveMenuSettings} className="w-full bg-black text-white hover:bg-gray-800">
                             메뉴 설정 저장
                         </Button>
+                    </div>
+                </section>
+
+                {/* 메일 관리 바로가기 */}
+                <section className="mb-8">
+                    <h3 className="text-lg font-bold mb-4">메일 관리</h3>
+                    <div className="glass p-6 rounded-xl shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Link
+                            href="/admin/mail-history"
+                            className="flex items-center justify-center p-4 rounded-lg border bg-white text-sm font-bold text-primary hover:bg-gray-50 hover:underline transition-colors"
+                        >
+                            메일 발송 이력
+                        </Link>
+                        <Link
+                            href="/admin/email-templates"
+                            className="flex items-center justify-center p-4 rounded-lg border bg-white text-sm font-bold text-primary hover:bg-gray-50 hover:underline transition-colors"
+                        >
+                            메일 템플릿 관리
+                        </Link>
                     </div>
                 </section>
 

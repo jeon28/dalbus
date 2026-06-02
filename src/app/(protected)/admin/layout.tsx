@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useServices } from "@/lib/ServiceContext";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminMobileMenu } from "@/components/admin/AdminMobileMenu";
@@ -12,6 +13,8 @@ export default function AdminLayout({
     children: React.ReactNode;
 }) {
     const { loginAdmin } = useServices();
+    const router = useRouter();
+    const pathname = usePathname();
     const [unlocked, setUnlocked] = useState(false);
     const [checked, setChecked] = useState(false);
 
@@ -28,6 +31,10 @@ export default function AdminLayout({
     const handleUnlock = () => {
         setUnlocked(true);
         loginAdmin();
+        // 기본 진입 화면을 주문내역으로
+        if (pathname === '/admin') {
+            router.replace('/admin/orders');
+        }
     };
 
     if (!checked) return null;
