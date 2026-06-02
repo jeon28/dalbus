@@ -10,10 +10,8 @@ export const menuItems = [
     { title: "Tidal 계정", href: "/admin/tidal" },
     { title: "HifiTidal 관리", href: "/admin/hifitidal" },
     { title: "기존 Tidal 계정", href: "/admin/legacy-tidal" },
-    { title: "메일 발송 이력", href: "/admin/mail-history" },
-    { title: "메일 템플릿 관리", href: "/admin/email-templates" },
 ];
-// 서비스/공지사항/FAQ/Q&A 관리는 대시보드 '메뉴 표시 설정' 카드의 링크로 이동
+// 서비스/공지사항/FAQ/Q&A 관리, 메일 발송 이력/템플릿 관리는 대시보드 링크로 이동
 
 export function AdminSidebar() {
     const pathname = usePathname();

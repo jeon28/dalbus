@@ -293,6 +293,25 @@ export default function AdminPage() {
                     </div>
                 </section>
 
+                {/* 메일 관리 바로가기 */}
+                <section className="mb-8">
+                    <h3 className="text-lg font-bold mb-4">메일 관리</h3>
+                    <div className="glass p-6 rounded-xl shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Link
+                            href="/admin/mail-history"
+                            className="flex items-center justify-center p-4 rounded-lg border bg-white text-sm font-bold text-primary hover:bg-gray-50 hover:underline transition-colors"
+                        >
+                            메일 발송 이력
+                        </Link>
+                        <Link
+                            href="/admin/email-templates"
+                            className="flex items-center justify-center p-4 rounded-lg border bg-white text-sm font-bold text-primary hover:bg-gray-50 hover:underline transition-colors"
+                        >
+                            메일 템플릿 관리
+                        </Link>
+                    </div>
+                </section>
+
                 <div className="grid lg:grid-cols-2 gap-8">
                     {/* Admin Account Settings */}
                     <section className={styles.settingsSection}>
