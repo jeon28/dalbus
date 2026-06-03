@@ -130,6 +130,8 @@ export default function MemberListPage() {
     const [mypageSubs, setMypageSubs] = useState<MypageSub[]>([]);
     const [mypageOrders, setMypageOrders] = useState<MypageOrder[]>([]);
     const [visiblePws, setVisiblePws] = useState<Record<string, boolean>>({});
+    const [orderLinkInput, setOrderLinkInput] = useState("");
+    const [linkingOrder, setLinkingOrder] = useState(false);
 
     // Resizing logic
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -350,14 +352,8 @@ export default function MemberListPage() {
     };
 
     // 회원이 보는 마이페이지 미리보기
-    const handleOpenMypage = async (member: Member) => {
-        setSelectedMember(member);
-        setIsMypageOpen(true);
+    const loadMypage = useCallback(async (memberId: string) => {
         setLoadingMypage(true);
-        setMypageProfile(null);
-        setMypageSubs([]);
-        setMypageOrders([]);
-        setVisiblePws({});
 
         type ProdRel = { name?: string } | null;
         type PlanRel = { duration_months?: number } | null;
@@ -365,7 +361,7 @@ export default function MemberListPage() {
         interface RawAssign { id: string; order_id?: string | null; order_number?: string | null; tidal_id?: string | null; tidal_password?: string | null; account_pw?: string | null; account_id?: string | null; start_date?: string | null; end_date?: string | null; orders?: { order_number?: string | null; products?: ProdRel; product_plans?: PlanRel } | null; }
 
         try {
-            const res = await apiFetch(`/api/admin/members/${member.id}/mypage`);
+            const res = await apiFetch(`/api/admin/members/${memberId}/mypage`);
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '불러오기 실패');
 
@@ -398,6 +394,38 @@ export default function MemberListPage() {
             setIsMypageOpen(false);
         } finally {
             setLoadingMypage(false);
+        }
+    }, []);
+
+    const handleOpenMypage = async (member: Member) => {
+        setSelectedMember(member);
+        setIsMypageOpen(true);
+        setMypageProfile(null);
+        setMypageSubs([]);
+        setMypageOrders([]);
+        setVisiblePws({});
+        setOrderLinkInput("");
+        await loadMypage(member.id);
+    };
+
+    const handleLinkOrder = async () => {
+        if (!selectedMember || !orderLinkInput.trim() || linkingOrder) return;
+        setLinkingOrder(true);
+        try {
+            const res = await apiFetch(`/api/admin/members/${selectedMember.id}/mypage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderNumber: orderLinkInput.trim() })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '연동에 실패했습니다.');
+            alert('✅ ' + (data.message || '연동되었습니다.'));
+            setOrderLinkInput("");
+            await loadMypage(selectedMember.id);
+        } catch (error) {
+            alert('❌ ' + (error instanceof Error ? error.message : '연동에 실패했습니다.'));
+        } finally {
+            setLinkingOrder(false);
         }
     };
 
@@ -885,6 +913,25 @@ export default function MemberListPage() {
                             이 회원이 마이페이지에서 보는 화면입니다. (읽기전용)
                         </DialogDescription>
                     </DialogHeader>
+
+                    {/* 주문번호로 강제 연동 (주문이 회원과 연결 안 된 경우) */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                        <span className="text-xs font-semibold text-amber-800 shrink-0">주문번호 강제 연동</span>
+                        <input
+                            type="text"
+                            value={orderLinkInput}
+                            onChange={(e) => setOrderLinkInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleLinkOrder(); }}
+                            placeholder="예: 06060201"
+                            className="flex-1 h-8 px-3 rounded-md border border-amber-200 bg-white text-sm outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <Button size="sm" onClick={handleLinkOrder} disabled={linkingOrder || !orderLinkInput.trim()} className="shrink-0">
+                            {linkingOrder ? '연동 중...' : '이 회원에 연동'}
+                        </Button>
+                    </div>
+                    <p className="text-[11px] text-gray-400 -mt-1">
+                        주문이 회원과 연결되지 않은 경우, 주문번호를 입력하면 해당 주문을 이 회원 계정에 연동합니다.
+                    </p>
 
                     {loadingMypage ? (
                         <div className="text-center py-12 text-gray-500">로딩 중...</div>

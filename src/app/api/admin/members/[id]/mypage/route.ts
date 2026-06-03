@@ -78,3 +78,65 @@ export async function GET(
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+
+/**
+ * 주문번호로 특정 주문을 이 회원에 강제 연동한다.
+ * 연동 = 해당 orders 행의 user_id 를 회원으로 설정 → 마이페이지에 주문/구독이 표시됨.
+ */
+export async function POST(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id: userId } = await params;
+
+    try {
+        const body = await request.json();
+        const orderNumber = (body.orderNumber || '').toString().trim().replace(/^DAL-/i, '');
+        if (!orderNumber) {
+            return NextResponse.json({ error: '주문번호를 입력해주세요.' }, { status: 400 });
+        }
+
+        // 회원 확인
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, name, email')
+            .eq('id', userId)
+            .single();
+        if (profileError || !profile) {
+            return NextResponse.json({ error: '회원 정보를 찾을 수 없습니다.' }, { status: 404 });
+        }
+
+        // 주문번호로 주문 찾기 (DAL- 접두사 유무 모두 허용)
+        const { data: orders, error: orderError } = await supabaseAdmin
+            .from('orders')
+            .select('id, order_number, user_id, buyer_name')
+            .or(`order_number.eq.${orderNumber},order_number.eq.DAL-${orderNumber}`)
+            .not('is_deleted', 'is', true)
+            .limit(1);
+        if (orderError) {
+            return NextResponse.json({ error: orderError.message }, { status: 500 });
+        }
+        const order = orders?.[0];
+        if (!order) {
+            return NextResponse.json({ error: `주문번호 '${orderNumber}' 주문을 찾을 수 없습니다.` }, { status: 404 });
+        }
+
+        // 회원으로 연동 (user_id 설정)
+        const { error: updateError } = await supabaseAdmin
+            .from('orders')
+            .update({ user_id: userId })
+            .eq('id', order.id);
+        if (updateError) {
+            return NextResponse.json({ error: updateError.message }, { status: 500 });
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: `주문번호 ${order.order_number}을(를) ${profile.name || profile.email} 회원에게 연동했습니다.`
+        });
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Server error';
+        console.error('Member order link error:', error);
+        return NextResponse.json({ error: msg }, { status: 500 });
+    }
+}
