@@ -17,7 +17,9 @@ import {
     ChevronUp,
     Monitor,
     Eye,
-    EyeOff
+    EyeOff,
+    MoreVertical,
+    ListOrdered
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
@@ -38,6 +40,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export interface Member {
     id: string;
@@ -544,6 +553,9 @@ export default function MemberListPage() {
                         <table className={`${styles.table} ${styles.resizableTable} text-xs mx-auto`} style={{ width: '100%', minWidth: '1000px' }}>
                             <thead className="bg-gray-100 border-b">
                                 <tr>
+                                    <th style={{ width: 56 }} className="p-3 text-xs font-bold text-gray-600 uppercase text-center">
+                                        관리
+                                    </th>
                                     <th style={{ width: columnWidths.email }} className="relative group p-3 text-xs font-bold text-gray-600 uppercase">
                                         <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => handleSort('email')}>
                                             아이디(이메일)
@@ -606,28 +618,48 @@ export default function MemberListPage() {
                                         </div>
                                         <div onMouseDown={(e) => startResizing('memo', e)} className={styles.resizer} />
                                     </th>
-                                    <th style={{ width: columnWidths.action }} className="relative group p-3 text-xs font-bold text-gray-600 uppercase text-center">
-                                        관리
-                                        <div onMouseDown={(e) => startResizing('action', e)} className={styles.resizer} />
-                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-20 text-slate-400">
+                                        <td colSpan={9} className="text-center py-20 text-slate-400">
                                             회원 정보를 불러오는 중...
                                         </td>
                                     </tr>
                                 ) : members.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-20 text-slate-400">
+                                        <td colSpan={9} className="text-center py-20 text-slate-400">
                                             등록된 회원이 없습니다.
                                         </td>
                                     </tr>
                                 ) : (
                                     members.map((member) => (
                                         <tr key={member.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-2 text-center">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-slate-700" title="관리">
+                                                            <MoreVertical className="w-4 h-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="start" className="w-44">
+                                                        <DropdownMenuItem onClick={() => handleOpenMypage(member)}>
+                                                            <Monitor className="w-4 h-4 mr-2" /> 마이페이지 미리보기
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleOpenAccounts(member)}>
+                                                            <ListOrdered className="w-4 h-4 mr-2" /> 주문 계정 목록
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => openMemoModal(member)}>
+                                                            <FileText className="w-4 h-4 mr-2" /> 메모
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onClick={() => handleDeleteMember(member)} className="text-red-600 focus:text-red-600">
+                                                            <Trash2 className="w-4 h-4 mr-2" /> 삭제
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </td>
                                             <td className="p-3 text-xs text-blue-600 hover:underline cursor-pointer truncate" onClick={() => handleOpenAccounts(member)}>
                                                 {member.email}
                                             </td>
@@ -671,19 +703,6 @@ export default function MemberListPage() {
                                                     ) : (
                                                         <span className="text-slate-300 italic">메모 없음</span>
                                                     )}
-                                                </div>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-green-600" title="회원 마이페이지 미리보기" onClick={() => handleOpenMypage(member)}>
-                                                        <Monitor className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600" title="메모" onClick={() => openMemoModal(member)}>
-                                                        <FileText className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-red-500" title="삭제" onClick={() => handleDeleteMember(member)}>
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>
