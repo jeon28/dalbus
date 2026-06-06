@@ -1299,21 +1299,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </div>
             </header>
 
-            <div className={`${styles.content} container mx-auto px-4 py-6`}>
-                <div className="mb-6">
-                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Status</span>
-                        <span>전체 계정 현황 (HifiTidal)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                         <span className="text-xs text-gray-400">데이터가 실시간으로 동기화됩니다.</span>
-                    </div>
-                </div>
-
+            <div className={`${styles.content} container mx-auto px-4 py-2`}>
                 {isGridView ? (
                     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                        <div className="overflow-x-auto custom-scrollbar">
+                        <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
                             <table className="w-full text-sm min-w-[1400px]">
                             <thead>
                                 <tr className="bg-gray-100/80 sticky top-0 z-10 border-b border-gray-200 shadow-sm text-sm">
@@ -1633,7 +1622,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </div>
                 ) : (
                     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
                             <div className="grid grid-cols-13 gap-4 p-4 bg-gray-50/80 font-bold border-b text-sm text-gray-600 min-w-[1200px]">
                             <div className="col-span-1 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('login_id')}>
                                 GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
