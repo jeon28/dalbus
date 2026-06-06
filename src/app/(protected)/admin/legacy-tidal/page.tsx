@@ -11,7 +11,7 @@ export default function AdminLegacyTidalPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
             </div>
         }>
-            <LegacyTidalContent basePath="/admin/legacy-tidal" titlePrefix="Legacy" fetchFn={apiFetch} />
+            <LegacyTidalContent basePath="/admin/legacy-tidal" titlePrefix="Legacy" fetchFn={apiFetch} useDirectInput={true} />
         </Suspense>
     );
 }

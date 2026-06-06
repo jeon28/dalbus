@@ -305,18 +305,20 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         } catch (error) { console.error(error); }
     }, [fetchFn]);
 
+    const apiBase = '/api' + basePath;
+
     const fetchDeletedAssignments = useCallback(async () => {
         setIsLoadingDeleted(true);
         setDeletedAssignments([]);
         try {
-            const res = await fetchFn('/api/quick/legacy-tidal/inactive?showDeleted=true', { cache: 'no-store' });
+            const res = await fetchFn(`${apiBase}/inactive?showDeleted=true`, { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 setDeletedAssignments(Array.isArray(data) ? data : []);
             }
         } catch (e) { console.error(e); }
         finally { setIsLoadingDeleted(false); }
-    }, [fetchFn]);
+    }, [fetchFn, apiBase]);
 
     useEffect(() => {
         fetchAccounts();
@@ -562,7 +564,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         if (!selectedAccount || selectedSlot === null) return;
         if (!directForm.buyer_name && !directForm.buyer_email) { alert('이름 또는 이메일을 입력해주세요.'); return; }
         try {
-            const res = await fetchFn(`/api/quick/legacy-tidal/assign/${selectedAccount.id}`, {
+            const res = await fetchFn(`${apiBase}/assign/${selectedAccount.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...directForm, slot_number: selectedSlot, tidal_password: slotPasswordModal, type: selectedSlot === 0 ? 'master' : 'user' })
