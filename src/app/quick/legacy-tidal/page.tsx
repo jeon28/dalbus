@@ -24,10 +24,11 @@ export default function QuickLegacyTidalPage() {
                 <span className="ml-3">데이터 로딩 중...</span>
             </div>
         }>
-            <LegacyTidalContent 
-                basePath="/quick/legacy-tidal" 
-                titlePrefix="Quick" 
-                fetchFn={quickFetch} 
+            <LegacyTidalContent
+                basePath="/quick/legacy-tidal"
+                titlePrefix="Quick"
+                fetchFn={quickFetch}
+                useDirectInput={true}
             />
         </Suspense>
     );

@@ -61,6 +61,8 @@ interface Assignment {
     memo?: string;
     assigned_at?: string;
     updated_at?: string;
+    accounts?: { id: string; login_id: string };
+    master_id?: string;
 }
 
 interface Account {
@@ -122,12 +124,14 @@ interface LegacyTidalContentProps {
     titlePrefix?: string;
     basePath: string;
     fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
+    useDirectInput?: boolean;
 }
 
-export function LegacyTidalContent({ 
-    titlePrefix = "Legacy", 
-    basePath, 
-    fetchFn = fetch 
+export function LegacyTidalContent({
+    titlePrefix = "Legacy",
+    basePath,
+    fetchFn = fetch,
+    useDirectInput = false
 }: LegacyTidalContentProps) {
     const router = useRouter();
 
@@ -182,6 +186,13 @@ export function LegacyTidalContent({
 
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [extendMsgCopied, setExtendMsgCopied] = useState(false);
+
+    // 직접입력/삭제복원 배정 모달용 상태
+    const [assignTab, setAssignTab] = useState<'direct' | 'restore'>('direct');
+    const [directForm, setDirectForm] = useState({ tidal_id: '', buyer_name: '', buyer_phone: '', buyer_email: '', start_date: '', end_date: '', period_months: 0, amount: 0, order_number: '', memo: '' });
+    const [deletedAssignments, setDeletedAssignments] = useState<Assignment[]>([]);
+    const [isLoadingDeleted, setIsLoadingDeleted] = useState(false);
+    const [deletedSearch, setDeletedSearch] = useState('');
 
     const handleMasterIdClick = (e: React.MouseEvent, id: string | null | undefined) => {
         if (!id || id === '-') return;
@@ -294,11 +305,24 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         } catch (error) { console.error(error); }
     }, [fetchFn]);
 
+    const fetchDeletedAssignments = useCallback(async () => {
+        setIsLoadingDeleted(true);
+        setDeletedAssignments([]);
+        try {
+            const res = await fetchFn('/api/quick/legacy-tidal/inactive?showDeleted=true', { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                setDeletedAssignments(Array.isArray(data) ? data : []);
+            }
+        } catch (e) { console.error(e); }
+        finally { setIsLoadingDeleted(false); }
+    }, [fetchFn]);
+
     useEffect(() => {
         fetchAccounts();
-        fetchPendingOrders();
+        if (!useDirectInput) fetchPendingOrders();
         fetchTemplates();
-    }, [fetchAccounts, fetchPendingOrders, fetchTemplates]);
+    }, [fetchAccounts, fetchPendingOrders, fetchTemplates, useDirectInput]);
 
     const getFlattenedAssignments = useCallback(() => {
         const flattened: { id: string; assignment: Assignment; account: Account; period: number; originalAccIndex: number }[] = [];
@@ -534,6 +558,37 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         }
     };
 
+    const handleDirectAssign = async () => {
+        if (!selectedAccount || selectedSlot === null) return;
+        if (!directForm.buyer_name && !directForm.buyer_email) { alert('이름 또는 이메일을 입력해주세요.'); return; }
+        try {
+            const res = await fetchFn(`/api/quick/legacy-tidal/assign/${selectedAccount.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...directForm, slot_number: selectedSlot, tidal_password: slotPasswordModal, type: selectedSlot === 0 ? 'master' : 'user' })
+            });
+            if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Create failed'); }
+            setIsAssignModalOpen(false);
+            fetchAccounts();
+        } catch (e) { alert('저장 실패: ' + (e instanceof Error ? e.message : String(e))); }
+    };
+
+    const handleLoadFromDeleted = (deleted: Assignment) => {
+        setDirectForm({
+            tidal_id: deleted.tidal_id || '',
+            buyer_name: deleted.buyer_name || '',
+            buyer_phone: deleted.buyer_phone || '',
+            buyer_email: deleted.buyer_email || '',
+            start_date: deleted.start_date || '',
+            end_date: deleted.end_date || '',
+            period_months: deleted.period_months || 0,
+            amount: deleted.amount || 0,
+            order_number: deleted.order_number || '',
+            memo: deleted.memo || ''
+        });
+        setAssignTab('direct');
+    };
+
     const exportToExcel = () => {
         const flatData = getFlattenedAssignments();
         const excelData = flatData.map((item, idx) => ({
@@ -585,7 +640,15 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     const openAssignModal = (account: Account, slotIndex: number) => {
         setSelectedAccount(account); setSelectedSlot(slotIndex);
-        setSlotPasswordModal(generateTidalPassword()); setIsAssignModalOpen(true);
+        setSlotPasswordModal(generateTidalPassword());
+        if (useDirectInput) {
+            setAssignTab('direct');
+            setDeletedSearch('');
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const defaultEnd = format(addDays(new Date(), 12 * 30), 'yyyy-MM-dd');
+            setDirectForm({ tidal_id: '', buyer_name: '', buyer_phone: '', buyer_email: '', start_date: today, end_date: defaultEnd, period_months: 12, amount: 0, order_number: '', memo: '' });
+        }
+        setIsAssignModalOpen(true);
     };
 
     const handleAssign = (orderId: string) => {
@@ -937,7 +1000,17 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             onChange={() => handleToggleSelection(assignment.id)} 
                                                         />
                                                     </td>
-                                                    <td className="text-center font-bold px-2 border-r border-slate-100 text-slate-700 whitespace-nowrap">
+                                                    <td
+                                                        className="text-center font-bold px-2 border-r border-slate-100 text-slate-700 whitespace-nowrap cursor-pointer hover:text-blue-600 hover:underline"
+                                                        title="리스트 뷰에서 그룹 열기"
+                                                        onClick={() => {
+                                                            setIsGridView(false);
+                                                            setExpandedRows(new Set([acc.id]));
+                                                            setTimeout(() => {
+                                                                document.getElementById(`account-${acc.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                            }, 100);
+                                                        }}
+                                                    >
                                                         {acc.login_id}-{assignment.slot_number + 1}
                                                     </td>
                                                     <td className="text-center border-r border-slate-100 whitespace-nowrap">
@@ -1343,33 +1416,169 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 </DialogContent>
             </Dialog>
 
-            {/* [MODAL: ASSIGN ORDER] */}
-            <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader><DialogTitle>배정할 주문 선택 ({selectedAccount?.login_id})</DialogTitle></DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border">
-                            <Label className="text-xs font-bold text-slate-500 whitespace-nowrap">초기 비번</Label>
-                            <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-9 bg-white" />
+            {/* [MODAL: ASSIGN — 직접입력 or 주문배정] */}
+            {useDirectInput ? (
+                <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+                    <DialogContent className="sm:max-w-[520px]">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <UserPlus className="w-4 h-4 text-emerald-600" />
+                                회원 배정 — {selectedAccount?.login_id} #{(selectedSlot ?? 0) + 1}
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="flex gap-0 border-b mb-3">
+                            <button
+                                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${assignTab === 'direct' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+                                onClick={() => setAssignTab('direct')}
+                            >직접 입력</button>
+                            <button
+                                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${assignTab === 'restore' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+                                onClick={() => { setAssignTab('restore'); if (deletedAssignments.length === 0 && !isLoadingDeleted) fetchDeletedAssignments(); }}
+                            >삭제 기록에서 불러오기</button>
                         </div>
-                        <div className="border rounded-xl overflow-hidden shadow-inner bg-white min-h-[200px] max-h-[400px] overflow-y-auto">
-                            {pendingOrders.length === 0 ? (
-                                <div className="p-12 text-center text-slate-400 text-sm">대기 중인 주문이 없습니다.</div>
-                            ) : (
-                                pendingOrders.map(order => (
-                                    <div key={order.id} className="flex justify-between items-center p-3 border-b hover:bg-slate-50 transition-colors">
-                                        <div className="space-y-0.5">
-                                            <div className="font-bold text-slate-800">{order.buyer_name || order.profiles?.name}</div>
-                                            <div className="text-[10px] text-slate-500">{order.products?.name} | {order.order_number}</div>
-                                        </div>
-                                        <Button size="sm" onClick={() => handleAssign(order.id)} className="h-8">배정</Button>
+
+                        {assignTab === 'direct' ? (
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border">
+                                    <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap w-14">초기 비번</Label>
+                                    <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-8 flex-1 bg-white text-xs font-mono" />
+                                    <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs shrink-0" onClick={() => setSlotPasswordModal(generateTidalPassword())}>재생성</Button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">이름</Label>
+                                        <Input value={directForm.buyer_name} onChange={e => setDirectForm(p => ({...p, buyer_name: e.target.value}))} className="h-9" placeholder="홍길동" />
                                     </div>
-                                ))
-                            )}
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">Tidal ID</Label>
+                                        <Input value={directForm.tidal_id} onChange={e => setDirectForm(p => ({...p, tidal_id: e.target.value}))} className="h-9" placeholder="user@hifitidal.com" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">전화번호</Label>
+                                        <Input value={directForm.buyer_phone} onChange={e => setDirectForm(p => ({...p, buyer_phone: e.target.value}))} className="h-9" placeholder="010-0000-0000" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">이메일</Label>
+                                        <Input value={directForm.buyer_email} onChange={e => setDirectForm(p => ({...p, buyer_email: e.target.value}))} className="h-9" placeholder="user@email.com" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-[1fr_1fr_0.55fr] gap-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">시작일</Label>
+                                        <Input type="date" value={directForm.start_date} onChange={e => {
+                                            const s = e.target.value;
+                                            let ne = directForm.end_date;
+                                            if (s && directForm.period_months) { try { ne = format(addDays(parseISO(s), directForm.period_months * 30), 'yyyy-MM-dd'); } catch {} }
+                                            setDirectForm(p => ({...p, start_date: s, end_date: ne}));
+                                        }} className="h-9 text-xs px-2" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">종료일</Label>
+                                        <Input type="date" value={directForm.end_date} onChange={e => {
+                                            const ne = e.target.value;
+                                            let nm = directForm.period_months;
+                                            if (directForm.start_date && ne) { try { nm = Math.max(0, Math.floor(differenceInDays(parseISO(ne), parseISO(directForm.start_date)) / 30)); } catch {} }
+                                            setDirectForm(p => ({...p, end_date: ne, period_months: nm}));
+                                        }} className="h-9 text-xs px-2" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">개월</Label>
+                                        <Input type="number" value={directForm.period_months || ''} onChange={e => {
+                                            const m = parseInt(e.target.value) || 0;
+                                            let ne = directForm.end_date;
+                                            if (directForm.start_date) { try { ne = format(addDays(parseISO(directForm.start_date), m * 30), 'yyyy-MM-dd'); } catch {} }
+                                            setDirectForm(p => ({...p, period_months: m, end_date: ne}));
+                                        }} className="h-9" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">계약금액</Label>
+                                        <Input type="number" value={directForm.amount || ''} onChange={e => setDirectForm(p => ({...p, amount: Number(e.target.value) || 0}))} className="h-9" placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-slate-500 font-semibold">주문번호 (선택)</Label>
+                                        <Input value={directForm.order_number} onChange={e => setDirectForm(p => ({...p, order_number: e.target.value}))} className="h-9" placeholder="자유 입력" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-slate-500 font-semibold">메모 (선택)</Label>
+                                    <Input value={directForm.memo} onChange={e => setDirectForm(p => ({...p, memo: e.target.value}))} className="h-9" />
+                                </div>
+                                <DialogFooter className="pt-1">
+                                    <Button variant="outline" onClick={() => setIsAssignModalOpen(false)} className="h-9">취소</Button>
+                                    <Button onClick={handleDirectAssign} className="h-9 bg-emerald-600 hover:bg-emerald-700">배정하기</Button>
+                                </DialogFooter>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <Input placeholder="이름, Tidal ID, 이메일로 검색..." className="pl-8 h-9 text-sm" value={deletedSearch} onChange={e => setDeletedSearch(e.target.value)} />
+                                </div>
+                                <div className="border rounded-xl overflow-hidden bg-white min-h-[180px] max-h-[340px] overflow-y-auto">
+                                    {isLoadingDeleted ? (
+                                        <div className="flex items-center justify-center p-12 text-slate-400 text-sm">
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-2" /> 불러오는 중...
+                                        </div>
+                                    ) : (() => {
+                                        const q = deletedSearch.toLowerCase();
+                                        const filtered = deletedAssignments.filter(d =>
+                                            !q || (d.buyer_name || '').toLowerCase().includes(q) || (d.tidal_id || '').toLowerCase().includes(q) || (d.buyer_email || '').toLowerCase().includes(q)
+                                        );
+                                        if (filtered.length === 0) return <div className="p-12 text-center text-slate-400 text-sm">삭제된 데이터가 없습니다.</div>;
+                                        return filtered.map(d => (
+                                            <div key={d.id} className="flex items-center justify-between px-3 py-2.5 border-b last:border-0 hover:bg-slate-50">
+                                                <div className="min-w-0">
+                                                    <div className="font-semibold text-sm text-slate-800 truncate">{d.buyer_name || '(이름없음)'}</div>
+                                                    <div className="text-[10px] text-slate-400 font-mono truncate">
+                                                        {d.tidal_id || '-'} · {d.end_date ? format(parseISO(d.end_date), 'yy-MM-dd') : '-'} · {d.accounts?.login_id || '-'}
+                                                    </div>
+                                                </div>
+                                                <Button size="sm" variant="outline" className="ml-2 h-7 px-2.5 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 shrink-0" onClick={() => handleLoadFromDeleted(d)}>
+                                                    불러오기
+                                                </Button>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setIsAssignModalOpen(false)} className="h-9">취소</Button>
+                                </DialogFooter>
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
+            ) : (
+                <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader><DialogTitle>배정할 주문 선택 ({selectedAccount?.login_id})</DialogTitle></DialogHeader>
+                        <div className="py-4 space-y-4">
+                            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border">
+                                <Label className="text-xs font-bold text-slate-500 whitespace-nowrap">초기 비번</Label>
+                                <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-9 bg-white" />
+                            </div>
+                            <div className="border rounded-xl overflow-hidden shadow-inner bg-white min-h-[200px] max-h-[400px] overflow-y-auto">
+                                {pendingOrders.length === 0 ? (
+                                    <div className="p-12 text-center text-slate-400 text-sm">대기 중인 주문이 없습니다.</div>
+                                ) : (
+                                    pendingOrders.map(order => (
+                                        <div key={order.id} className="flex justify-between items-center p-3 border-b hover:bg-slate-50 transition-colors">
+                                            <div className="space-y-0.5">
+                                                <div className="font-bold text-slate-800">{order.buyer_name || order.profiles?.name}</div>
+                                                <div className="text-[10px] text-slate-500">{order.products?.name} | {order.order_number}</div>
+                                            </div>
+                                            <Button size="sm" onClick={() => handleAssign(order.id)} className="h-8">배정</Button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                    </DialogContent>
+                </Dialog>
+            )}
 
             {/* [MODAL: QUICK EDIT (Sub-item)] */}
             <Dialog open={isQuickEditModalOpen} onOpenChange={setIsQuickEditModalOpen}>
