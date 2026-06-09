@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { validateEmail } from '@/lib/emailValidation';
+
+// dns 모듈 사용 — Edge 런타임에서는 동작하지 않으므로 Node.js 런타임 강제
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
     try {
@@ -12,26 +16,19 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const normalizedEmail = email.toLowerCase();
+        const normalizedEmail = email.trim().toLowerCase();
 
-        // Check email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(normalizedEmail)) {
+        // 형식 검사 + 차단 도메인 + 화이트리스트(즉시 통과) + DNS MX 점검
+        const validation = await validateEmail(normalizedEmail);
+        if (!validation.valid) {
+            const status = validation.reason === 'invalid_format' ? 400 : 200;
             return NextResponse.json(
-                { available: false, message: '올바른 이메일 형식이 아닙니다.' },
-                { status: 400 }
+                { available: false, message: validation.message, reason: validation.reason },
+                { status }
             );
         }
 
-        // hifitidal.com 도메인은 내부 계정용이므로 가입 불가
-        if (normalizedEmail.endsWith('@hifitidal.com')) {
-            return NextResponse.json(
-                { available: false, message: '가입할 수 없는 메일입니다.' }
-            );
-        }
-
-        // Check if email exists in profiles table
-        // Use select and potentially multiple rows to handle cases where duplicates might already exist
+        // 중복 가입 확인 (여러 행이 있을 수 있는 케이스 대비)
         const { data, error } = await supabaseAdmin
             .from('profiles')
             .select('email')
@@ -48,13 +45,15 @@ export async function POST(request: NextRequest) {
         if (data && data.length > 0) {
             return NextResponse.json({
                 available: false,
-                message: '이미 사용 중인 이메일입니다.'
+                message: '이미 사용 중인 이메일입니다.',
+                reason: 'duplicate',
             });
         }
 
         return NextResponse.json({
             available: true,
-            message: '사용 가능한 이메일입니다.'
+            message: '사용 가능한 이메일입니다.',
+            reason: validation.reason,
         });
 
     } catch (error) {

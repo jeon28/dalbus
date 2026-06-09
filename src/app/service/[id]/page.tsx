@@ -250,6 +250,22 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             return;
         }
 
+        // 실제 수신 가능한 이메일인지 점검 (메일을 받을 수 없는 도메인이면 주문 차단)
+        try {
+            const emailRes = await apiFetch('/api/auth/validate-email', {
+                method: 'POST',
+                body: JSON.stringify({ email: guestInfo.email })
+            });
+            const emailResult = await emailRes.json();
+            if (!emailResult.valid) {
+                toast.error(emailResult.message || '사용할 수 없는 이메일입니다.');
+                return;
+            }
+        } catch {
+            toast.error('이메일 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+
         const selectedPlan = plans.find(p => p.duration_months === selectedPeriod);
         if (!selectedPlan) {
             toast.error('선택한 기간에 해당하는 요금제 정보를 찾을 수 없습니다.');

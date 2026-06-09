@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendAdminOrderNotification, sendUserOrderNotification } from '@/lib/email';
 import { getServerSession } from '@/lib/auth';
 import { normalizePhone } from '@/lib/utils';
+import { validateEmail } from '@/lib/emailValidation';
+
+// validateEmail 이 dns 모듈을 사용 — Edge 런타임 회피
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
     try {
@@ -11,6 +15,15 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
         const { orderData, product_name, plan_name, extend_tidal_id } = body;
+
+        // 0. 구매자 이메일 검증 (형식 + 차단 도메인 + 실제 수신 가능 여부)
+        //    메일을 받을 수 없는 도메인으로는 주문이 완료되지 않도록 서버에서 차단
+        if (orderData?.buyer_email) {
+            const emailCheck = await validateEmail(orderData.buyer_email);
+            if (!emailCheck.valid) {
+                return NextResponse.json({ error: emailCheck.message }, { status: 400 });
+            }
+        }
 
         // 1. 활성화된 입금 계좌 중 1개 자동 할당 (라운드로빈)
         //    클라이언트의 계좌 선택을 신뢰하지 않고 서버에서 결정
