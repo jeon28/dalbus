@@ -33,6 +33,7 @@ import {
     ChevronDown
 } from "lucide-react";
 import { format } from 'date-fns';
+import DOMPurify from 'dompurify';
 
 interface MailHistory {
     id: string;
@@ -581,7 +582,7 @@ export default function MailHistoryPage() {
                             <div className="flex-1 overflow-auto p-6 bg-white">
                                 <div
                                     className="mail-content-preview border rounded p-4 min-h-[400px]"
-                                    dangerouslySetInnerHTML={{ __html: selectedMail.content }}
+                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedMail.content) }}
                                 />
                             </div>
                         </>

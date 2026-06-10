@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Session } from '@supabase/supabase-js';
+import { logger } from './logger';
 
 // Global session cache to avoid redundant and concurrent async calls
 let sessionCache: Session | null = null;
@@ -26,7 +27,7 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     const method = init?.method || 'GET';
     const body = init?.body;
 
-    console.log(`[apiFetch] Request start: ${method} ${url}`);
+    logger.debug(`[apiFetch] Request start: ${method} ${url}`);
 
     try {
         // Use cached session if available to avoid awaiting
@@ -34,16 +35,15 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 
         // If not cached and we are in the browser, try to wait for the initial promise
         if (!session && sessionPromise) {
-            console.log('[apiFetch] Waiting for supabase session...');
+            logger.debug('[apiFetch] Waiting for supabase session...');
             const result = await supabase.auth.getSession();
             session = result.data.session;
             sessionCache = session;
-            console.log('[apiFetch] Session retrieved:', session ? 'OK' : 'None');
+            logger.debug('[apiFetch] Session retrieved:', session ? 'OK' : 'None');
         }
 
         const token = session?.access_token;
-        if (!token) console.warn('[apiFetch] Missing access token! Session:', session ? 'Found but no token' : 'None');
-        else console.log('[apiFetch] Token prefix:', token.substring(0, 10));
+        if (!token) logger.debug('[apiFetch] Missing access token');
 
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();

@@ -1,22 +1,18 @@
-"use client";
-
-import React, { useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { apiFetch } from '@/lib/api';
-import { PageLoading } from '@/components/ui/PageLoading';
+import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Image from 'next/image';
 import { Badge } from "@/components/ui/badge";
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-interface Product {
-    id: string;
-    name: string;
-    icon: string;
-    price: string;
-    description?: string;
-    tag: string;
-}
+// 상품/가격 변동 반영을 위해 1분 단위 재생성 (SEO + 빠른 초기 렌더)
+export const revalidate = 60;
+
+export const metadata: Metadata = {
+    title: '구독 상품 | 달버스',
+    description: '타이달(TIDAL) HIFI를 월 최저가로. 달버스의 프리미엄 구독 상품을 확인하세요.',
+};
 
 interface ProductResponse {
     id: string;
@@ -27,42 +23,44 @@ interface ProductResponse {
     tags: string[] | null;
 }
 
-export default function ProductsPage() {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+interface Product {
+    id: string;
+    name: string;
+    icon: string;
+    price: string;
+    description: string;
+    tag: string;
+}
 
-    useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const response = await apiFetch('/api/public/products');
-                if (!response.ok) throw new Error('Failed to fetch products');
+async function getProducts(): Promise<Product[]> {
+    const { data, error } = await supabaseAdmin
+        .from('products')
+        .select(`*, product_plans (*)`)
+        .eq('is_active', true)
+        .eq('product_plans.is_active', true)
+        .not('name', 'ilike', '%HifiTidal%')
+        .order('sort_order', { ascending: true });
 
-                const data: ProductResponse[] = await response.json();
-                
-                // Hifitidal 상품은 노출되지 않도록 필터링
-                const mapped: Product[] = data
-                    .filter((p) => !p.name.toLowerCase().includes('hifitidal'))
-                    .map((p) => ({
-                        id: p.id,
-                        name: p.name,
-                        icon: p.image_url || 'default',
-                        price: p.original_price.toLocaleString(),
-                        description: p.description || '가장 저렴하고 안전한 공유 계정 이용.',
-                        tag: (p.tags && p.tags.length > 0) ? p.tags[0] : ''
-                    }));
+    if (error) {
+        console.error('Error fetching public products (SSR):', error);
+        return [];
+    }
 
-                setProducts(mapped);
-            } catch (error) {
-                console.error('Error fetching products:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    return ((data as ProductResponse[]) ?? [])
+        // Hifitidal 상품 2차 필터(안전망)
+        .filter((p) => !p.name.toLowerCase().includes('hifitidal'))
+        .map((p) => ({
+            id: p.id,
+            name: p.name,
+            icon: p.image_url || 'default',
+            price: p.original_price.toLocaleString(),
+            description: p.description || '가장 저렴하고 안전한 공유 계정 이용.',
+            tag: (p.tags && p.tags.length > 0) ? p.tags[0] : '',
+        }));
+}
 
-        fetchProducts();
-    }, []);
-
-    if (isLoading) return <PageLoading />;
+export default async function ProductsPage() {
+    const products = await getProducts();
 
     return (
         <div className="container py-12 px-4 max-w-4xl mx-auto">

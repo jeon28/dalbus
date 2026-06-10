@@ -1,5 +1,6 @@
 
 import Image from "next/image";
+import Link from "next/link";
 
 export default function HeroSection() {
     return (
@@ -33,6 +34,24 @@ export default function HeroSection() {
                             달버스에서 타이달을 만나보세요{"\n"}
                             음악에만 집중하세요, 달버스가 책임집니다.
                         </p>
+                    </div>
+
+                    {/* 1차 CTA: 첫 화면에서 바로 행동 유도 */}
+                    <div className="flex flex-col items-center gap-3 pt-2">
+                        <p className="text-sm text-muted-foreground">
+                            월 <span className="text-lg font-bold text-primary">₩4,900~</span>
+                            <span className="mx-2 text-gray-300">|</span>
+                            정가 ₩16,000 대비 <span className="font-semibold text-primary">최대 70% 절약</span>
+                        </p>
+                        <Link
+                            href="/public/products"
+                            className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-4 text-base font-bold text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95"
+                        >
+                            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-300" />
+                            지금 바로 신청하기
+                            <span className="text-lg transition-transform group-hover:translate-x-1">→</span>
+                        </Link>
+                        <p className="text-xs text-muted-foreground">고정 아이디 · 만료 알림 · 안심 구독</p>
                     </div>
                 </div>
             </div>

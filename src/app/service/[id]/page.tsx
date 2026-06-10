@@ -15,9 +15,6 @@ import DOMPurify from 'dompurify';
 import { toast } from 'sonner';
 import { PageLoading } from '@/components/ui/PageLoading';
 import { formatPhoneInput } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import SignupForm from '@/components/auth/SignupForm';
-import { BellRing } from 'lucide-react';
 
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -91,9 +88,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         privacy: false,
         terms: false
     });
-
-    // 비회원 구독 시 회원가입 유도 모달
-    const [signupModalOpen, setSignupModalOpen] = useState(false);
 
     // Unpack params
     useEffect(() => {
@@ -272,12 +266,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
             return;
         }
 
-        // 비회원이면 주문 진행 전에 회원가입 유도 모달을 띄운다.
-        if (!user) {
-            setSignupModalOpen(true);
-            return;
-        }
-
+        // 비회원도 가입 없이 즉시 주문한다. (회원 전환은 결제완료 페이지에서 권유)
         await createOrder();
     };
 
@@ -377,7 +366,9 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                 <div className="container relative flex flex-col items-center w-full">
                     <button onClick={() => router.back()} className="absolute left-0 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-black/5 transition-colors" aria-label="뒤로가기"><ArrowLeft className="h-5 w-5" /></button>
                     <div className={styles.headerBrand}>
-                        {product.image_url ? (
+                        {product.image_url && product.image_url.startsWith('/') ? (
+                            // 로컬(/public) 경로만 next/image로 최적화. 외부 URL은 remotePatterns 미설정 시
+                            // 런타임 에러가 나므로 안전하게 이모지로 폴백한다. (상품 목록과 동일 규칙)
                             <div className="relative w-12 h-12 mr-2">
                                 <Image src={product.image_url} alt={product.name} fill className="object-contain" />
                             </div>
@@ -711,36 +702,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     {loading ? '처리 중...' : '구독하기'}
                 </button>
             </div>
-
-            {/* 비회원 → 회원가입 유도 모달 */}
-            <Dialog open={signupModalOpen} onOpenChange={setSignupModalOpen}>
-                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="text-center">달버스 회원가입</DialogTitle>
-                        <DialogDescription className="sr-only">
-                            회원가입 후 주문을 이어가거나 비회원으로 주문할 수 있습니다.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
-                        <BellRing className="w-4 h-4 shrink-0 text-blue-500" />
-                        <span>회원가입 시 잔여기간 조회·만료 알림 서비스를 보내드립니다.</span>
-                    </div>
-
-                    <SignupForm
-                        compact
-                        initialValues={{ email: guestInfo.email, name: guestInfo.name, phone: guestInfo.phone }}
-                        onSignupSuccess={(uid) => {
-                            setSignupModalOpen(false);
-                            createOrder(uid);
-                        }}
-                        onGuestContinue={() => {
-                            setSignupModalOpen(false);
-                            createOrder();
-                        }}
-                    />
-                </DialogContent>
-            </Dialog>
         </main>
     );
 }

@@ -36,6 +36,7 @@ export async function GET(
                 payment_due_at,
                 buyer_name,
                 buyer_email,
+                buyer_phone,
                 product_id,
                 plan_id,
                 assigned_bank_account_id
@@ -88,6 +89,7 @@ export async function GET(
             payment_due_at: order.payment_due_at,
             buyer_name: order.buyer_name,
             buyer_email: order.buyer_email,
+            buyer_phone: order.buyer_phone,
             product_name: productRes.data?.name || null,
             duration_months: planRes.data?.duration_months || null,
             bank: bankRes.data

@@ -1,10 +1,15 @@
-"use client";
-
-import React, { useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { apiFetch } from '@/lib/api';
-import { PageLoading } from '@/components/ui/PageLoading';
 import { Badge } from "@/components/ui/badge";
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+
+// 공지는 자주 바뀌지 않으므로 5분 단위로 정적 재생성 (SEO + 빠른 초기 렌더)
+export const revalidate = 300;
+
+export const metadata: Metadata = {
+    title: '공지사항 | 달버스',
+    description: '달버스의 새로운 소식과 서비스 안내를 확인하세요.',
+};
 
 interface Notice {
     id: string;
@@ -15,48 +20,23 @@ interface Notice {
     created_at: string;
 }
 
-export default function NoticesPage() {
-    const [notices, setNotices] = useState<Notice[]>([]);
-    const [loading, setLoading] = useState(true);
+async function getNotices(): Promise<Notice[]> {
+    const { data, error } = await supabaseAdmin
+        .from('notices')
+        .select('*')
+        .eq('is_published', true)
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false });
 
-    useEffect(() => {
-        let isMounted = true;
+    if (error) {
+        console.error('Error fetching public notices (SSR):', error);
+        return [];
+    }
+    return (data as Notice[]) ?? [];
+}
 
-        const fetchData = async () => {
-            try {
-                const response = await apiFetch('/api/public/notices');
-                if (!response.ok) throw new Error('Failed to fetch notices');
-
-                const data = await response.json();
-
-                if (isMounted) {
-                    setNotices(data || []);
-                }
-            } catch (error) {
-                const err = error as Error;
-                // Ignore AbortError
-                if (err.name === 'AbortError' || err.message?.includes('aborted') || err.message?.includes('signal is aborted')) {
-                    return;
-                }
-
-                if (isMounted) {
-                    console.error('Error fetching notices:', error);
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        fetchData();
-
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
-    if (loading) return <PageLoading />;
+export default async function NoticesPage() {
+    const notices = await getNotices();
 
     return (
         <div className="container mx-auto py-12 px-4 max-w-4xl">
