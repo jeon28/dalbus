@@ -216,6 +216,18 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     }, [guestInfo.tidalId, id]);
 
+    // SNS(카카오/구글) 간편가입 — 가입 후 현재 주문 페이지로 복귀하면 회원 정보가 자동 입력된다.
+    const handleSnsSignup = async (provider: 'kakao' | 'google') => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider,
+            options: { redirectTo: window.location.href }
+        });
+        if (error) {
+            console.error('SNS signup failed:', error);
+            toast.error('SNS 로그인 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        }
+    };
+
     const handleSubscribe = async () => {
         if (!product) return;
 
@@ -602,6 +614,40 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                 />
                             )}
                             <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
+
+                            {/* SNS 간편가입 유도 — 가입하면 이름·이메일이 자동 입력된다 (주문은 가입 없이도 가능) */}
+                            {!user && (
+                                <div className="pt-1">
+                                    <p className="text-xs text-muted-foreground text-center mb-2">
+                                        SNS로 가입하면 회원 정보가 자동으로 입력되고, 만료 알림·이용내역 조회를 이용할 수 있어요.
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSnsSignup('kakao')}
+                                            className="flex items-center justify-center gap-2 py-3 rounded-lg bg-[#FEE500] text-[#191919] text-sm font-bold hover:brightness-95 transition-all"
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                <path d="M12 3C6.48 3 2 6.58 2 11c0 2.84 1.86 5.33 4.64 6.74-.2.75-.74 2.72-.85 3.14-.13.52.19.51.4.37.17-.11 2.66-1.81 3.74-2.55.66.1 1.35.15 2.07.15 5.52 0 10-3.58 10-8s-4.48-8-10-8z" />
+                                            </svg>
+                                            카카오로 가입
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSnsSignup('google')}
+                                            className="flex items-center justify-center gap-2 py-3 rounded-lg bg-white border border-input text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
+                                                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
+                                                <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z" />
+                                                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
+                                            </svg>
+                                            구글로 가입
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
