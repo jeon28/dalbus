@@ -32,6 +32,15 @@ export default function SignupCompletePage() {
     const birthdateRef = useRef<HTMLSelectElement>(null);
     const phoneRef = useRef<HTMLInputElement>(null);
 
+    // SNS 가입 팝업 안에서 열렸으면, 완료 시 페이지 이동 대신 원래 창에 알리고 닫는다.
+    const isPopup = typeof window !== 'undefined' && window.opener != null;
+    const closePopup = () => {
+        try {
+            window.opener?.postMessage({ type: 'dalbus-sns-auth-complete' }, window.location.origin);
+        } catch { /* opener 접근 불가 시 무시 */ }
+        window.close();
+    };
+
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -65,12 +74,14 @@ export default function SignupCompletePage() {
             // Email users: redirect to mypage if info is complete, or home if not (they shouldn't be here)
             const isEmailUser = !profile?.signup_method || profile.signup_method === 'email';
             if (isEmailUser) {
+                if (isPopup) { closePopup(); return; }
                 window.location.replace(profile?.phone && profile?.birth_date ? '/mypage' : '/');
                 return;
             }
 
             // Social users: redirect home if already completed
             if (profile?.phone && profile?.birth_date) {
+                if (isPopup) { closePopup(); return; }
                 window.location.replace('/');
                 return;
             }
@@ -201,6 +212,11 @@ export default function SignupCompletePage() {
             }
 
             toast.success('회원가입이 완료되었습니다! 서비스를 이용해 주세요.');
+            if (isPopup) {
+                // 주문 페이지에 완료를 알리고 팝업을 닫는다 (주문 입력값은 원래 창에 유지됨)
+                closePopup();
+                return;
+            }
             window.location.replace('/');
         } catch (error) {
             console.error('Submit error:', error);

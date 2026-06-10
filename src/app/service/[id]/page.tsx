@@ -19,7 +19,7 @@ import { formatPhoneInput } from '@/lib/utils';
 export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { user } = useServices();
+    const { user, refreshUser } = useServices();
     const [id, setId] = useState<string | null>(null);
 
     // interfaces
@@ -242,15 +242,18 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     };
 
-    // 팝업에서 가입 완료 알림을 받으면 안내 토스트 (user 자동입력은 onAuthStateChange가 처리)
+    // 팝업에서 가입 완료(추가정보 입력 포함) 알림을 받으면 프로필을 다시 읽어
+    // 이름·전화번호·이메일을 자동 입력한다.
     useEffect(() => {
         const onMessage = (e: MessageEvent) => {
             if (e.origin === window.location.origin && e.data?.type === 'dalbus-sns-auth-complete') {
                 toast.success('가입이 완료되었습니다. 회원 정보가 자동으로 입력됩니다.');
+                refreshUser?.();
             }
         };
         window.addEventListener('message', onMessage);
         return () => window.removeEventListener('message', onMessage);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleSubscribe = async () => {
