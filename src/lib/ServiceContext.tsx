@@ -238,7 +238,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
                         email: profile?.email || session.user.email || '',
                         phone: profile?.phone || '',
                         birth_date: profile?.birth_date || session.user.user_metadata.birthdate || '',
-                        role: profile?.role
+                        role: profile?.role,
+                        signup_method: profile?.signup_method ?? null
                     };
                     safeSetUser(userObj);
                     localStorage.setItem('dalbus-user', JSON.stringify(userObj));

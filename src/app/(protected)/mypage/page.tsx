@@ -207,6 +207,15 @@ export default function MyPage() {
         }
     }, [isHydrated, user, user?.id, fetchData]); // Only depend on user.id to avoid reference-related loops
 
+    // 진입 시 프로필을 DB에서 새로 읽는다 — SNS 가입 팝업 등 다른 창에서 저장한
+    // 전화번호·생년월일이 컨텍스트 캐시 때문에 비어 보이는 문제 방지 (user.id 기준이라 루프 없음)
+    useEffect(() => {
+        if (isHydrated && user?.id) {
+            refreshUser();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isHydrated, user?.id]);
+
     const [isEditing, setIsEditing] = useState(false);
     const [visiblePws, setVisiblePws] = useState<Record<string, boolean>>({});
 
