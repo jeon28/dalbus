@@ -53,6 +53,9 @@ export default function Header() {
                                 서비스
                             </Link>
                         )}
+                        <Link href="/public/orders" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                            주문조회
+                        </Link>
                         {navSettings.menu_notices_enabled && (
                             <Link href="/public/notices" className="transition-colors hover:text-foreground/80 text-foreground/60">
                                 공지사항

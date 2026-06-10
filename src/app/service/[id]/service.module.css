@@ -54,7 +54,7 @@
 .price {
     font-size: 2.2rem;
     font-weight: 950;
-    color: var(--primary);
+    color: hsl(var(--primary));
 }
 
 .optionItem {
@@ -74,14 +74,15 @@
 }
 
 .active {
-    border: 3px solid var(--primary) !important;
-    background: rgba(0, 0, 0, 0.05);
+    border: 3px solid hsl(var(--primary)) !important;
+    background: hsl(var(--primary) / 0.05);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .submitBtn {
-    background: #000 !important;
-    color: #fff !important;
+    /* 브랜드 색상(관리자 설정)을 따르도록 토큰 사용 */
+    background: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
     padding: 20px;
     border-radius: 8px;
     font-size: 1.1rem;

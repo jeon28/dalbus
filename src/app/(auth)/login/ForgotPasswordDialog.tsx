@@ -150,16 +150,7 @@ export function ForgotPasswordDialog() {
             if (!val) resetState();
         }}>
             <DialogTrigger asChild>
-                <button type="button" style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--primary)',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    padding: '0',
-                    textDecoration: 'none'
-                }}>
+                <button type="button" className="bg-transparent border-none text-primary text-[0.9rem] font-bold cursor-pointer p-0 no-underline">
                     비밀번호를 잊으셨나요?
                 </button>
             </DialogTrigger>

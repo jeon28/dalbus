@@ -158,18 +158,8 @@ export default function LoginPage() {
                 <form className={styles.form} onSubmit={handleSubmit}>
                     <div className={styles.inputGroup}>
                         <label>이메일 (아이디)</label>
-                        <div style={{ position: 'relative' }}>
-                            <div style={{
-                                position: 'absolute',
-                                left: '15px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                color: '#64748b',
-                                pointerEvents: 'none',
-                                zIndex: 1
-                            }}>
+                        <div className="relative">
+                            <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none z-[1]">
                                 <Mail size={18} />
                             </div>
                             <input
@@ -177,7 +167,7 @@ export default function LoginPage() {
                                 placeholder="name@example.com"
                                 value={id}
                                 onChange={(e) => setId(e.target.value)}
-                                style={{ paddingLeft: '45px' }}
+                                className="!pl-[45px]"
                                 disabled={isLoading}
                                 required
                             />
@@ -185,18 +175,8 @@ export default function LoginPage() {
                     </div>
                     <div className={styles.inputGroup}>
                         <label>비밀번호</label>
-                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                            <div style={{
-                                position: 'absolute',
-                                left: '15px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                color: '#64748b',
-                                pointerEvents: 'none',
-                                zIndex: 1
-                            }}>
+                        <div className="relative flex items-center">
+                            <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none z-[1]">
                                 <Lock size={18} />
                             </div>
                             <input
@@ -204,34 +184,14 @@ export default function LoginPage() {
                                 placeholder="비밀번호를 입력하세요"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    paddingLeft: '45px',
-                                    paddingRight: '50px'
-                                }}
+                                className="w-full !pl-[45px] !pr-[50px]"
                                 disabled={isLoading}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
                                 tabIndex={-1}
-                                style={{
-                                    position: 'absolute',
-                                    right: '15px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#64748b',
-                                    zIndex: 2,
-                                    width: '20px',
-                                    height: '20px'
-                                }}
+                                className="absolute right-[15px] top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0 flex items-center justify-center text-muted-foreground z-[2] w-5 h-5"
                             >
                                 {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
                             </button>
@@ -245,7 +205,7 @@ export default function LoginPage() {
                         {isLoading ? '로그인 처리 중...' : '로그인'}
                     </button>
                 </form>
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
+                <div className="flex justify-center mt-3">
                     <ForgotPasswordDialog />
                 </div>
 

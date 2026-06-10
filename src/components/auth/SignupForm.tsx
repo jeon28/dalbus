@@ -373,9 +373,9 @@ export default function SignupForm({
                 {/* 1. 이메일 (계정 아이디) */}
                 <div className={styles.inputGroup}>
                     <label>이메일 (아이디)</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <div style={{ position: 'relative', flex: 1 }}>
-                            <div style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: '#64748b', pointerEvents: 'none' }}>
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none">
                                 <Mail size={18} />
                             </div>
                             <input
@@ -386,8 +386,7 @@ export default function SignupForm({
                                 value={formData.id}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                className={errors.id ? styles.inputError : ''}
-                                style={{ width: '100%', paddingLeft: '45px' }}
+                                className={`${errors.id ? styles.inputError : ''} w-full !pl-[45px]`}
                                 disabled={emailChecked}
                             />
                         </div>
@@ -395,16 +394,7 @@ export default function SignupForm({
                             type="button"
                             onClick={() => handleCheckEmail(false)}
                             disabled={checkingEmail || emailChecked}
-                            className={styles.checkBtn}
-                            style={{
-                                padding: '0 16px',
-                                fontSize: '14px',
-                                whiteSpace: 'nowrap',
-                                backgroundColor: emailChecked ? '#e5e7eb' : undefined,
-                                color: emailChecked ? '#9ca3af' : undefined,
-                                cursor: emailChecked ? 'not-allowed' : 'pointer',
-                                opacity: 1
-                            }}
+                            className={`${styles.checkBtn} !py-0 !px-4 !text-sm whitespace-nowrap !opacity-100 ${emailChecked ? '!bg-gray-200 !text-gray-400 cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                             {checkingEmail ? '확인 중...' : emailChecked ? '확인 완료' : '중복 확인'}
                         </button>
@@ -415,8 +405,8 @@ export default function SignupForm({
                 {/* 2. 이름 */}
                 <div className={styles.inputGroup}>
                     <label>이름</label>
-                    <div style={{ position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: '#64748b', pointerEvents: 'none' }}>
+                    <div className="relative">
+                        <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none">
                             <User size={18} />
                         </div>
                         <input
@@ -427,8 +417,7 @@ export default function SignupForm({
                             value={formData.name}
                             onChange={handleChange}
                             onBlur={handleBlur}
-                            className={errors.name ? styles.inputError : ''}
-                            style={{ paddingLeft: '45px' }}
+                            className={`${errors.name ? styles.inputError : ''} !pl-[45px]`}
                             disabled={!emailChecked}
                         />
                     </div>
@@ -438,8 +427,8 @@ export default function SignupForm({
                 {/* 생일 */}
                 <div className={styles.inputGroup}>
                     <label>생년월일</label>
-                    <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
-                        <div style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: '#64748b', pointerEvents: 'none', zIndex: 1 }}>
+                    <div className="relative flex gap-2">
+                        <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none z-[1]">
                             <Calendar size={18} />
                         </div>
                         <select
@@ -451,8 +440,7 @@ export default function SignupForm({
                                 const err = validateField('birthdate', '');
                                 setErrors(prev => ({ ...prev, birthdate: err }));
                             }}
-                            className={errors.birthdate ? styles.inputError : ''}
-                            style={{ flex: 1.2, paddingLeft: '38px' }}
+                            className={`${errors.birthdate ? styles.inputError : ''} flex-[1.2] !pl-[38px]`}
                             disabled={!emailChecked}
                         >
                             <option value="">년도</option>
@@ -468,8 +456,7 @@ export default function SignupForm({
                                 const err = validateField('birthdate', '');
                                 setErrors(prev => ({ ...prev, birthdate: err }));
                             }}
-                            className={errors.birthdate ? styles.inputError : ''}
-                            style={{ flex: 1 }}
+                            className={`${errors.birthdate ? styles.inputError : ''} flex-1`}
                             disabled={!emailChecked}
                         >
                             <option value="">월</option>
@@ -485,8 +472,7 @@ export default function SignupForm({
                                 const err = validateField('birthdate', '');
                                 setErrors(prev => ({ ...prev, birthdate: err }));
                             }}
-                            className={errors.birthdate ? styles.inputError : ''}
-                            style={{ flex: 1 }}
+                            className={`${errors.birthdate ? styles.inputError : ''} flex-1`}
                             disabled={!emailChecked}
                         >
                             <option value="">일</option>
@@ -501,8 +487,8 @@ export default function SignupForm({
                 {/* 3. 전화번호 */}
                 <div className={styles.inputGroup}>
                     <label>전화번호</label>
-                    <div style={{ position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: '#64748b', pointerEvents: 'none' }}>
+                    <div className="relative">
+                        <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none">
                             <Phone size={18} />
                         </div>
                         <input
@@ -513,8 +499,7 @@ export default function SignupForm({
                             value={formData.phone}
                             onChange={handleChange}
                             onBlur={handleBlur}
-                            className={errors.phone ? styles.inputError : ''}
-                            style={{ paddingLeft: '45px' }}
+                            className={`${errors.phone ? styles.inputError : ''} !pl-[45px]`}
                             disabled={!emailChecked}
                         />
                     </div>
@@ -524,8 +509,8 @@ export default function SignupForm({
                 {/* 4. 비밀번호 */}
                 <div className={styles.inputGroup}>
                     <label>비밀번호 (6자 이상)</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <div style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: '#64748b', pointerEvents: 'none', zIndex: 1 }}>
+                    <div className="relative flex items-center">
+                        <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none z-[1]">
                             <Lock size={18} />
                         </div>
                         <input
@@ -536,15 +521,14 @@ export default function SignupForm({
                             value={formData.password}
                             onChange={handleChange}
                             onBlur={handleBlur}
-                            className={errors.password ? styles.inputError : ''}
-                            style={{ width: '100%', paddingLeft: '45px', paddingRight: '50px' }}
+                            className={`${errors.password ? styles.inputError : ''} w-full !pl-[45px] !pr-[50px]`}
                             disabled={!emailChecked}
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             tabIndex={-1}
-                            style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', zIndex: 2, width: '20px', height: '20px' }}
+                            className="absolute right-[15px] top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0 flex items-center justify-center text-muted-foreground z-[2] w-5 h-5"
                         >
                             {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
                         </button>
@@ -555,8 +539,8 @@ export default function SignupForm({
                 {/* 5. 비밀번호 확인 */}
                 <div className={styles.inputGroup}>
                     <label>비밀번호 확인</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <div style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: '#64748b', pointerEvents: 'none', zIndex: 1 }}>
+                    <div className="relative flex items-center">
+                        <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none z-[1]">
                             <Lock size={18} />
                         </div>
                         <input
@@ -567,15 +551,14 @@ export default function SignupForm({
                             value={formData.confirmPassword}
                             onChange={handleChange}
                             onBlur={handleBlur}
-                            className={errors.confirmPassword ? styles.inputError : ''}
-                            style={{ width: '100%', paddingLeft: '45px', paddingRight: '50px' }}
+                            className={`${errors.confirmPassword ? styles.inputError : ''} w-full !pl-[45px] !pr-[50px]`}
                             disabled={!emailChecked}
                         />
                         <button
                             type="button"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                             tabIndex={-1}
-                            style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', zIndex: 2, width: '20px', height: '20px' }}
+                            className="absolute right-[15px] top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0 flex items-center justify-center text-muted-foreground z-[2] w-5 h-5"
                         >
                             {showConfirmPassword ? <Eye size={18} /> : <EyeOff size={18} />}
                         </button>
@@ -585,14 +568,8 @@ export default function SignupForm({
 
                 <button
                     type="submit"
-                    className={styles.submitBtn}
+                    className={`${styles.submitBtn} ${isFormValid ? 'bg-primary text-primary-foreground cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'} ${loading ? 'opacity-70' : 'opacity-100'}`}
                     disabled={loading || !isFormValid}
-                    style={{
-                        backgroundColor: isFormValid ? '#000000' : '#e5e7eb',
-                        color: isFormValid ? '#ffffff' : '#9ca3af',
-                        cursor: isFormValid ? 'pointer' : 'not-allowed',
-                        opacity: loading ? 0.7 : 1
-                    }}
                 >
                     {loading ? '처리 중...' : '가입하기'}
                 </button>

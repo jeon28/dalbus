@@ -65,7 +65,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     const [product, setProduct] = useState<Product | null>(null);
     const [plans, setPlans] = useState<Plan[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState<number>(12);
-    const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
     const [selectedOrder, setSelectedOrder] = useState<ExtensionOrder | null>(null);
@@ -81,12 +80,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         email: '',
         depositor: '',
         tidalId: ''
-    });
-
-    const [agreements, setAgreements] = useState({
-        all: false,
-        privacy: false,
-        terms: false
     });
 
     // Unpack params
@@ -223,10 +216,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     }, [guestInfo.tidalId, id]);
 
-    const toggleAllAgreements = (checked: boolean) => {
-        setAgreements({ all: checked, privacy: checked, terms: checked });
-    };
-
     const handleSubscribe = async () => {
         if (!product) return;
 
@@ -237,10 +226,6 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
         if (!emailRegex.test(guestInfo.email)) {
             toast.error('올바른 이메일 형식이 아닙니다. (예: name@example.com)');
-            return;
-        }
-        if (!user && (!agreements.privacy || !agreements.terms)) {
-            toast.error('필수 약관에 동의해주세요.');
             return;
         }
 
@@ -396,7 +381,7 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     <ul className="text-xs text-muted-foreground mt-4 space-y-1 list-disc pl-4">
                         <li>모든 구독 상품은 추후 기간연장하여 동일 계정으로 계속 사용할 수 있습니다.</li>
                         <li>만료 일주일 전 알림톡으로 연장 메세지를 보내드립니다.</li>
-                        <li>상단 결제내역 메뉴에서 이용 정보 및 결제 내역 조회가 가능합니다.</li>
+                        <li>상단 주문조회 메뉴에서 이용 정보 및 결제 내역 조회가 가능합니다.</li>
                         <li>디지털 상품 특성 상, 상품 인도 후 구매자의 단순 변심으로 인한 환불은 불가합니다.</li>
                     </ul>
                 </div>
@@ -405,20 +390,14 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                     <h3 className="text-lg font-bold mb-3">이용 기간 선택</h3>
                     <div className={styles.optionList}>
                         {plans.length > 0 ? (
-                            plans
-                                .filter(plan => isPlanExpanded || selectedPeriod === plan.duration_months)
-                                .map((plan) => (
+                            // 모든 플랜을 항상 노출 — 다른 기간 옵션을 펼침 없이 한눈에 비교
+                            plans.map((plan) => (
                                 <div
                                     key={plan.id}
-                                    className={`${styles.optionItem} ${selectedPeriod === plan.duration_months ? styles.active : ''} glass`}
-                                    onClick={() => {
-                                        if (selectedPeriod === plan.duration_months) {
-                                            setIsPlanExpanded(v => !v);
-                                        } else {
-                                            setSelectedPeriod(plan.duration_months);
-                                            setIsPlanExpanded(false);
-                                        }
-                                    }}
+                                    role="radio"
+                                    aria-checked={selectedPeriod === plan.duration_months}
+                                    className={`${styles.optionItem} ${selectedPeriod === plan.duration_months ? styles.active : ''} glass cursor-pointer`}
+                                    onClick={() => setSelectedPeriod(plan.duration_months)}
                                 >
                                     <span>
                                         {plan.duration_months === 25 ? '24개월 +1개월' : `${plan.duration_months}개월`}
@@ -428,11 +407,11 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                                             </span>
                                         )}
                                     </span>
-                                    <span className="flex items-center gap-2">
-                                        {plan.price.toLocaleString()}원
-                                        {selectedPeriod === plan.duration_months && !isPlanExpanded && (
-                                            <span className="text-[10px] text-slate-400">▼ 변경</span>
-                                        )}
+                                    <span className="text-right">
+                                        <span className="block">{plan.price.toLocaleString()}원</span>
+                                        <span className="block text-[11px] text-muted-foreground font-normal">
+                                            월 {Math.round(plan.price / plan.duration_months).toLocaleString()}원
+                                        </span>
                                     </span>
                                 </div>
                             ))
@@ -626,24 +605,17 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                         </div>
                     )}
 
-                    <h3 className="text-xl font-bold text-center mt-8">결제 수단</h3>
-                    <div className="glass p-4 rounded-xl">
-                        <div className="flex items-center gap-2 mb-4 px-1">
-                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+                    {/* 결제수단은 무통장입금 하나뿐이므로 한 줄 안내 + 입금자명 입력으로 축소 */}
+                    <div className="glass p-4 rounded-xl mt-8 space-y-3">
+                        <p className="text-sm">
+                            <span className="inline-flex items-center gap-1.5 font-semibold text-primary mr-2">
                                 <span className="w-2 h-2 rounded-full bg-primary inline-block" />
                                 무통장 입금
                             </span>
-                        </div>
-
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                            <p className="text-sm font-semibold text-blue-900 mb-1">
-                                결제하기 버튼을 누르시면 입금 계좌를 안내해드립니다
-                            </p>
-                            <ul className="text-xs text-blue-700 space-y-0.5 list-disc pl-4">
-                                <li>안내된 계좌로 정확한 금액을 입금해주세요</li>
-                                <li>48시간 내 미입금 시 주문이 자동 취소됩니다</li>
-                            </ul>
-                        </div>
+                            <span className="text-muted-foreground text-xs">
+                                주문 후 입금 계좌를 안내해드립니다 · 48시간 내 미입금 시 자동 취소
+                            </span>
+                        </p>
 
                         <Input
                             placeholder="입금자명을 입력해 주세요. (필수)"
@@ -651,55 +623,43 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, depositor: e.target.value })}
                         />
 
-                        <p className="text-xs text-green-600 mt-2">
-                            * 정확한 입금자명을 적어주셔야 입금확인 가능합니다.<br />
-                            * 현재 결제수단은 무통장 입금만 가능합니다.
+                        <p className="text-xs text-green-600">
+                            * 정확한 입금자명을 적어주셔야 입금확인 가능합니다.
                         </p>
                     </div>
 
-                    {!user && (
-                        <div className="space-y-2 mt-4">
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="all"
-                                    checked={agreements.all}
-                                    onChange={(e) => toggleAllAgreements(e.target.checked)}
-                                    className="rounded border-gray-300"
-                                />
-                                <label htmlFor="all" className="text-sm font-bold cursor-pointer">전체동의</label>
-                            </div>
-                            <hr className="my-2" />
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="privacy"
-                                    checked={agreements.privacy}
-                                    onChange={(e) => setAgreements({ ...agreements, privacy: e.target.checked })}
-                                    className="rounded border-gray-300"
-                                />
-                                <label htmlFor="privacy" className="text-xs text-muted-foreground cursor-pointer">개인정보 수집 동의</label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    id="terms"
-                                    checked={agreements.terms}
-                                    onChange={(e) => setAgreements({ ...agreements, terms: e.target.checked })}
-                                    className="rounded border-gray-300"
-                                />
-                                <label htmlFor="terms" className="text-xs text-muted-foreground cursor-pointer">구매조건 확인 및 이용약관 동의</label>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
+                {/* 약관은 별도 체크 대신 버튼에 통합 — 링크 한 줄 + "동의하고 주문하기" 문구로 고지 */}
                 <button
-                    className={`${styles.submitBtn} w-full mt-8 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl`}
-                    disabled={loading || (orderMode === 'EXT' && !selectedOrder) || (!user && (!agreements.privacy || !agreements.terms))}
+                    className={`${styles.submitBtn} w-full mt-8 font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl hidden md:block`}
+                    disabled={loading || (orderMode === 'EXT' && !selectedOrder)}
                     onClick={handleSubscribe}
                 >
-                    {loading ? '처리 중...' : '구독하기'}
+                    {loading ? '처리 중...' : (user ? '구독하기' : '동의하고 주문하기')}
+                </button>
+                <p className="text-[11px] text-muted-foreground text-center mt-3 pb-24 md:pb-0">
+                    주문 시{' '}
+                    <a href="/public/terms" target="_blank" className="underline">이용약관</a> 및{' '}
+                    <a href="/public/privacy" target="_blank" className="underline">개인정보 수집·이용</a>에
+                    동의하는 것으로 간주됩니다.
+                </p>
+            </div>
+
+            {/* 모바일 하단 고정 결제 바 — 스크롤 위치와 무관하게 가격·CTA 상시 노출 */}
+            <div className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-background/95 backdrop-blur border-t px-4 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                        {currentPlan ? (currentPlan.duration_months === 25 ? '24개월 +1개월' : `${currentPlan.duration_months}개월`) : product.name}
+                    </p>
+                    <p className="text-lg font-extrabold leading-tight">{calculatedPrice}원</p>
+                </div>
+                <button
+                    className="shrink-0 bg-primary text-primary-foreground font-bold text-sm px-6 py-3 rounded-xl shadow-lg disabled:bg-gray-300 disabled:text-gray-400 transition-all"
+                    disabled={loading || (orderMode === 'EXT' && !selectedOrder)}
+                    onClick={handleSubscribe}
+                >
+                    {loading ? '처리 중...' : (user ? '구독하기' : '동의하고 주문하기')}
                 </button>
             </div>
         </main>

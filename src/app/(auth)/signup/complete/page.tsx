@@ -223,28 +223,14 @@ export default function SignupCompletePage() {
     return (
         <main className={styles.main}>
             <div className={`${styles.card} glass animate-fade-in`}>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{
-                        width: '56px',
-                        height: '56px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 16px'
-                    }}>
+                <div className="text-center">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center mx-auto mb-4">
                         <CheckCircle size={28} color="#fff" />
                     </div>
                     <h1 className={styles.title}>
                         거의 다 됐어요!
                     </h1>
-                    <p style={{
-                        fontSize: '0.9rem',
-                        color: '#64748b',
-                        marginTop: '8px',
-                        lineHeight: '1.5'
-                    }}>
+                    <p className="text-[0.9rem] text-muted-foreground mt-2 leading-normal">
                         서비스 이용을 위해 아래 정보를 입력해주세요.
                     </p>
                 </div>
@@ -253,17 +239,8 @@ export default function SignupCompletePage() {
                     {/* 이름 */}
                     <div className={styles.inputGroup}>
                         <label>이름</label>
-                        <div style={{ position: 'relative' }}>
-                            <div style={{
-                                position: 'absolute',
-                                left: '15px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                color: '#64748b',
-                                pointerEvents: 'none'
-                            }}>
+                        <div className="relative">
+                            <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none">
                                 <User size={18} />
                             </div>
                             <input
@@ -274,8 +251,7 @@ export default function SignupCompletePage() {
                                 value={formData.name}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                className={errors.name ? styles.inputError : ''}
-                                style={{ paddingLeft: '45px', width: '100%' }}
+                                className={`${errors.name ? styles.inputError : ''} !pl-[45px] w-full`}
                             />
                         </div>
                         {errors.name && <span className={styles.errorText}>{errors.name}</span>}
@@ -284,18 +260,8 @@ export default function SignupCompletePage() {
                     {/* 생년월일 */}
                     <div className={styles.inputGroup}>
                         <label>생년월일</label>
-                        <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
-                            <div style={{
-                                position: 'absolute',
-                                left: '15px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                color: '#64748b',
-                                pointerEvents: 'none',
-                                zIndex: 1
-                            }}>
+                        <div className="relative flex gap-2">
+                            <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none z-[1]">
                                 <Calendar size={18} />
                             </div>
                             <select
@@ -307,8 +273,7 @@ export default function SignupCompletePage() {
                                     const err = validateField('birthdate', '');
                                     setErrors(prev => ({ ...prev, birthdate: err }));
                                 }}
-                                className={errors.birthdate ? styles.inputError : ''}
-                                style={{ flex: 1.2, paddingLeft: '38px' }}
+                                className={`${errors.birthdate ? styles.inputError : ''} flex-[1.2] !pl-[38px]`}
                             >
                                 <option value="">년도</option>
                                 {years.map(year => (
@@ -323,8 +288,7 @@ export default function SignupCompletePage() {
                                     const err = validateField('birthdate', '');
                                     setErrors(prev => ({ ...prev, birthdate: err }));
                                 }}
-                                className={errors.birthdate ? styles.inputError : ''}
-                                style={{ flex: 1 }}
+                                className={`${errors.birthdate ? styles.inputError : ''} flex-1`}
                             >
                                 <option value="">월</option>
                                 {months.map(month => (
@@ -339,8 +303,7 @@ export default function SignupCompletePage() {
                                     const err = validateField('birthdate', '');
                                     setErrors(prev => ({ ...prev, birthdate: err }));
                                 }}
-                                className={errors.birthdate ? styles.inputError : ''}
-                                style={{ flex: 1 }}
+                                className={`${errors.birthdate ? styles.inputError : ''} flex-1`}
                             >
                                 <option value="">일</option>
                                 {days.map(day => (
@@ -354,17 +317,8 @@ export default function SignupCompletePage() {
                     {/* 전화번호 */}
                     <div className={styles.inputGroup}>
                         <label>전화번호</label>
-                        <div style={{ position: 'relative' }}>
-                            <div style={{
-                                position: 'absolute',
-                                left: '15px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                color: '#64748b',
-                                pointerEvents: 'none'
-                            }}>
+                        <div className="relative">
+                            <div className="absolute left-[15px] top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none">
                                 <Phone size={18} />
                             </div>
                             <input
@@ -375,8 +329,7 @@ export default function SignupCompletePage() {
                                 value={formData.phone}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                className={errors.phone ? styles.inputError : ''}
-                                style={{ paddingLeft: '45px', width: '100%' }}
+                                className={`${errors.phone ? styles.inputError : ''} !pl-[45px] w-full`}
                             />
                         </div>
                         {errors.phone && <span className={styles.errorText}>{errors.phone}</span>}
@@ -384,14 +337,8 @@ export default function SignupCompletePage() {
 
                     <button
                         type="submit"
-                        className={styles.submitBtn}
+                        className={`${styles.submitBtn} ${isFormValid ? 'bg-primary text-primary-foreground cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'} ${loading ? 'opacity-70' : 'opacity-100'}`}
                         disabled={loading || !isFormValid}
-                        style={{
-                            backgroundColor: isFormValid ? '#000000' : '#e5e7eb',
-                            color: isFormValid ? '#ffffff' : '#9ca3af',
-                            cursor: isFormValid ? 'pointer' : 'not-allowed',
-                            opacity: loading ? 0.7 : 1
-                        }}
                     >
                         {loading ? '처리 중...' : '회원 가입 완료'}
                     </button>
@@ -403,12 +350,7 @@ export default function SignupCompletePage() {
                         await supabase.auth.signOut();
                         window.location.href = '/';
                     }}
-                    className="mt-4 w-full h-12 rounded-xl text-sm font-medium transition-all duration-200 border border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-2"
-                    style={{
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        textAlign: 'center'
-                    }}
+                    className="mt-4 w-full h-12 rounded-xl text-sm font-medium transition-all duration-200 border border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-2 text-muted-foreground cursor-pointer text-center"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round"/>

@@ -8,20 +8,43 @@ export interface ServerSessionUser {
 }
 
 /**
+ * 관리자 대시보드(설정)에서 관리하는 로그인 비밀번호(site_settings.admin_login_pw)를 읽는다.
+ * 미설정/오류 시 null. ADMIN_QUICK_PASSWORD(env)와 함께 관리자 게이트 인증에 사용된다.
+ */
+export async function getAdminLoginPassword(): Promise<string | null> {
+    try {
+        const { data } = await supabaseAdmin
+            .from('site_settings')
+            .select('value')
+            .eq('key', 'admin_login_pw')
+            .maybeSingle();
+        const v = (data?.value as string | undefined)?.trim();
+        return v || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Verifies the session from the Authorization header and returns the user with their role.
  */
 export async function getServerSession(req: NextRequest): Promise<ServerSessionUser | null> {
     try {
         // Quick Access: X-Quick-Token 헤더로 비밀번호 인증 (Supabase 로그인 없이 접근)
+        // env(ADMIN_QUICK_PASSWORD) 또는 대시보드 설정(admin_login_pw) 비밀번호 둘 다 허용
         const quickToken = req.headers.get('X-Quick-Token');
-        const quickPassword = process.env.ADMIN_QUICK_PASSWORD;
-        if (quickToken && quickPassword && quickToken === quickPassword) {
-            console.log('[getServerSession] Quick access authenticated');
-            return {
-                id: 'quick-access-admin',
-                email: 'quick@admin.local',
-                role: 'admin'
-            };
+        if (quickToken) {
+            const quickPassword = process.env.ADMIN_QUICK_PASSWORD;
+            const matched = (quickPassword && quickToken === quickPassword)
+                || (quickToken === await getAdminLoginPassword());
+            if (matched) {
+                console.log('[getServerSession] Quick access authenticated');
+                return {
+                    id: 'quick-access-admin',
+                    email: 'quick@admin.local',
+                    role: 'admin'
+                };
+            }
         }
 
         const authHeader = req.headers.get('Authorization');
