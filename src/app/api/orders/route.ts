@@ -78,6 +78,29 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: insertError.message }, { status: 500 });
         }
 
+        // 2-1. 회원 주문이면 프로필의 비어있는 연락처 정보를 주문 입력값으로 보완
+        //      (SNS 가입 직후 phone 이 없는 프로필을 채워 /signup/complete 입력 부담을 줄인다.
+        //       기존 값은 덮어쓰지 않으며, 실패해도 주문은 정상 처리한다)
+        if (order.user_id) {
+            try {
+                const { data: profile } = await supabaseAdmin
+                    .from('profiles')
+                    .select('name, phone')
+                    .eq('id', order.user_id)
+                    .maybeSingle();
+                if (profile) {
+                    const patch: Record<string, string> = {};
+                    if (!profile.phone && normalizedOrderData.buyer_phone) patch.phone = normalizedOrderData.buyer_phone;
+                    if (!profile.name && normalizedOrderData.buyer_name) patch.name = normalizedOrderData.buyer_name;
+                    if (Object.keys(patch).length > 0) {
+                        await supabaseAdmin.from('profiles').update(patch).eq('id', order.user_id);
+                    }
+                }
+            } catch (profileError) {
+                console.error('Profile backfill failed (order still created):', profileError);
+            }
+        }
+
         // 3. Fetch Admin Email Settings
         const { data: adminEmailSetting } = await supabaseAdmin
             .from('site_settings')

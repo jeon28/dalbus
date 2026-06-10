@@ -76,10 +76,12 @@ export default function SignupCompletePage() {
             }
 
             // Social user with incomplete profile — show the form
+            // 주문 시 백필된 프로필 값(이름·전화번호)이 있으면 미리 채워 생년월일만 입력하면 되게 한다.
             const socialName = metadata?.full_name || metadata?.name || '';
             setFormData(prev => ({
                 ...prev,
-                name: profile?.name || socialName || ''
+                name: profile?.name || socialName || '',
+                phone: profile?.phone ? formatPhoneInput(profile.phone) : prev.phone
             }));
 
             setChecking(false);
