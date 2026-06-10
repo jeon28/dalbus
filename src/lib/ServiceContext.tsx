@@ -194,7 +194,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!isHydrated) return;
 
-        const publicPaths = ['/login', '/signup', '/public', '/api'];
+        // /service(주문서)·/auth(SNS 팝업)는 가드 제외 — 주문 중 프로필 완성 페이지로 끌려가지 않도록
+        const publicPaths = ['/login', '/signup', '/public', '/api', '/service', '/auth'];
         const isPublicPath = publicPaths.some(path => pathname?.startsWith(path));
         const isCompletePage = pathname === '/signup/complete';
 

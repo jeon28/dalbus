@@ -216,17 +216,42 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
         }
     }, [guestInfo.tidalId, id]);
 
-    // SNS(카카오/구글) 간편가입 — 가입 후 현재 주문 페이지로 복귀하면 회원 정보가 자동 입력된다.
+    // SNS(카카오/구글) 간편가입 — 주문 페이지를 떠나지 않도록 팝업 창에서 진행한다.
+    // 팝업에서 로그인이 끝나면 BroadcastChannel(SIGNED_IN)로 이 창의 user 가 채워져
+    // 입력 중인 주문 정보를 유지한 채 회원 정보가 자동 입력된다.
     const handleSnsSignup = async (provider: 'kakao' | 'google') => {
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { data, error } = await supabase.auth.signInWithOAuth({
             provider,
-            options: { redirectTo: window.location.href }
+            options: {
+                redirectTo: `${window.location.origin}/auth/popup-complete`,
+                skipBrowserRedirect: true
+            }
         });
-        if (error) {
+        if (error || !data?.url) {
             console.error('SNS signup failed:', error);
             toast.error('SNS 로그인 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+        const w = 500, h = 650;
+        const left = Math.max(0, window.screenX + (window.outerWidth - w) / 2);
+        const top = Math.max(0, window.screenY + (window.outerHeight - h) / 2);
+        const popup = window.open(data.url, 'dalbus-sns-signup', `width=${w},height=${h},left=${left},top=${top}`);
+        if (!popup) {
+            // 팝업 차단 시 전체 리다이렉트로 폴백 (가입 후 주문 페이지로 복귀)
+            window.location.href = data.url;
         }
     };
+
+    // 팝업에서 가입 완료 알림을 받으면 안내 토스트 (user 자동입력은 onAuthStateChange가 처리)
+    useEffect(() => {
+        const onMessage = (e: MessageEvent) => {
+            if (e.origin === window.location.origin && e.data?.type === 'dalbus-sns-auth-complete') {
+                toast.success('가입이 완료되었습니다. 회원 정보가 자동으로 입력됩니다.');
+            }
+        };
+        window.addEventListener('message', onMessage);
+        return () => window.removeEventListener('message', onMessage);
+    }, []);
 
     const handleSubscribe = async () => {
         if (!product) return;
