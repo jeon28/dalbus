@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from './supabaseAdmin';
 
 export interface ServerSessionUser {
@@ -82,4 +82,19 @@ export async function getServerSession(req: NextRequest): Promise<ServerSessionU
  */
 export function isAdmin(session: ServerSessionUser | null): boolean {
     return session?.role === 'admin';
+}
+
+/**
+ * 관리자 권한 가드. 라우트 핸들러 첫 줄에서 호출한다.
+ *   const denied = await requireAdmin(req);
+ *   if (denied) return denied;
+ * 권한이 있으면 null, 없으면 403 NextResponse 를 반환한다.
+ * (X-Quick-Token 또는 admin role Supabase 세션 모두 허용 — getServerSession 참고)
+ */
+export async function requireAdmin(req: NextRequest): Promise<NextResponse | null> {
+    const session = await getServerSession(req);
+    if (!session || !isAdmin(session)) {
+        return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 });
+    }
+    return null;
 }

@@ -1,10 +1,18 @@
 // A temporary API route to check the constraints on the order_accounts table directly via PostgreSQL system catalogs.
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    // 스키마 정보 노출 + 테스트 데이터 삽입을 수행하므로 운영 환경에서는 차단한다.
+    if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
+
     try {
         // Query the PostgreSQL pg_indexes or pg_constraint tables
         await supabaseAdmin.rpc('get_schema_info');

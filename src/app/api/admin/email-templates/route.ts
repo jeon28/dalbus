@@ -1,7 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireAdmin } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
     try {
         const { data, error } = await supabaseAdmin
             .from('email_templates')
@@ -17,7 +20,9 @@ export async function GET() {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
     try {
         const body = await request.json();
         const { key, name, subject, content, placeholders, design } = body;

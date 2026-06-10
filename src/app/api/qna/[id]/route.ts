@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getServerSession, isAdmin, requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+    const session = await getServerSession(req);
+    const admin = isAdmin(session);
+
     const { data, error } = await supabaseAdmin
         .from('qna')
         .select('*')
@@ -15,18 +19,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // guest_password 는 반환 금지. 비밀글은 작성자 본인/관리자만 본문 열람.
+    const rest = { ...(data as Record<string, unknown>) };
+    delete rest.guest_password;
+
+    const isOwner = !!data?.user_id && !!session?.id && data.user_id === session.id;
+    if (data?.is_secret && !admin && !isOwner) {
+        rest.title = '';
+        rest.content = '';
+        rest.answer_content = null;
+        rest.guest_name = '';
+    }
+
+    return NextResponse.json(rest);
 }
 
+// 편집 UI는 없으며, 임의 수정/삭제 방지를 위해 관리자만 허용한다.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
+
     const { id } = await params;
     try {
         const body = await req.json();
         const { title, content, is_secret } = body;
-
-        // Note: Password verification should happen before calling this update generally, 
-        // or we check it here if passed. For simplicity, assuming verified on client for now 
-        // OR we can add a verify step in the logic.
 
         const { data, error } = await supabaseAdmin
             .from('qna')
@@ -46,6 +62,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
+
     const { id } = await params;
     const { error } = await supabaseAdmin
         .from('qna')

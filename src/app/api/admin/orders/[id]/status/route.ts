@@ -1,10 +1,14 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 
 export async function PUT(
     req: NextRequest,
     props: { params: Promise<{ id: string }> }
 ) {
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
+
     const params = await props.params;
 
     try {

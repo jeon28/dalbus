@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
     try {
         const { id } = await params;
         const { data, error } = await supabaseAdmin
@@ -24,9 +27,11 @@ export async function GET(
 }
 
 export async function PUT(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
     try {
         const { id } = await params;
         const body = await request.json();
@@ -49,9 +54,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const denied = await requireAdmin(request);
+    if (denied) return denied;
     try {
         const { id } = await params;
         const { error } = await supabaseAdmin

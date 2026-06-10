@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { addDays, format, parseISO } from 'date-fns';
 import { syncUsedSlots } from '@/lib/assignment-utils';
+import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const denied = await requireAdmin(req);
+    if (denied) return denied;
+
     try {
         const { id: account_id } = await params;
         const body = await req.json();
