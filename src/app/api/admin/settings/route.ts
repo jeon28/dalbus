@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getServerSession, isAdmin } from '@/lib/auth';
+import { isValidHex } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +57,11 @@ export async function PUT(req: NextRequest) {
             // Exclude empty keys if any, though frontend should handle this
             if (!key) continue;
 
+            if (key === 'brand_primary' && !isValidHex(String(value))) {
+                errors.push({ key, error: '유효하지 않은 색상 형식입니다. (#rrggbb)' });
+                continue;
+            }
+
             const { data, error } = await supabaseAdmin
                 .from('site_settings')
                 .upsert({
@@ -70,6 +77,10 @@ export async function PUT(req: NextRequest) {
                 errors.push({ key, error: error.message });
             } else {
                 results.push(data);
+                // 브랜드 색상은 layout 의 unstable_cache 를 태그로 즉시 무효화해 전역 반영
+                if (key === 'brand_primary') {
+                    revalidateTag('brand-primary', 'max');
+                }
             }
         }
 

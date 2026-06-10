@@ -37,7 +37,8 @@ export default function AdminPage() {
         admin_login_pw: '',
         admin_sender_email: '',
         admin_email: '',
-        admin_phone: ''
+        admin_phone: '',
+        brand_primary: '#18181b'
     });
     const [originalSettings, setOriginalSettings] = useState(settings);
 
@@ -72,8 +73,16 @@ export default function AdminPage() {
         const res = await apiFetch('/api/admin/settings');
         if (res.ok) {
             const data = await res.json();
-            setSettings(data);
-            setOriginalSettings(data);
+            // 기본값과 병합하여 brand_primary 등 미저장 키도 항상 정의되게 한다.
+            const merged = {
+                admin_login_pw: data.admin_login_pw ?? '',
+                admin_sender_email: data.admin_sender_email ?? '',
+                admin_email: data.admin_email ?? '',
+                admin_phone: data.admin_phone ?? '',
+                brand_primary: data.brand_primary || '#18181b',
+            };
+            setSettings(merged);
+            setOriginalSettings(merged);
             const ms = {
                 menu_services_enabled: data.menu_services_enabled ?? 'true',
                 menu_notices_enabled: data.menu_notices_enabled ?? 'true',
@@ -127,6 +136,62 @@ export default function AdminPage() {
             alert('관리자 설정이 저장되었습니다.');
             // Update original settings to match current state
             setOriginalSettings(prev => ({ ...prev, ...updates }));
+        }
+    };
+
+    // hex(#rrggbb) → "H S% L%" (Tailwind hsl(var(--primary)) 용). 라이브 미리보기에 사용.
+    const hexToHsl = (hex: string): { primary: string; foreground: string } => {
+        const h = hex.replace('#', '');
+        if (!/^[0-9a-fA-F]{6}$/.test(h)) return { primary: '222 47% 11%', foreground: '0 0% 100%' };
+        const r = parseInt(h.substring(0, 2), 16) / 255;
+        const g = parseInt(h.substring(2, 4), 16) / 255;
+        const b = parseInt(h.substring(4, 6), 16) / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let hue = 0, sat = 0; const light = (max + min) / 2;
+        if (max !== min) {
+            const d = max - min;
+            sat = light > 0.5 ? d / (2 - max - min) : d / (max + min);
+            if (max === r) hue = (g - b) / d + (g < b ? 6 : 0);
+            else if (max === g) hue = (b - r) / d + 2;
+            else hue = (r - g) / d + 4;
+            hue /= 6;
+        }
+        const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        return {
+            primary: `${Math.round(hue * 360)} ${Math.round(sat * 100)}% ${Math.round(light * 100)}%`,
+            foreground: lum > 0.55 ? '222 47% 11%' : '0 0% 100%',
+        };
+    };
+
+    const applyBrandLive = (hex: string) => {
+        const { primary, foreground } = hexToHsl(hex);
+        const root = document.documentElement;
+        root.style.setProperty('--primary', primary);
+        root.style.setProperty('--primary-foreground', foreground);
+        root.style.setProperty('--ring', primary);
+    };
+
+    const BRAND_PRESETS = [
+        { hex: '#18181b', name: '블랙' },
+        { hex: '#0066ff', name: '블루' },
+        { hex: '#6d28d9', name: '퍼플' },
+        { hex: '#0891b2', name: '틸' },
+        { hex: '#e11d48', name: '로즈' },
+        { hex: '#059669', name: '그린' },
+    ];
+
+    const handleSaveBrand = async () => {
+        const res = await apiFetch('/api/admin/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ brand_primary: settings.brand_primary })
+        });
+        if (res.ok) {
+            setOriginalSettings(prev => ({ ...prev, brand_primary: settings.brand_primary }));
+            applyBrandLive(settings.brand_primary);
+            alert('브랜드 색상이 저장되었습니다. 사이트 전체에 반영됩니다.');
+        } else {
+            alert('저장 실패. 다시 시도해주세요.');
         }
     };
 
@@ -289,6 +354,63 @@ export default function AdminPage() {
                         </div>
                         <Button onClick={handleSaveMenuSettings} className="w-full bg-black text-white hover:bg-gray-800">
                             메뉴 설정 저장
+                        </Button>
+                    </div>
+                </section>
+
+                {/* Brand Color Settings */}
+                <section className="mb-8">
+                    <h3 className="text-lg font-bold mb-4">브랜드 색상</h3>
+                    <div className="glass p-6 rounded-xl shadow-sm">
+                        <p className="text-sm text-gray-500 mb-5">버튼·강조·선택 상태 등 사이트 전체의 메인 색상을 변경합니다.</p>
+
+                        {/* 프리셋 */}
+                        <div className="flex flex-wrap gap-3 mb-5">
+                            {BRAND_PRESETS.map(({ hex, name }) => {
+                                const active = (settings.brand_primary || '').toLowerCase() === hex.toLowerCase();
+                                return (
+                                    <button
+                                        key={hex}
+                                        type="button"
+                                        onClick={() => { setSettings({ ...settings, brand_primary: hex }); applyBrandLive(hex); }}
+                                        className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all ${active ? 'border-2 border-gray-900 scale-105' : 'border-gray-200 hover:border-gray-400'}`}
+                                    >
+                                        <span className="block w-10 h-10 rounded-full shadow-inner" style={{ backgroundColor: hex }} />
+                                        <span className="text-[11px] font-medium text-gray-600">{name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* 커스텀 색상 + 미리보기 */}
+                        <div className="flex flex-wrap items-center gap-4 mb-6">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="color"
+                                    value={/^#[0-9a-fA-F]{6}$/.test(settings.brand_primary) ? settings.brand_primary : '#18181b'}
+                                    onChange={e => { setSettings({ ...settings, brand_primary: e.target.value }); applyBrandLive(e.target.value); }}
+                                    className="w-12 h-10 rounded border border-gray-200 cursor-pointer bg-white p-0.5"
+                                    aria-label="브랜드 색상 선택"
+                                />
+                                <Input
+                                    value={settings.brand_primary}
+                                    onChange={e => setSettings({ ...settings, brand_primary: e.target.value })}
+                                    onBlur={e => { if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) applyBrandLive(e.target.value); }}
+                                    placeholder="#0066ff"
+                                    className="w-32 font-mono"
+                                />
+                            </div>
+                            {/* 라이브 미리보기 */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">미리보기</span>
+                                <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-bold bg-primary text-primary-foreground shadow">
+                                    구독하기
+                                </span>
+                            </div>
+                        </div>
+
+                        <Button onClick={handleSaveBrand} className="w-full bg-primary text-primary-foreground hover:opacity-90">
+                            브랜드 색상 저장
                         </Button>
                     </div>
                 </section>
