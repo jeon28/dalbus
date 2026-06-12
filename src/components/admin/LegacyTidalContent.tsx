@@ -505,7 +505,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         if (!editingAccount) return;
         try {
             const res = await fetchFn(`/api/admin/legacy-tidal/${editingAccount.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingAccount) });
-            if (!res.ok) throw new Error('Failed to update');
+            if (!res.ok) {
+                const detail = await res.json().catch(() => null);
+                throw new Error(detail?.error || 'Failed to update');
+            }
             setIsEditModalOpen(false); fetchAccounts(); alert('수정되었습니다.');
         } catch (error) { alert('실패: ' + (error instanceof Error ? error.message : String(error))); }
     };
