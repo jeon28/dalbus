@@ -524,6 +524,13 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     };
 
     const handleToggleActive = async (assignment: Assignment, accountId?: string) => {
+        // 마스터 슬롯(그룹 대표)은 비활성화 금지: 비활성 시 그룹 전체가 화면에서 사라짐 (재활성화는 허용)
+        const isMaster = assignment.type === 'master' || assignment.slot_number === 0;
+        if (isMaster && (assignment.is_active ?? true)) {
+            alert('마스터 슬롯은 비활성할 수 없습니다.');
+            return;
+        }
+
         // Optimistic update
         const accId = accountId || accounts.find(acc => acc.order_accounts?.some(oa => oa.id === assignment.id))?.id;
         
@@ -726,9 +733,21 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     const handleBulkDeactivate = async () => {
         if (!confirm('일괄 비활성/활성 하시겠습니까?')) return;
+
+        // 마스터 슬롯은 비활성 토글 대상에서 제외 (비활성 시 그룹 전체가 사라짐)
+        const allAssignments = accounts.flatMap(acc => acc.order_accounts || []);
+        const masterIds = new Set(
+            allAssignments
+                .filter(oa => (oa.type === 'master' || oa.slot_number === 0) && (oa.is_active ?? true))
+                .map(oa => oa.id)
+        );
+        const targetIds = Array.from(selectedAssignmentIds).filter(id => !masterIds.has(id));
+        const skipped = selectedAssignmentIds.size - targetIds.length;
+
         try {
-            await Promise.all(Array.from(selectedAssignmentIds).map(id => fetchFn(`/api/admin/legacy-tidal/assignment/${id}/toggle-active`, { method: 'POST' })));
+            await Promise.all(targetIds.map(id => fetchFn(`/api/admin/legacy-tidal/assignment/${id}/toggle-active`, { method: 'POST' })));
             fetchAccounts();
+            if (skipped > 0) alert(`마스터 슬롯 ${skipped}건은 비활성할 수 없어 제외되었습니다.`);
         } catch { alert('일괄 처리 실패'); }
     };
 
