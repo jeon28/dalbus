@@ -50,11 +50,38 @@ interface EditAssignFormData {
     memo: string;
 }
 
+interface GroupSlot {
+    id: string;
+    slot_number: number;
+    type?: string;
+    tidal_id?: string;
+    buyer_name?: string;
+    buyer_phone?: string;
+    buyer_email?: string;
+    start_date?: string;
+    end_date?: string;
+    memo?: string;
+    is_active?: boolean;
+    is_deleted?: boolean;
+}
+
+interface AccountGroup {
+    id: string;
+    login_id: string;
+    max_slots: number;
+    order_accounts?: GroupSlot[];
+}
+
 function LegacyTidalInactiveContent() {
     const router = useRouter();
     const [records, setRecords] = useState<LegacyTidalHistory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showDeleted, setShowDeleted] = useState(false);
+
+    // 그룹 현황 팝업: 계정 원본 데이터를 보관하고 id로 파생시켜 저장 후 자동 최신화
+    const [accountsRaw, setAccountsRaw] = useState<AccountGroup[]>([]);
+    const [groupAccountId, setGroupAccountId] = useState<string | null>(null);
+    const groupAccount = groupAccountId ? accountsRaw.find(a => a.id === groupAccountId) || null : null;
 
     // Modal state for direct editing
     const [isEditAssignModalOpen, setIsEditAssignModalOpen] = useState(false);
@@ -99,6 +126,7 @@ function LegacyTidalInactiveContent() {
 
             // 2. Clear empty slots if showing deleted
             if (showDeleted) {
+                setAccountsRaw([]);
                 setRecords(inactiveData);
                 return;
             }
@@ -108,6 +136,7 @@ function LegacyTidalInactiveContent() {
             const accRes = await apiFetch('/api/admin/legacy-tidal?showInactive=true', { cache: 'no-store' });
             if (!accRes.ok) throw new Error('Failed to fetch accounts');
             const accountsData = await accRes.json();
+            setAccountsRaw(accountsData as AccountGroup[]);
 
             // 4. Create Master ID map and Identfy empty slots
             const masterMap: Record<string, string> = {};
@@ -214,6 +243,39 @@ function LegacyTidalInactiveContent() {
             const message = error instanceof Error ? error.message : '복구 실패';
             alert('복구 실패: ' + message);
         }
+    };
+
+    // 그룹 팝업: 배정번호 클릭 시 해당 계정(그룹) 현황 열기
+    const openGroupPopup = (accountId?: string) => {
+        if (!accountId) return;
+        setGroupAccountId(accountId);
+    };
+
+    // 그룹 내 특정 슬롯의 현재 배정 정보 조회 (삭제 제외, 활성 우선)
+    const getSlotAssignment = (acc: AccountGroup, i: number): GroupSlot | null => {
+        const candidates = (acc.order_accounts || []).filter(oa => oa.slot_number === i && !oa.is_deleted);
+        if (candidates.length === 0) return null;
+        return candidates.find(oa => oa.is_active) || candidates[0];
+    };
+
+    // 그룹 팝업의 슬롯 행 클릭 → 기존 수정 모달 재사용
+    const openEditModalFromGroup = (acc: AccountGroup, i: number, oa: GroupSlot | null) => {
+        const assignment: LegacyTidalHistory = {
+            id: oa?.id || `empty-${acc.id}-${i}`,
+            slot_number: i,
+            tidal_id: oa?.tidal_id || '',
+            buyer_name: oa?.buyer_name,
+            buyer_phone: oa?.buyer_phone,
+            buyer_email: oa?.buyer_email,
+            start_date: oa?.start_date,
+            end_date: oa?.end_date,
+            memo: oa?.memo,
+            is_active: oa?.is_active ?? false,
+            isEmpty: !oa,
+            account_id: acc.id,
+            accounts: { id: acc.id, login_id: acc.login_id },
+        };
+        openEditModal(acc.id, i, assignment);
     };
 
     const openEditModal = (accountId: string, slotIdx: number, assignment?: LegacyTidalHistory) => {
@@ -401,7 +463,18 @@ function LegacyTidalInactiveContent() {
                                         <tr key={a.id} className={`border-b hover:bg-gray-50 h-8 ${isEmpty ? 'bg-green-100/50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                             <td className="p-1 text-center opacity-70 overflow-hidden">{idx + 1}</td>
                                             <td className="p-1 text-center font-bold truncate">
-                                                {a.accounts?.login_id || '-'}-{a.slot_number + 1}
+                                                {!showDeleted ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openGroupPopup(a.account_id || a.accounts?.id)}
+                                                        className="hover:underline hover:text-blue-600 transition-colors cursor-pointer"
+                                                        title="그룹 전체 보기"
+                                                    >
+                                                        {a.accounts?.login_id || '-'}-{a.slot_number + 1}
+                                                    </button>
+                                                ) : (
+                                                    <>{a.accounts?.login_id || '-'}-{a.slot_number + 1}</>
+                                                )}
                                             </td>
                                             {!showDeleted && (
                                                 <td 
@@ -527,6 +600,81 @@ function LegacyTidalInactiveContent() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsEditAssignModalOpen(false)}>취소</Button>
                         <Button onClick={handleUpdateEditAssign} className="bg-blue-600 hover:bg-blue-700">저장하기</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* 그룹 현황 팝업 */}
+            <Dialog open={!!groupAccountId} onOpenChange={(o) => { if (!o) setGroupAccountId(null); }}>
+                <DialogContent className="sm:max-w-[760px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 flex-wrap">
+                            <span>그룹 현황 / {groupAccount?.login_id}</span>
+                            {groupAccount && getSlotAssignment(groupAccount, 0)?.tidal_id && (
+                                <span className="text-[11px] font-normal text-gray-500 font-mono">
+                                    Master: {getSlotAssignment(groupAccount, 0)?.tidal_id}
+                                </span>
+                            )}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {groupAccount ? (
+                        <div className="overflow-x-auto">
+                            <p className="text-[11px] text-gray-400 mb-2">슬롯을 클릭하면 정보수정 창이 열립니다.</p>
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b text-gray-500">
+                                        <th className="p-2 text-center">배정번호</th>
+                                        <th className="p-2 text-left">구분</th>
+                                        <th className="p-2 text-left">구매자</th>
+                                        <th className="p-2 text-left">Tidal ID</th>
+                                        <th className="p-2 text-center">기간</th>
+                                        <th className="p-2 text-center">상태</th>
+                                        <th className="p-2 text-center w-10">수정</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Array.from({ length: groupAccount.max_slots || 6 }).map((_, i) => {
+                                        const oa = getSlotAssignment(groupAccount, i);
+                                        const isMaster = i === 0 || oa?.type === 'master';
+                                        const empty = !oa;
+                                        return (
+                                            <tr
+                                                key={i}
+                                                className={`border-b hover:bg-blue-50/60 cursor-pointer transition-colors ${empty ? 'text-gray-400' : ''}`}
+                                                onClick={() => openEditModalFromGroup(groupAccount, i, oa)}
+                                            >
+                                                <td className="p-2 text-center font-bold whitespace-nowrap">{groupAccount.login_id}-{i + 1}</td>
+                                                <td className="p-2">
+                                                    {isMaster
+                                                        ? <span className="text-orange-600 font-semibold">마스터</span>
+                                                        : <span className="text-gray-500">유저</span>}
+                                                </td>
+                                                <td className="p-2 font-medium">{empty ? '빈 슬롯' : (oa?.buyer_name || '-')}</td>
+                                                <td className="p-2 font-mono text-[10px] truncate max-w-[160px]" title={oa?.tidal_id || ''}>{oa?.tidal_id || '-'}</td>
+                                                <td className="p-2 text-center text-[10px] whitespace-nowrap">
+                                                    {empty ? '-' : `${(oa?.start_date || '').slice(5)} ~ ${(oa?.end_date || '').slice(5)}`}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    {empty
+                                                        ? <span className="text-gray-300">-</span>
+                                                        : (oa?.is_active
+                                                            ? <span className="text-green-600 font-semibold">활성</span>
+                                                            : <span className="text-red-500 font-semibold">비활성</span>)}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    <Pencil size={13} className="inline text-gray-400" />
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="p-6 text-center text-sm text-gray-400">그룹 정보를 찾을 수 없습니다.</div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setGroupAccountId(null)}>닫기</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
