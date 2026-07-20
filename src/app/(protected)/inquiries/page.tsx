@@ -45,10 +45,10 @@ export default function InquiriesPage() {
         }
     };
 
-    // 비로그인 시 로그인 페이지로
+    // 비로그인 시 로그인 페이지로 (로그인 후 다시 문의 페이지로 복귀)
     useEffect(() => {
         if (isHydrated && !user) {
-            router.replace('/login');
+            router.replace('/login?redirect=/inquiries');
         }
     }, [isHydrated, user, router]);
 

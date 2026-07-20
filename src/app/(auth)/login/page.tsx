@@ -9,17 +9,25 @@ import styles from './auth.module.css';
 import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 import { toast } from 'sonner';
 
+// 쿼리스트링의 redirect 값을 읽되, 내부 경로(/...)만 허용해 오픈 리다이렉트를 방지한다.
+function getSafeRedirect(): string | null {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search).get('redirect');
+    if (p && p.startsWith('/') && !p.startsWith('//')) return p;
+    return null;
+}
+
 export default function LoginPage() {
     const [id, setId] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // 이미 로그인된 경우 홈으로 리다이렉트
+    // 이미 로그인된 경우 리다이렉트 (redirect 지정 시 해당 경로, 없으면 홈)
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
-                window.location.replace('/');
+                window.location.replace(getSafeRedirect() || '/');
             }
         });
     }, []);
@@ -78,7 +86,7 @@ export default function LoginPage() {
                 }
 
                 console.log('Login: Forcing navigation...');
-                const targetUrl = data.role === 'admin' ? '/admin' : '/';
+                const targetUrl = data.role === 'admin' ? '/admin' : (getSafeRedirect() || '/');
                 window.location.replace(targetUrl);
             } else {
                 console.warn('Login: No session in response');
