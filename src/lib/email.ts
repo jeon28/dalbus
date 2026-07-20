@@ -368,6 +368,88 @@ export const sendAssignmentNotification = async (
     });
 };
 
+interface InquiryNotificationProps {
+    inquiryId: string;
+    userName: string;
+    userEmail?: string | null;
+    title: string;
+    content: string;
+    imageCount?: number;
+}
+
+/**
+ * 회원의 1:1 문의 접수 시 관리자에게 발송하는 알림 메일
+ */
+export const sendInquiryNotification = async (
+    adminEmail: string,
+    inquiry: InquiryNotificationProps
+) => {
+    const { userName, userEmail, title, content, imageCount = 0 } = inquiry;
+    const subject = `[Dalbus] 새 1:1 문의 도착 - ${userName}님`;
+    const imageLine = imageCount > 0
+        ? `<p style="margin: 12px 0 0; color:#2563eb;"><strong>📎 첨부 이미지 ${imageCount}개</strong> — 관리자 페이지에서 확인하세요.</p>`
+        : '';
+    const html = `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">새로운 1:1 문의가 접수되었습니다.</h2>
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>작성자:</strong> ${userName}</p>
+            <p style="margin: 5px 0;"><strong>이메일:</strong> ${userEmail || '정보 없음'}</p>
+            <p style="margin: 5px 0;"><strong>제목:</strong> ${title}</p>
+          </div>
+          <p style="font-weight: bold; margin-bottom: 4px;">문의 내용</p>
+          <div style="white-space: pre-wrap; background:#fff; border:1px solid #eee; padding:12px; border-radius:8px;">${content}</div>
+          ${imageLine}
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p>관리자 페이지에서 답변을 등록해주세요.</p>
+          <a href="https://www.dalbus.com/admin/inquiries" style="color:#2563eb;">문의 관리 페이지 바로가기</a>
+        </div>
+      `;
+
+    return sendEmail({
+        recipient_email: adminEmail,
+        recipient_name: 'Admin',
+        subject,
+        html,
+        mailType: '1:1 문의 접수 (관리자)'
+    });
+};
+
+/**
+ * 관리자 답변 등록 시 문의한 회원에게 발송하는 답변 완료 알림 메일
+ */
+export const sendInquiryAnswerNotification = async (
+    userEmail: string,
+    details: { userName: string; title: string; answer: string; imageCount?: number }
+) => {
+    const { userName, title, answer, imageCount = 0 } = details;
+    const subject = `[Dalbus] 문의하신 내용에 답변이 등록되었습니다 - ${userName}님`;
+    const imageLine = imageCount > 0
+        ? `<p style="margin: 12px 0 0; color:#2563eb;"><strong>📎 첨부 이미지 ${imageCount}개</strong> — 문의 페이지에서 확인하세요.</p>`
+        : '';
+    const html = `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">문의 답변 안내</h2>
+          <p>안녕하세요, <strong>${userName}</strong>님! 문의해 주셔서 감사합니다.</p>
+          <p>남겨주신 문의(<strong>${title}</strong>)에 대한 답변이 등록되었습니다.</p>
+          <p style="font-weight: bold; margin-bottom: 4px;">답변 내용</p>
+          <div style="white-space: pre-wrap; background:#f8fafc; border:1px solid #eee; padding:12px; border-radius:8px;">${answer}</div>
+          ${imageLine}
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p>자세한 내용은 로그인 후 1:1 문의 페이지에서 확인하실 수 있습니다.</p>
+          <a href="https://www.dalbus.com/inquiries" style="color:#2563eb;">문의 내역 바로가기</a>
+        </div>
+      `;
+
+    return sendEmail({
+        recipient_email: userEmail,
+        recipient_name: userName,
+        subject,
+        html,
+        mailType: '1:1 문의 답변 안내'
+    });
+};
+
 /**
  * 비밀번호 초기화 인증번호 메일 발송
  */

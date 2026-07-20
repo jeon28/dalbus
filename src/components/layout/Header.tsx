@@ -71,6 +71,11 @@ export default function Header() {
                                 Q&A
                             </Link>
                         )}
+                        {user && (
+                            <Link href="/inquiries" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                                1:1 문의
+                            </Link>
+                        )}
                     </nav>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
