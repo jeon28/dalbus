@@ -13,7 +13,11 @@ interface NavSettings {
 }
 
 export default function Header() {
-    const { user, isAdmin, logout, logoutAdmin } = useServices();
+    const { user, isAdmin, isHydrated, logout, logoutAdmin } = useServices();
+
+    // 로그인 상태가 확정된 비로그인 사용자는 보호 페이지를 거치지 않고 바로 로그인 화면으로
+    // (보호 페이지 왕복 로딩 제거). 초기화 전에는 기존대로 /inquiries가 처리.
+    const inquiriesHref = isHydrated && !user ? '/login?redirect=/inquiries' : '/inquiries';
 
     const handleAdminLogout = () => {
         logoutAdmin();
@@ -71,7 +75,7 @@ export default function Header() {
                                 Q&A
                             </Link>
                         )}
-                        <Link href="/inquiries" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                        <Link href={inquiriesHref} className="transition-colors hover:text-foreground/80 text-foreground/60">
                             1:1 문의
                         </Link>
                     </nav>
