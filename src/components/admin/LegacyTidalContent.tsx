@@ -1700,6 +1700,17 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                 ))}
                             </div>
                             <div className="space-y-1.5">
+                                <Label className="text-xs text-slate-500 font-semibold">계약금액(원)</Label>
+                                <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={quickEditValues.amount ? quickEditValues.amount.toLocaleString() : ''}
+                                    onChange={e => setQuickEditValues({ ...quickEditValues, amount: parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0 })}
+                                    className="h-10"
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
                                 <Label className="text-xs text-slate-500 font-semibold">메모</Label>
                                 <textarea 
                                     rows={3} 
