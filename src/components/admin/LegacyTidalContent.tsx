@@ -531,6 +531,14 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             return;
         }
 
+        // 활성 → 비활성 전환 시 클릭 실수 방지 확인 (재활성화는 확인 없이 진행)
+        const isCurrentlyActive = assignment.is_active ?? true;
+        if (isCurrentlyActive) {
+            const slotLabel = assignment.accounts?.login_id ? `${assignment.accounts.login_id}-${assignment.slot_number + 1}` : '';
+            const label = `${slotLabel}${assignment.buyer_name ? ` (${assignment.buyer_name})` : ''}`.trim();
+            if (!confirm(`${label ? `[${label}] ` : ''}배정을 비활성화하시겠습니까?\n비활성 내역으로 이동됩니다.`)) return;
+        }
+
         // Optimistic update
         const accId = accountId || accounts.find(acc => acc.order_accounts?.some(oa => oa.id === assignment.id))?.id;
         
