@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History, MessageSquareText } from 'lucide-react';
+import { ArrowLeft, Trash2, Download, Pencil, RotateCcw, History, MessageSquareText, Undo2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 import { Label } from "@/components/ui/label";
@@ -242,6 +242,28 @@ function LegacyTidalInactiveContent() {
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : '복구 실패';
             alert('복구 실패: ' + message);
+        }
+    };
+
+    // 실행취소: 실수로 비활성화된 배정을 다시 활성(정상) 상태로 되돌린다.
+    const handleReactivate = async (record: LegacyTidalHistory) => {
+        const label = `${record.accounts?.login_id || '-'}-${record.slot_number + 1}${record.buyer_name ? ` (${record.buyer_name})` : ''}`;
+        if (!confirm(`[${label}] 배정을 다시 활성 상태로 되돌리시겠습니까?\n활성 내역으로 이동됩니다.`)) return;
+        try {
+            const res = await apiFetch(`/api/admin/legacy-tidal/assignment/${record.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: true })
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Reactivate failed');
+            }
+            alert('활성 상태로 복구되었습니다.');
+            fetchInactiveRecords();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '실행취소 실패';
+            alert('실행취소 실패: ' + message);
         }
     };
 
@@ -532,7 +554,11 @@ function LegacyTidalInactiveContent() {
                                                                     <RotateCcw size={14} />
                                                                 </Button>
                                                             </>
-                                                        ) : null}
+                                                        ) : (
+                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50" onClick={() => handleReactivate(a)} title="실행취소 (활성으로 되돌리기)">
+                                                                <Undo2 size={14} />
+                                                            </Button>
+                                                        )}
                                                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => handleDelete(a.id)} title={showDeleted ? "영구 삭제" : "삭제 내역으로 이동"}>
                                                             <Trash2 size={14} />
                                                         </Button>
