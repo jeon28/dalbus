@@ -4,8 +4,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
     Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil, Upload, 
-    LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText, 
-    Zap, UserPlus, Settings 
+    LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText,
+    Zap, UserPlus, Settings, CalendarClock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
@@ -152,6 +152,8 @@ export function LegacyTidalContent({
     const [selectedTargetAccount, setSelectedTargetAccount] = useState<string>('');
     const [selectedTargetSlot, setSelectedTargetSlot] = useState<number | null>(null);
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
+    // 1개월 계약 건은 기본 숨김. 토글 시 그리드/리스트/검색/잔여일 필터 전체에 포함된다.
+    const [includeOneMonth, setIncludeOneMonth] = useState(false);
     
 
     
@@ -357,8 +359,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     try { periodNum = Math.floor(differenceInDays(parseISO(assignment.end_date), parseISO(assignment.start_date)) / 30); } catch { }
                 }
 
-                // 1개월 계약 건 제외 (사용자 요청)
-                if (periodNum > 0 && periodNum <= 1) continue;
+                // 1개월 계약 건 제외 (토글 시 포함)
+                if (!includeOneMonth && periodNum > 0 && periodNum <= 1) continue;
 
                 const query = searchQuery.toLowerCase().trim();
                 if (query) {
@@ -385,7 +387,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             }
         });
         return flattened;
-    }, [accounts, searchQuery, showExpiredOnly, expiredDays]);
+    }, [accounts, searchQuery, showExpiredOnly, expiredDays, includeOneMonth]);
 
     const filteredAccounts = accounts.filter(acc => {
         const query = searchQuery.toLowerCase().trim();
@@ -395,12 +397,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             if (acc.login_id.toLowerCase().includes(query) || acc.payment_email.toLowerCase().includes(query)) {
                 queryMatches = true;
             } else if (acc.order_accounts?.some(oa => {
-                // 1개월 계약 건은 검색에서도 제외
+                // 1개월 계약 건은 검색에서도 제외 (토글 시 포함)
                 let pMonths = oa.period_months || 0;
                 if (!pMonths && oa.start_date && oa.end_date) {
                     try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
                 }
-                if (pMonths > 0 && pMonths <= 1) return false;
+                if (!includeOneMonth && pMonths > 0 && pMonths <= 1) return false;
 
                 const ti = (oa.tidal_id || '').toLowerCase();
                 const bn = (oa.buyer_name || '').toLowerCase();
@@ -418,12 +420,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             const hasExpiringSlot = acc.order_accounts?.some(oa => {
                 if (!oa.end_date || oa.is_deleted || !oa.is_active) return false;
                 
-                // 계약개월 1개월 이하 체크
+                // 계약개월 1개월 이하 체크 (토글 시 포함)
                 let pMonths = oa.period_months || 0;
                 if (!pMonths && oa.start_date && oa.end_date) {
                     try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
                 }
-                if (pMonths > 0 && pMonths <= 1) return false;
+                if (!includeOneMonth && pMonths > 0 && pMonths <= 1) return false;
 
                 const today = new Date(); today.setHours(0, 0, 0, 0);
                 const diff = Math.ceil((parseISO(oa.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -869,6 +871,16 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             <Filter className="w-3.5 h-3.5" /> 잔여일
                         </Button>
 
+                        <Button
+                            variant={includeOneMonth ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setIncludeOneMonth(!includeOneMonth)}
+                            title="1개월 계약 건은 기본적으로 숨겨집니다"
+                            className="h-9 px-3 text-xs gap-1.5"
+                        >
+                            <CalendarClock className="w-3.5 h-3.5" /> 1개월 포함
+                        </Button>
+
                         <Button 
                             variant={sortConfig?.key === 'updated_at' ? "default" : "outline"}
                             size="sm" 
@@ -1244,15 +1256,17 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                 }
                                                             }
 
-                                                            // 1개월 계약 건 필터링 (항상 적용)
-                                                            slots = slots.filter(oa => {
-                                                                let pMonths = oa.period_months || 0;
-                                                                if (!pMonths && oa.start_date && oa.end_date) {
-                                                                    try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
-                                                                }
-                                                                if (pMonths > 0 && pMonths <= 1) return false;
-                                                                return true;
-                                                            });
+                                                            // 1개월 계약 건 필터링 (토글 시 포함)
+                                                            if (!includeOneMonth) {
+                                                                slots = slots.filter(oa => {
+                                                                    let pMonths = oa.period_months || 0;
+                                                                    if (!pMonths && oa.start_date && oa.end_date) {
+                                                                        try { pMonths = Math.floor(differenceInDays(parseISO(oa.end_date), parseISO(oa.start_date)) / 30); } catch { }
+                                                                    }
+                                                                    if (pMonths > 0 && pMonths <= 1) return false;
+                                                                    return true;
+                                                                });
+                                                            }
 
                                                             // 잔여일 조회 필터링
                                                             if (showExpiredOnly) {
