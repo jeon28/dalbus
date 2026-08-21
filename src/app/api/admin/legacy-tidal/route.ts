@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
         
         const normalizedBody = {
             ...body,
-            login_id: body.login_id ? body.login_id.toLowerCase().trim() : body.login_id,
+            // 그룹 ID는 항상 대문자로 저장한다 (HA01 형식)
+            login_id: body.login_id ? body.login_id.toUpperCase().trim() : body.login_id,
             payment_email: body.payment_email ? body.payment_email.toLowerCase().trim() : body.payment_email
         };
 

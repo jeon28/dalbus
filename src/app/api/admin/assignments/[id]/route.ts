@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { normalizePhone } from '@/lib/utils';
-import { reindexSlots } from '@/lib/assignment-utils';
+import { normalizeSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +65,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             // 2. Re-index slots if type, is_active, or is_deleted changed
             const shouldReindex = type !== undefined || is_active !== undefined || body.is_deleted !== undefined;
             if (shouldReindex && updatedData) {
-                await reindexSlots(updatedData.account_id, 'tidal_assignments', 'tidal_accounts');
+                await normalizeSlots(updatedData.account_id, 'tidal_assignments', 'tidal_accounts');
             }
 
             // 3. Sync orders.assignment_status when is_active toggled (종료/복구)
@@ -140,7 +140,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         if (delError) throw delError;
 
         // 3. Re-index remaining slots
-        await reindexSlots(assignment.account_id, 'tidal_assignments', 'tidal_accounts');
+        await normalizeSlots(assignment.account_id, 'tidal_assignments', 'tidal_accounts');
 
         // 5. Update Order Status: 남은 active 배정이 없을 때만 'waiting'으로 복원
         if (assignment.order_id) {

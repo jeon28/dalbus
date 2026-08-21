@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/lib/group-id-utils';
 import { 
     Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil, Upload, 
     LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText,
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/popover";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
+import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
 
 interface Assignment {
     id: string;
@@ -251,7 +253,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             setAccounts(data);
             const initialGrid: Record<string, GridValue> = {};
             data.forEach((acc: Account) => {
-                for (let i = 0; i < acc.max_slots; i++) {
+                const slotCount = getSlotRenderCount(acc);
+                for (let i = 0; i < slotCount; i++) {
                     const assignment = acc.order_accounts?.find((oa: Assignment) => oa.slot_number === i);
                     let defaultPw = assignment?.tidal_password || '';
                     if (i === 0 && !defaultPw) defaultPw = acc.login_pw;
@@ -329,11 +332,14 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     const getFlattenedAssignments = useCallback(() => {
         const flattened: { id: string; assignment: Assignment; account: Account; period: number; originalAccIndex: number }[] = [];
         accounts.forEach((acc, accIdx) => {
-            for (let i = 0; i < acc.max_slots; i++) {
+            const slotCount = getSlotRenderCount(acc);
+            for (let i = 0; i < slotCount; i++) {
                 let assignmentObj: Assignment | null = acc.order_accounts?.find(oa => oa.slot_number === i) || null;
                 if (!assignmentObj) {
+                    // 정원(max_slots) 밖의 빈 자리는 배정 가능한 슬롯이 아니므로 만들지 않는다
+                    if (i >= acc.max_slots) continue;
                     // 비어있는 슬롯 객체 생성
-                    assignmentObj = { 
+                    assignmentObj = {
                         id: `empty_${acc.id}_${i}`, 
                         slot_number: i, 
                         type: i === 0 ? 'master' : 'user', 
@@ -446,8 +452,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     bVal = b.order_accounts?.reduce((max, oa) => { const date = oa.updated_at || oa.assigned_at || '1970-01-01'; return date > max ? date : max; }, '1970-01-01') || '1970-01-01';
                     break;
                 case 'end_date':
-                    aVal = a.order_accounts?.find(oa => oa.type === 'master')?.end_date || '9999-12-31';
-                    bVal = b.order_accounts?.find(oa => oa.type === 'master')?.end_date || '9999-12-31';
+                    aVal = findMasterAssignment(a.order_accounts)?.end_date || '9999-12-31';
+                    bVal = findMasterAssignment(b.order_accounts)?.end_date || '9999-12-31';
                     break;
                 default: return 0;
             }
@@ -455,8 +461,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
         }
-        const masterA = a.order_accounts?.find(oa => oa.type === 'master');
-        const masterB = b.order_accounts?.find(oa => oa.type === 'master');
+        const masterA = findMasterAssignment(a.order_accounts);
+        const masterB = findMasterAssignment(b.order_accounts);
         const endA = masterA?.end_date || '9999-12-31';
         const endB = masterB?.end_date || '9999-12-31';
         if (endA !== endB) return endA.localeCompare(endB);
@@ -487,13 +493,26 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         } catch { alert('저장 실패'); }
     };
 
+    // 그룹 추가 시 비어 있는 번호(삭제된 그룹 자리)를 우선 추천하고, 없으면 마지막 번호 + 1을 추천한다.
+    const groupIdSuggestion = useMemo(
+        () => suggestGroupId(accounts.map(a => a.login_id)),
+        [accounts]
+    );
+
+    useEffect(() => {
+        if (!isAddModalOpen) return;
+        setNewAccount(prev => (prev.login_id.trim() ? prev : { ...prev, login_id: groupIdSuggestion.id }));
+    }, [isAddModalOpen, groupIdSuggestion.id]);
+
     const handleCreateAccount = async () => {
-        if (!newAccount.login_id.trim() || !newAccount.payment_email.trim()) { alert('필수 항목을 입력해주세요.'); return; }
+        const loginId = normalizeGroupId(newAccount.login_id);
+        if (!loginId || !newAccount.payment_email.trim()) { alert('필수 항목을 입력해주세요.'); return; }
+        if (accounts.some(a => normalizeGroupId(a.login_id) === loginId)) { alert(`이미 사용 중인 그룹 ID입니다. (${loginId})`); return; }
         try {
             const prodRes = await fetchFn('/api/admin/products');
             const products = await prodRes.json();
             const hifitidal = products.find((p: { name: string }) => p.name.toLowerCase() === 'hifitidal') || products.find((p: { name: string }) => p.name.toLowerCase().includes('hifitidal'));
-            const res = await fetchFn('/api/admin/legacy-tidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newAccount, product_id: hifitidal?.id }) });
+            const res = await fetchFn('/api/admin/legacy-tidal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newAccount, login_id: loginId, product_id: hifitidal?.id }) });
             if (!res.ok) throw new Error('Failed to create');
             alert('생성되었습니다.');
             setIsAddModalOpen(false); fetchAccounts();
@@ -1021,7 +1040,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             const isExpired = assignment.end_date ? parseISO(assignment.end_date) < today : false;
                                             const isEmpty = assignment.id.startsWith('empty_');
                                             const isDeactivated = val.is_active === false;
-                                            
+                                            // 마스터 표시가 빠진 그룹은 1번 슬롯을 마스터로 간주 (헤더 표기와 동일 기준)
+                                            const isMasterSlot = findMasterAssignment(acc.order_accounts)?.id === assignment.id;
+
                                             return (
                                                 <tr key={assignment.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDeactivated ? 'bg-red-50 text-red-500' : (isExpired ? 'bg-red-50/30' : (isEmpty ? 'bg-emerald-50/50 text-emerald-700' : ''))} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                     <td className="text-center py-2 border-r border-slate-100 whitespace-nowrap">
@@ -1033,8 +1054,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                         />
                                                     </td>
                                                     <td
-                                                        className="text-center font-bold px-2 border-r border-slate-100 text-slate-700 whitespace-nowrap cursor-pointer hover:text-blue-600 hover:underline"
-                                                        title="리스트 뷰에서 그룹 열기"
+                                                        className={`text-center font-bold px-2 border-r border-slate-100 whitespace-nowrap cursor-pointer hover:text-blue-600 hover:underline ${sIdx >= acc.max_slots ? 'text-amber-600' : 'text-slate-700'}`}
+                                                        title={sIdx >= acc.max_slots
+                                                            ? `정원 초과 슬롯 (정원 ${acc.max_slots}개). 중복 배정 여부를 확인하세요.`
+                                                            : "리스트 뷰에서 그룹 열기"}
                                                         onClick={() => {
                                                             setIsGridView(false);
                                                             setExpandedRows(new Set([acc.id]));
@@ -1044,6 +1067,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                         }}
                                                     >
                                                         {acc.login_id}-{assignment.slot_number + 1}
+                                                        {sIdx >= acc.max_slots && <span className="ml-1 text-[9px] font-normal">초과</span>}
                                                     </td>
                                                     <td className="text-center border-r border-slate-100 whitespace-nowrap">
                                                         <Popover>
@@ -1092,14 +1116,14 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             </PopoverContent>
                                                         </Popover>
                                                     </td>
-                                                    <td 
-                                                        className={`px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate ${assignment.type === 'master' ? 'bg-violet-50 text-violet-700 font-bold cursor-pointer hover:text-blue-600' : ''}`} 
+                                                    <td
+                                                        className={`px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate ${isMasterSlot ? 'bg-violet-50 text-violet-700 font-bold cursor-pointer hover:text-blue-600' : ''}`}
                                                         title={assignment.tidal_id || undefined}
-                                                        onClick={(e) => assignment.type === 'master' && handleMasterIdClick(e, assignment.tidal_id)}
+                                                        onClick={(e) => isMasterSlot && handleMasterIdClick(e, assignment.tidal_id)}
                                                     >
                                                         <div className="relative">
                                                             {assignment.tidal_id || '-'}
-                                                            {assignment.type === 'master' && copiedId === assignment.tidal_id && (
+                                                            {isMasterSlot && copiedId === assignment.tidal_id && (
                                                                 <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">ID 복사됨!</span>
                                                             )}
                                                         </div>
@@ -1160,7 +1184,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         <div className="divide-y divide-slate-100">
                             {sortedAccounts.map(acc => {
                                 const isExpanded = expandedRows.has(acc.id);
-                                const masterSlot = acc.order_accounts?.find(oa => oa.type === 'master');
+                                const masterSlot = findMasterAssignment(acc.order_accounts);
                                 const tidalId = masterSlot?.tidal_id || '-';
                                 const endDate = masterSlot?.end_date || '-';
                                 
@@ -1199,7 +1223,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             <div className="col-span-1 text-center text-slate-500 font-mono whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{duration}</div>
                                             <div className="col-span-1 text-right text-slate-500 font-mono pr-1 whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{masterSlot?.amount ? masterSlot.amount.toLocaleString() : '-'}</div>
                                             <div className="col-span-1 text-slate-400 text-[10px] truncate whitespace-nowrap" title={acc.memo} onClick={() => toggleRow(acc.id)}>{acc.memo}</div>
-                                            <div className="col-span-1 text-center font-bold text-blue-600 whitespace-nowrap" onClick={() => toggleRow(acc.id)}>{acc.used_slots}/{acc.max_slots}</div>
+                                            <div
+                                                className={`col-span-1 text-center font-bold whitespace-nowrap ${acc.used_slots > acc.max_slots ? 'text-amber-600' : 'text-blue-600'}`}
+                                                title={acc.used_slots > acc.max_slots ? `정원 초과: 활성 배정 ${acc.used_slots}건 / 정원 ${acc.max_slots}개. 중복 배정 여부를 확인하세요.` : undefined}
+                                                onClick={() => toggleRow(acc.id)}
+                                            >{acc.used_slots}/{acc.max_slots}</div>
                                             <div className="col-span-1 flex justify-center">
                                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-blue-50 text-blue-600" onClick={() => { setEditingAccount(acc); setIsEditModalOpen(true); }}><Pencil size={13} /></Button>
                                             </div>
@@ -1230,10 +1258,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                     <tbody>
                                                         {(() => {
                                                             let slots: Assignment[] = [];
-                                                            for (let i=0; i<acc.max_slots; i++) {
+                                                            const slotCount = getSlotRenderCount(acc);
+                                                            for (let i=0; i<slotCount; i++) {
                                                                 const found = acc.order_accounts?.find(oa => oa.slot_number === i);
                                                                 if (found) slots.push(found);
-                                                                else if (i===0 || acc.order_accounts?.length) {
+                                                                // 정원 밖의 빈 자리는 배정 가능한 슬롯이 아니므로 만들지 않는다
+                                                                else if (i < acc.max_slots && (i===0 || acc.order_accounts?.length)) {
                                                                     slots.push({ 
                                                                         id: `empty_${acc.id}_${i}`, 
                                                                         slot_number: i, 
@@ -1270,8 +1300,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                             return slots.sort((a,b) => (a.slot_number||0)-(b.slot_number||0)).map(assignment => {
                                                                 const isEmpty = assignment.id.startsWith('empty_');
                                                                 const isDeactivated = assignment.is_active === false;
+                                                                const isOverCapacity = assignment.slot_number >= acc.max_slots;
                                                                 const val = gridValues[`${acc.id}_${assignment.slot_number}`] || {};
-                                                                
+
                                                                 let period = '-';
                                                                 if (val.start_date && val.end_date) {
                                                                     try {
@@ -1281,7 +1312,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                 }
 
                                                                 return (
-                                                                    <tr key={assignment.id} className={`border-b last:border-0 border-slate-100 h-10 ${isDeactivated ? 'bg-red-50 text-red-500' : (isEmpty ? 'bg-emerald-50/20 text-emerald-600' : 'bg-white')}`}>
+                                                                    <tr
+                                                                        key={assignment.id}
+                                                                        title={isOverCapacity ? `정원 초과 슬롯 (정원 ${acc.max_slots}개). 중복 배정 여부를 확인하세요.` : undefined}
+                                                                        className={`border-b last:border-0 border-slate-100 h-10 ${isDeactivated ? 'bg-red-50 text-red-500' : (isEmpty ? 'bg-emerald-50/20 text-emerald-600' : (isOverCapacity ? 'bg-amber-50 text-amber-700' : 'bg-white'))}`}
+                                                                    >
                                                                         <td className="text-center whitespace-nowrap">
                                                                             <Popover>
                                                                                 <PopoverTrigger asChild>
@@ -1396,7 +1431,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-xs">그룹 ID <span className="text-red-500">*</span></Label>
-                            <Input value={newAccount.login_id} onChange={e => setNewAccount({ ...newAccount, login_id: e.target.value })} className="col-span-3 h-9" placeholder="예: HIFI-001" />
+                            <div className="col-span-3">
+                                <Input value={newAccount.login_id} onChange={e => setNewAccount({ ...newAccount, login_id: e.target.value.toUpperCase() })} className="h-9" placeholder={groupIdSuggestion.id} />
+                                <p className="mt-1 text-xs text-gray-500">{describeGroupIdSuggestion(groupIdSuggestion)}</p>
+                            </div>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-xs">비밀번호</Label>
@@ -1427,7 +1465,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         <div className="grid gap-4 py-4">
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">그룹 ID <span className="text-red-500">*</span></Label>
-                                <Input value={editingAccount.login_id} onChange={e => setEditingAccount({ ...editingAccount, login_id: e.target.value })} className="col-span-3 h-9" />
+                                <Input value={editingAccount.login_id} onChange={e => setEditingAccount({ ...editingAccount, login_id: e.target.value.toUpperCase() })} className="col-span-3 h-9" />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">결제 이메일 <span className="text-red-500">*</span></Label>

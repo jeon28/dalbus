@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { addDays, format, parseISO } from 'date-fns';
-import { syncUsedSlots } from '@/lib/assignment-utils';
+import { findFirstEmptySlot, syncUsedSlots } from '@/lib/assignment-utils';
 import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -126,9 +126,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (fetchError) throw fetchError;
 
         if (finalSlotNumber === undefined || finalSlotNumber === null) {
-            // 비삭제 항목 수를 기준으로 다음 슬롯 결정
-            // (reindexSlots가 0-based 연속 정렬을 보장하므로 비삭제 개수 = 다음 번호)
-            finalSlotNumber = currentAssignments?.filter(a => !a.is_deleted).length || 0;
+            // 슬롯 번호는 고정이므로 중간이 비어 있을 수 있다. 개수로 다음 번호를 정하면
+            // 이미 쓰는 번호와 충돌하므로, 비어 있는 가장 작은 번호를 찾아 그 자리를 채운다.
+            finalSlotNumber = findFirstEmptySlot(currentAssignments);
         }
 
         if (!finalType) {
@@ -187,6 +187,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             if (updateError) throw updateError;
         } else {
+            // 정원 초과 방지: 신규 배정은 정원(max_slots) 안에서만 생성한다.
+            // (초과를 허용하면 slot_number가 정원 밖으로 밀려 관리자 화면에서 누락된다)
+            const { data: account, error: accountError } = await supabaseAdmin
+                .from('tidal_accounts')
+                .select('max_slots')
+                .eq('id', account_id)
+                .single();
+
+            if (accountError) throw accountError;
+
+            const activeCount = currentAssignments?.filter(a => !a.is_deleted && a.is_active !== false).length ?? 0;
+            if (activeCount >= account.max_slots) {
+                return NextResponse.json(
+                    { error: `슬롯 부족 (${activeCount}/${account.max_slots}) — 정원을 늘리거나 기존 배정을 정리해주세요.` },
+                    { status: 400 }
+                );
+            }
+            if (finalSlotNumber >= account.max_slots) {
+                return NextResponse.json(
+                    { error: `정원(${account.max_slots}개)을 벗어난 슬롯 번호입니다.` },
+                    { status: 400 }
+                );
+            }
+
             const insertPayload: Record<string, string | number | boolean | null | undefined> = {
                 order_number: finalOrderNumber,
                 account_id: account_id,

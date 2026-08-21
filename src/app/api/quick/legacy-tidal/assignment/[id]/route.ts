@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { normalizePhone } from '@/lib/utils';
-import { reindexSlots, syncUsedSlots } from '@/lib/assignment-utils';
+import { normalizeSlots, syncUsedSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +68,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             // Re-index slots if type, is_active, or is_deleted changed
             const shouldReindex = type !== undefined || is_active !== undefined || body.is_deleted !== undefined;
             if (shouldReindex && updatedData) {
-                await reindexSlots(updatedData.account_id, assignmentTable, accountTable);
+                await normalizeSlots(updatedData.account_id, assignmentTable, accountTable);
                 await syncUsedSlots(updatedData.account_id, accountTable, assignmentTable);
             }
         }
@@ -112,7 +112,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         }
 
         // Re-index and Sync
-        await reindexSlots(assignment.account_id, assignmentTable, accountTable);
+        await normalizeSlots(assignment.account_id, assignmentTable, accountTable);
         await syncUsedSlots(assignment.account_id, accountTable, assignmentTable);
 
         return NextResponse.json({ success: true });

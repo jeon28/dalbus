@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getServerSession, isAdmin } from '@/lib/auth';
-import { reindexSlots, syncUsedSlots } from '@/lib/assignment-utils';
+import { normalizeSlots, syncUsedSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,8 +51,8 @@ export async function POST(
 
         if (updateError) throw updateError;
 
-        // 3. Re-index and Sync (to ensure slot ordering and counts are correct)
-        await reindexSlots(current.account_id, assignmentTable, accountTable);
+        // 3. 마스터 표시/사용 슬롯 수만 정리 (비활성 슬롯도 자기 번호를 그대로 유지)
+        await normalizeSlots(current.account_id, assignmentTable, accountTable);
 
         return NextResponse.json({ success: true, is_active: nextStatus });
     } catch (error) {

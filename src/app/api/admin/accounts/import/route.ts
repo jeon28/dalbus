@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { reindexSlots, syncUsedSlots } from '@/lib/assignment-utils';
+import { normalizeSlots, syncUsedSlots } from '@/lib/assignment-utils';
 
 function parseExcelDate(value: unknown): string | null {
     if (!value) return null;
@@ -399,8 +399,8 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                // 3. Re-index and Sync
-                await reindexSlots(masterAccountId, slotTable, 'tidal_accounts');
+                // 3. 마스터 표시/사용 슬롯 수 정리 (엑셀에 적힌 슬롯 번호는 그대로 유지)
+                await normalizeSlots(masterAccountId, slotTable, 'tidal_accounts');
                 await syncUsedSlots(masterAccountId, 'tidal_accounts', slotTable);
 
             } catch (error) {

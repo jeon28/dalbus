@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
+import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/lib/group-id-utils';
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
+import { getSlotRenderCount } from '@/lib/slot-utils';
 
 interface Assignment {
     id: string;
@@ -299,7 +301,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
             const initialGrid: Record<string, GridValue> = {};
             data.forEach((acc: Account) => {
-                for (let i = 0; i < acc.max_slots; i++) {
+                const slotCount = getSlotRenderCount(acc);
+                for (let i = 0; i < slotCount; i++) {
                     const assignment = acc.order_accounts?.find((oa: Assignment) => oa.slot_number === i);
                     let defaultPw = assignment?.tidal_password || '';
                     if (i === 0 && !defaultPw) defaultPw = acc.login_pw;
@@ -465,9 +468,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 return;
             }
 
-            for (let i = 0; i < acc.max_slots; i++) {
+            for (let i = 0; i < getSlotRenderCount(acc); i++) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let assignment: any = acc.order_accounts?.find(oa => oa.slot_number === i && !oa.is_deleted);
+                // 정원 밖의 빈 자리는 배정 가능한 슬롯이 아니므로 만들지 않는다
+                if (!assignment && i >= acc.max_slots) continue;
                 if (!assignment) {
                     assignment = {
                         id: `empty_${acc.id}_${i}`,
@@ -541,8 +546,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         const query = searchQuery.toLowerCase().trim();
 
         accounts.forEach(acc => {
-            for (let i = 0; i < acc.max_slots; i++) {
+            for (let i = 0; i < getSlotRenderCount(acc); i++) {
                 const assignment = acc.order_accounts?.find(oa => oa.slot_number === i);
+                // 정원 밖의 빈 자리는 배정 가능한 슬롯이 아니므로 만들지 않는다
+                if (!assignment && i >= acc.max_slots) continue;
                 const val = gridValues[`${acc.id}_${i}`] || {};
 
                 // Apply Search Filter
@@ -832,9 +839,25 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
 
 
+    // 그룹 추가 시 비어 있는 번호(삭제된 그룹 자리)를 우선 추천하고, 없으면 마지막 번호 + 1을 추천한다.
+    const groupIdSuggestion = useMemo(
+        () => suggestGroupId(accounts.map(a => a.login_id)),
+        [accounts]
+    );
+
+    useEffect(() => {
+        if (!isAddModalOpen) return;
+        setNewAccount(prev => (prev.login_id.trim() ? prev : { ...prev, login_id: groupIdSuggestion.id }));
+    }, [isAddModalOpen, groupIdSuggestion.id]);
+
     const handleCreateAccount = async () => {
-        if (!newAccount.login_id.trim() || !newAccount.payment_email.trim()) {
+        const loginId = normalizeGroupId(newAccount.login_id);
+        if (!loginId || !newAccount.payment_email.trim()) {
             alert('필수 항목을 입력해주세요.');
+            return;
+        }
+        if (accounts.some(a => normalizeGroupId(a.login_id) === loginId)) {
+            alert(`이미 사용 중인 그룹 ID입니다. (${loginId})`);
             return;
         }
         try {
@@ -845,7 +868,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             const res = await apiFetch('/api/admin/accounts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newAccount, product_id: tidal?.id })
+                body: JSON.stringify({ ...newAccount, login_id: loginId, product_id: tidal?.id })
             });
             if (!res.ok) throw new Error('Failed to create');
             alert('생성되었습니다.');
@@ -1834,10 +1857,13 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                     if (sortedAssignments.length === 0) return null;
                                 } else {
                                     const paddedAssignments: Assignment[] = [];
-                                    for (let i = 0; i < acc.max_slots; i++) {
+                                    for (let i = 0; i < getSlotRenderCount(acc); i++) {
                                         const existing = acc.order_accounts?.find(oa => oa.slot_number === i && !oa.is_deleted);
                                         if (existing) {
                                             paddedAssignments.push(existing);
+                                        // 정원 밖의 빈 자리는 배정 가능한 슬롯이 아니므로 만들지 않는다
+                                        } else if (i >= acc.max_slots) {
+                                            continue;
                                         } else {
                                             paddedAssignments.push({
                                                 id: `empty_${acc.id}_${i}`,
@@ -2230,7 +2256,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                             <Label htmlFor="login_id" className="text-right">
                                 그룹 ID <span className="text-red-500">*</span>
                             </Label>
-                            <Input id="login_id" type="text" value={newAccount.login_id} onChange={(e) => setNewAccount({ ...newAccount, login_id: e.target.value })} className="col-span-3" placeholder="GROUP-001" required />
+                            <div className="col-span-3">
+                                <Input id="login_id" type="text" value={newAccount.login_id} onChange={(e) => setNewAccount({ ...newAccount, login_id: e.target.value.toUpperCase() })} placeholder={groupIdSuggestion.id} required />
+                                <p className="mt-1 text-xs text-gray-500">{describeGroupIdSuggestion(groupIdSuggestion)}</p>
+                            </div>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="payment_email" className="text-right">
@@ -2262,7 +2291,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 <Label htmlFor="edit_login_id" className="text-right">
                                     그룹 ID <span className="text-red-500">*</span>
                                 </Label>
-                                <Input id="edit_login_id" value={editingAccount.login_id || ''} onChange={(e) => setEditingAccount({ ...editingAccount, login_id: e.target.value })} className="col-span-3" required />
+                                <Input id="edit_login_id" value={editingAccount.login_id || ''} onChange={(e) => setEditingAccount({ ...editingAccount, login_id: e.target.value.toUpperCase() })} className="col-span-3" required />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit_payment_email" className="text-right">

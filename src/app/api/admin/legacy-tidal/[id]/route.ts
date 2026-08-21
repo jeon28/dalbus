@@ -37,7 +37,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             }, {} as Record<string, unknown>);
 
         if (updateData.login_id) {
-            updateData.login_id = (updateData.login_id as string).toLowerCase().trim();
+            // 그룹 ID는 항상 대문자로 저장한다 (HA01 형식)
+            updateData.login_id = (updateData.login_id as string).toUpperCase().trim();
         }
 
         const { data, error } = await supabaseAdmin

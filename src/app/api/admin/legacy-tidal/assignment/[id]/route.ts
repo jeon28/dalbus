@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { normalizePhone } from '@/lib/utils';
 import { getServerSession, isAdmin } from '@/lib/auth';
-import { reindexSlots, syncUsedSlots } from '@/lib/assignment-utils';
+import { normalizeSlots, syncUsedSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,18 +85,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
             if (updateError) throw updateError;
 
-            // Re-index slots if type, is_active, or is_deleted actually changed
-            const structuralChanged = 
-                updates.type !== undefined || 
-                updates.is_active !== undefined || 
+            // 마스터 표시/사용 슬롯 수 정리 (슬롯 번호는 그대로 유지)
+            const structuralChanged =
+                updates.type !== undefined ||
+                updates.is_active !== undefined ||
                 updates.is_deleted !== undefined;
 
             if (structuralChanged) {
-                await reindexSlots(current.account_id, assignmentTable, accountTable);
-                // syncUsedSlots is already called inside reindexSlots
-            } else if (updates.is_active !== undefined) {
-                // If only is_active changed but not others, reindexSlots calls syncUsedSlots anyway.
-                // But we already covered is_active in structuralChanged.
+                // syncUsedSlots는 normalizeSlots 안에서 호출된다
+                await normalizeSlots(current.account_id, assignmentTable, accountTable);
             }
         }
 
@@ -139,8 +136,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             if (error) throw error;
         }
 
-        // 3. Re-index and Sync
-        await reindexSlots(assignment.account_id, assignmentTable, accountTable);
+        // 3. 삭제한 슬롯 번호는 그대로 공란으로 남긴다 (뒤 번호를 당기지 않음)
+        await normalizeSlots(assignment.account_id, assignmentTable, accountTable);
 
         return NextResponse.json({ success: true });
     } catch (error) {
