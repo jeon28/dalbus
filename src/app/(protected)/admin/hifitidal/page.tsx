@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
+import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
 import {
     Dialog,
     DialogContent,
@@ -164,6 +165,10 @@ function HifiTidalAccountsContent() {
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [emailTemplates, setEmailTemplates] = useState<{ id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[] }[]>([]);
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
+    const [isTemplateEditOpen, setIsTemplateEditOpen] = useState(false);
     const [isSendingNotify, setIsSendingNotify] = useState(false);
     const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
     
@@ -201,6 +206,7 @@ function HifiTidalAccountsContent() {
         'end_date': 120,
         'period': 60,
         'amount': 100,
+        'expiry_mail': 90,
         'memo_col': 400
     });
     const [resizingCol, setResizingCol] = useState<string | null>(null);
@@ -238,6 +244,22 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     useEffect(() => {
         setNotificationMessage(defaultTemplate);
     }, [defaultTemplate]);
+
+    // 메일 미리보기용 템플릿 목록
+    const fetchEmailTemplates = () => {
+        apiFetch('/api/admin/email-templates').then(res => {
+            if (!res.ok) return;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            res.json().then((data: { id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[] }[]) => {
+                setEmailTemplates(data);
+            }).catch(() => { });
+        }).catch(() => { });
+    };
+
+    useEffect(() => {
+        fetchEmailTemplates();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (isHydrated && !isAdmin) router.push('/admin');
@@ -1091,7 +1113,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             const res = await apiFetch('/api/admin/tidal/notify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ recipients, messageTemplate: notificationMessage })
+                body: JSON.stringify({ recipients, messageTemplate: notificationMessage, templateKey: selectedTemplateKey || undefined })
             });
 
             if (res.ok) {
@@ -1106,6 +1128,33 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         } finally {
             setIsSendingNotify(false);
         }
+    };
+
+    // 종료 메일: 종료일이 15일 이하로 남은 배정에만 발송 버튼을 노출한다.
+    // 1개월 계약은 갱신 대상이 아니라 제외한다 (잔여일 필터와 동일한 기준).
+    const EXPIRY_MAIL_DAYS = 15;
+
+    const getDaysLeft = (endDate?: string | null) => {
+        if (!endDate) return null;
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return Math.ceil((parseISO(endDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        } catch {
+            return null;
+        }
+    };
+
+    // 버튼 클릭 시 해당 1건만 대상으로 기존 만료 알림 모달을 연다 (내용 확인 후 발송)
+    const openExpiryMail = (assignmentId: string) => {
+        setNotificationMessage(defaultTemplate);
+        setSelectedAssignmentIds(new Set([assignmentId]));
+        // 만료 안내 템플릿을 기본 선택해 바로 미리보기가 보이도록 한다
+        if (!selectedTemplateKey) {
+            const expiry = emailTemplates.find(t => t.key === 'EXPIRY_NOTICE') || emailTemplates.find(t => !t.key.startsWith('LEGACY'));
+            if (expiry) setSelectedTemplateKey(expiry.key);
+        }
+        setIsNotifyModalOpen(true);
     };
 
     const generateTidalPassword = () => {
@@ -1400,6 +1449,10 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         </div>
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('amount', e)} />
                                     </th>
+                                    <th className="relative p-2 text-center border-r" style={{ width: columnWidths['expiry_mail'] }}>
+                                        종료메일
+                                        <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('expiry_mail', e)} />
+                                    </th>
                                     <th className="relative p-2 text-center" style={{ width: columnWidths['memo_col'] }}>
                                         메모
                                         <div className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400" onMouseDown={e => startResizing('memo_col', e)} />
@@ -1478,6 +1531,18 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
                                         const isEmpty = assignment.id.startsWith('empty_');
                                         const isActive = assignment.is_active !== false;
+
+                                        // 종료 메일 버튼 노출 조건: 활성 배정 + 잔여 15일 이하 + 1개월 계약 제외 + 이메일 보유
+                                        const daysLeft = getDaysLeft(assignment.end_date);
+                                        const expiryMailTo = assignment.buyer_email || assignment.orders?.buyer_email || '';
+                                        const canSendExpiryMail =
+                                            !isEmpty &&
+                                            !assignment.is_deleted &&
+                                            isActive &&
+                                            daysLeft !== null &&
+                                            daysLeft <= EXPIRY_MAIL_DAYS &&
+                                            !(item.period > 0 && item.period <= 1) &&
+                                            !!expiryMailTo;
 
                                         return (
                                             <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
@@ -1592,6 +1657,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-1 border-r w-16" style={{ width: columnWidths['amount'] || 80 }}>
                                                             <Input type="number" className="h-7 text-xs bg-white px-1" placeholder="금액" value={val.amount || ''} onChange={e => updateGridValue(acc.id, sIdx, 'amount', parseInt(e.target.value) || 0)} />
                                                         </td>
+                                                        <td className="p-1 border-r" style={{ width: columnWidths['expiry_mail'] }}></td>
                                                     </>
                                                 ) : isEmpty ? (
                                                     <>
@@ -1605,6 +1671,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['end_date'] }}></td>
                                                         <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['period'] }}></td>
                                                         <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['amount'] }}></td>
+                                                        <td className="p-2 border-r bg-green-100/50" style={{ width: columnWidths['expiry_mail'] }}></td>
                                                     </>
                                                 ) : (
                                                     <>
@@ -1630,6 +1697,22 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         </td>
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                         <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
+                                                        <td className="p-1 text-center border-r" style={{ width: columnWidths['expiry_mail'] }}>
+                                                            {canSendExpiryMail ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-6 px-2 gap-1 text-[10px] font-bold text-orange-700 border-orange-300 hover:bg-orange-50"
+                                                                    title={`${expiryMailTo} 로 종료 메일 발송 (잔여 ${daysLeft}일)`}
+                                                                    onClick={() => openExpiryMail(assignment.id)}
+                                                                >
+                                                                    <Mail size={11} />
+                                                                    {daysLeft !== null && daysLeft < 0 ? '만료' : `D-${daysLeft}`}
+                                                                </Button>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">-</span>
+                                                            )}
+                                                        </td>
                                                         <td className="p-2 text-left border-r truncate max-w-[400px] text-xs" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
                                                             <span className="text-gray-500">{val.memo?.split('\n')[0] || '-'}</span>
                                                         </td>
@@ -2195,11 +2278,31 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                 </DialogContent>
             </Dialog>
             <Dialog open={isNotifyModalOpen} onOpenChange={setIsNotifyModalOpen}>
-                <DialogContent className="max-w-xl">
+                <DialogContent className="max-w-[680px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>만료 알림 메세지 발송</DialogTitle>
+                        <DialogTitle>만료 알림 메세지 발송 ({selectedAssignmentIds.size}명)</DialogTitle>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <Select value={selectedTemplateKey} onValueChange={setSelectedTemplateKey}>
+                                    <SelectTrigger className="h-10 border-slate-200">
+                                        <SelectValue placeholder="템플릿 선택" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {emailTemplates.filter(t => !t.key.startsWith('LEGACY')).map(t => (
+                                            <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button type="button" variant="outline" size="sm" className="h-10 px-3 text-xs shrink-0"
+                                onClick={() => setIsTemplateEditOpen(true)}
+                                disabled={!selectedTemplateKey}
+                            >
+                                메일 수정하기
+                            </Button>
+                        </div>
                         <div className="p-3 bg-blue-50 text-blue-700 rounded-md text-xs">
                             <p className="font-bold mb-1">💡 안내</p>
                             <p>전체 {selectedAssignmentIds.size}명의 회원에게 메일을 발송합니다.</p>
@@ -2234,11 +2337,36 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <div className="space-y-2">
                             <Label>메세지 내용 (메일 본문)</Label>
                             <textarea
-                                className="w-full h-80 p-3 text-sm border rounded-md focus:ring-2 focus:ring-primary outline-none whitespace-pre-wrap"
+                                className="w-full h-48 p-3 text-sm border rounded-md focus:ring-2 focus:ring-primary outline-none whitespace-pre-wrap"
                                 value={notificationMessage}
                                 onChange={(e) => setNotificationMessage(e.target.value)}
                             />
                         </div>
+
+                        {/* 발송 전 미리보기: 수신자 첫 번째 건의 값으로 치환해 실제 메일 모양을 보여준다 */}
+                        {(() => {
+                            const tmpl = emailTemplates.find(t => t.key === selectedTemplateKey);
+                            const sampleId = Array.from(selectedAssignmentIds)[0];
+                            const sample = sampleId ? getFlattenedAssignments().find(a => a.id === sampleId) : null;
+                            const buyerName = sample?.assignment.buyer_name || sample?.assignment.orders?.buyer_name || '홍길동';
+                            const tidalId = sample?.assignment.tidal_id || 'sample@tidal.com';
+                            const endDate = sample?.assignment.end_date || '2027.05.02';
+                            const html = tmpl?.content
+                                ? tmpl.content.replace(/{buyer_name}/g, buyerName).replace(/{tidal_id}/g, tidalId).replace(/{end_date}/g, endDate).replace(/{message}/g, notificationMessage)
+                                : '<div style="padding:24px;color:#999;font-family:sans-serif;text-align:center">템플릿을 선택하면 미리보기가 표시됩니다.</div>';
+                            return (
+                                <div className="space-y-2">
+                                    <Label>미리보기</Label>
+                                    <div className="border rounded-xl overflow-hidden shadow-sm">
+                                        <div className="bg-slate-100 px-3 py-1.5 text-[10px] text-slate-500 font-mono border-b flex items-center justify-between">
+                                            <span>{sample ? `${buyerName} / ${tidalId} / ${endDate}` : '샘플 데이터'}</span>
+                                            {tmpl?.subject && <span className="text-slate-400">제목: {tmpl.subject}</span>}
+                                        </div>
+                                        <iframe srcDoc={html} className="w-full h-80 bg-white" sandbox="allow-same-origin" />
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsNotifyModalOpen(false)}>취소</Button>
@@ -2539,6 +2667,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     </div>
                 </div>
             </div>
+
+            <EmailTemplateModal
+                isOpen={isTemplateEditOpen}
+                onClose={() => setIsTemplateEditOpen(false)}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                template={emailTemplates.find(t => t.key === selectedTemplateKey) as any ?? null}
+                onSave={() => {
+                    setIsTemplateEditOpen(false);
+                    fetchEmailTemplates();
+                }}
+            />
         </main >
     );
 }
