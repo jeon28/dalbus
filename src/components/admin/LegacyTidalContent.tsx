@@ -781,8 +781,15 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     const handleBulkDelete = async () => {
         if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
-            await Promise.all(Array.from(selectedAssignmentIds).map(id => fetchFn(`/api/admin/legacy-tidal/assignment/${id}`, { method: 'DELETE' })));
+            // 실패한 요청을 조용히 넘기면 "삭제했는데 삭제내역에 없다"가 된다. 응답을 확인한다.
+            const results = await Promise.all(
+                Array.from(selectedAssignmentIds).map(id =>
+                    fetchFn(`/api/admin/legacy-tidal/assignment/${id}`, { method: 'DELETE' })
+                )
+            );
+            const failed = results.filter(r => !r.ok).length;
             setSelectedAssignmentIds(new Set()); fetchAccounts();
+            if (failed > 0) alert(`${failed}건 삭제 실패 (권한 또는 서버 오류)`);
         } catch { alert('일괄 삭제 실패'); }
     };
 

@@ -31,6 +31,8 @@ interface LegacyTidalHistory {
     master_id?: string;
     account_id?: string;
     memo?: string;
+    amount?: number;
+    period_months?: number;
     accounts?: {
         id: string;
         login_id: string;
@@ -61,6 +63,8 @@ interface GroupSlot {
     start_date?: string;
     end_date?: string;
     memo?: string;
+    amount?: number;
+    period_months?: number;
     is_active?: boolean;
     is_deleted?: boolean;
 }
@@ -99,6 +103,16 @@ function LegacyTidalInactiveContent() {
     const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
     const [currentMemoInput, setCurrentMemoInput] = useState('');
     const [memoTargetAssignmentId, setMemoTargetAssignmentId] = useState('');
+
+    // 개월수가 비어 있을 때만 기간에서 추정한다 (저장 값이 있으면 그대로 사용)
+    const monthsBetween = (start?: string, end?: string) => {
+        if (!start || !end) return 0;
+        try {
+            return Math.max(0, Math.floor(differenceInDays(parseISO(end), parseISO(start)) / 30));
+        } catch {
+            return 0;
+        }
+    };
 
     const handleMasterIdClick = (e: React.MouseEvent, id?: string) => {
         e.stopPropagation();
@@ -292,6 +306,8 @@ function LegacyTidalInactiveContent() {
             start_date: oa?.start_date,
             end_date: oa?.end_date,
             memo: oa?.memo,
+            amount: oa?.amount,
+            period_months: oa?.period_months,
             is_active: oa?.is_active ?? false,
             isEmpty: !oa,
             account_id: acc.id,
@@ -313,8 +329,9 @@ function LegacyTidalInactiveContent() {
                 tidal_id: assignment.tidal_id || '',
                 start_date: assignment.start_date || '',
                 end_date: assignment.end_date || '',
-                period_months: 0, // Will be calculated if needed
-                amount: 0,
+                // 0으로 초기화하면 저장 시 기존 계약금액/개월수를 0으로 덮어쓴다.
+                period_months: assignment.period_months ?? monthsBetween(assignment.start_date, assignment.end_date),
+                amount: assignment.amount ?? 0,
                 memo: assignment.memo || '',
             });
         } else {

@@ -36,7 +36,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ acc
 
         // 삭제/비활성 행까지 모두 가져온다.
         // - 비활성 행도 자기 슬롯 번호를 계속 점유한다 (화면에 그 번호로 남아 있음)
-        // - 삭제 행은 (account_id, slot_number) 유니크 제약 때문에 insert가 아니라 되살려야 한다
+        // - 삭제 행은 슬롯을 점유하지 않는다. 유니크 인덱스가 부분 인덱스(삭제 행 제외)라서
+        //   같은 슬롯에 새 행을 insert할 수 있다. 삭제 행을 덮어쓰면 삭제내역이 사라진다.
         const { data: currentAssignments, error: fetchError } = await supabaseAdmin
             .from('legacy_tidal_assignments')
             .select('id, slot_number, type, is_active, is_deleted')
@@ -57,8 +58,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ acc
             finalType = finalSlotNumber === 0 ? 'master' : 'user';
         }
 
-        // Check for existing at this slot
-        const existingAssignment = currentAssignments?.find(a => a.slot_number === finalSlotNumber);
+        // Check for existing at this slot.
+        // 삭제된 행은 삭제내역(휴지통)에 남아 있어야 하므로 재사용하지 않고 새 행을 만든다.
+        const existingAssignment = currentAssignments?.find(
+            a => a.slot_number === finalSlotNumber && a.is_deleted !== true
+        );
 
         if (existingAssignment) {
             const { error: updateError } = await supabaseAdmin

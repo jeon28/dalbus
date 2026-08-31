@@ -139,8 +139,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             }
         }
 
-        // 3. Check for existing at this slot (Include deleted ones to prevent account_slot_key unique violation pada INSERT)
-        const existingAssignment = currentAssignments?.find(a => a.slot_number === finalSlotNumber);
+        // 3. Check for existing at this slot.
+        //    삭제된 행은 재사용하지 않는다. 유니크 인덱스가 부분 인덱스(삭제 행 제외)라서
+        //    같은 슬롯에 새 행을 insert할 수 있고, 덮어쓰면 삭제내역이 사라진다.
+        const existingAssignment = currentAssignments?.find(
+            a => a.slot_number === finalSlotNumber && a.is_deleted !== true
+        );
 
         if (existingAssignment) {
             const { data: targetOrder } = await supabaseAdmin
@@ -155,7 +159,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 ((targetOrder.buyer_email && targetOrder.buyer_email === existingAssignment?.buyer_email) ||
                     (targetOrder.buyer_name && targetOrder.buyer_name === existingAssignment?.buyer_name));
 
-            if (!existingAssignment.is_deleted && !isSameOrder && !isExtensionOfExisting && !isBuyerMatch) {
+            if (!isSameOrder && !isExtensionOfExisting && !isBuyerMatch) {
                 return NextResponse.json({
                     error: `선택하신 슬롯(${finalSlotNumber + 1}번)은 이미 다른 주문이 점유하고 있습니다.`
                 }, { status: 409 });

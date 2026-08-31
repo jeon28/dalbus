@@ -32,6 +32,8 @@ interface LegacyTidalHistory {
     master_id?: string;
     account_id?: string;
     memo?: string;
+    amount?: number;
+    period_months?: number;
     accounts?: {
         id: string;
         login_id: string;
@@ -62,6 +64,8 @@ interface GroupSlot {
     start_date?: string;
     end_date?: string;
     memo?: string;
+    amount?: number;
+    period_months?: number;
     is_active?: boolean;
     is_deleted?: boolean;
 }
@@ -273,6 +277,8 @@ function LegacyTidalInactiveContent() {
             start_date: oa?.start_date,
             end_date: oa?.end_date,
             memo: oa?.memo,
+            amount: oa?.amount,
+            period_months: oa?.period_months,
             is_active: oa?.is_active ?? false,
             isEmpty: !oa,
             account_id: acc.id,
@@ -286,8 +292,8 @@ function LegacyTidalInactiveContent() {
         setActiveEditSlotIdx(slotIdx);
         if (assignment && !assignment.isEmpty) {
             setSelectedAssignmentId(assignment.id);
-            let pm = 0;
-            if (assignment.start_date && assignment.end_date) {
+            let pm = assignment.period_months ?? 0;
+            if (!pm && assignment.start_date && assignment.end_date) {
                 try { pm = Math.max(0, Math.floor(differenceInDays(parseISO(assignment.end_date), parseISO(assignment.start_date)) / 30)); } catch { }
             }
             setInitialEditEndDate(assignment.end_date || '');
@@ -301,7 +307,7 @@ function LegacyTidalInactiveContent() {
                 start_date: assignment.start_date || '',
                 end_date: assignment.end_date || '',
                 period_months: pm,
-                amount: 0,
+                amount: assignment.amount ?? 0,
                 memo: assignment.memo || '',
             });
         } else {
