@@ -1100,15 +1100,17 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         setIsSendingNotify(true);
         try {
             const flattened = getFlattenedAssignments();
-            const recipients = flattened
+            // 메모 기록을 위해 배정 정보를 그대로 들고 간다
+            const targets = flattened
                 .filter(item => selectedAssignmentIds.has(item.id))
-                .map(item => ({
-                    email: item.assignment.buyer_email || item.assignment.orders?.buyer_email,
-                    buyerName: item.assignment.buyer_name || item.assignment.orders?.buyer_name || '고객',
-                    tidalId: item.assignment.tidal_id || '알 수 없음',
-                    endDate: item.assignment.end_date || '알 수 없음'
-                }))
-                .filter(r => !!r.email);
+                .filter(item => !!(item.assignment.buyer_email || item.assignment.orders?.buyer_email));
+
+            const recipients = targets.map(item => ({
+                email: (item.assignment.buyer_email || item.assignment.orders?.buyer_email) as string,
+                buyerName: item.assignment.buyer_name || item.assignment.orders?.buyer_name || '고객',
+                tidalId: item.assignment.tidal_id || '알 수 없음',
+                endDate: item.assignment.end_date || '알 수 없음'
+            }));
 
             const res = await apiFetch('/api/admin/tidal/notify', {
                 method: 'POST',
@@ -1117,9 +1119,21 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             });
 
             if (res.ok) {
-                alert('발송되었습니다.');
+                const result = await res.json().catch(() => null);
+                const failedEmails = new Set<string>(
+                    ((result?.failures || []) as { email?: string }[]).map(fail => fail.email || '')
+                );
+                // 실제로 나간 건만 메모에 이력을 남긴다
+                await appendExpiryMailMemo(
+                    targets.filter(item => {
+                        const email = item.assignment.buyer_email || item.assignment.orders?.buyer_email || '';
+                        return !failedEmails.has(email);
+                    })
+                );
+                alert(result?.message ? `발송 완료 — ${result.message}` : '발송되었습니다.');
                 setIsNotifyModalOpen(false);
                 setSelectedAssignmentIds(new Set());
+                fetchAccounts();
             } else {
                 alert('발송 실패');
             }
@@ -1142,6 +1156,48 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             return Math.ceil((parseISO(endDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         } catch {
             return null;
+        }
+    };
+
+    // 메모에 남기는 발송 이력 한 줄의 형식: "2026-08-31 D-7 종료메일 발송"
+    const EXPIRY_MAIL_MEMO_RE = /^(\d{4}-\d{2}-\d{2})\s+(D[-+]\d+)\s+종료메일 발송$/;
+
+    const formatDLabel = (daysLeft: number) => (daysLeft >= 0 ? `D-${daysLeft}` : `D+${Math.abs(daysLeft)}`);
+
+    // 메모에 쌓인 종료메일 발송 이력을 읽어온다 (최신순)
+    const getExpiryMailLogs = (memo?: string | null) => {
+        if (!memo) return [] as { date: string; label: string }[];
+        const logs: { date: string; label: string }[] = [];
+        for (const line of memo.split('\n')) {
+            const m = line.trim().match(EXPIRY_MAIL_MEMO_RE);
+            if (m) logs.push({ date: m[1], label: m[2] });
+        }
+        // 이력은 메모 맨 위에 쌓이지만, 손으로 편집된 메모도 있으므로 날짜로 다시 정렬한다
+        return logs.sort((a, b) => b.date.localeCompare(a.date));
+    };
+
+    // 발송 성공 건의 메모에 이력 한 줄을 덧붙인다.
+    // 여러 번 보낼 수 있으므로 기존 이력은 지우지 않고 계속 누적한다.
+    const appendExpiryMailMemo = async (items: { assignment: Assignment; account: Account }[]) => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        for (const item of items) {
+            const sIdx = item.assignment.slot_number;
+            const key = `${item.account.id}_${sIdx}`;
+            const currentMemo = gridValues[key]?.memo ?? item.assignment.memo ?? '';
+            const daysLeft = getDaysLeft(item.assignment.end_date);
+            const line = `${today} ${daysLeft === null ? 'D+0' : formatDLabel(daysLeft)} 종료메일 발송`;
+            // 메모 열은 첫 줄만 보여주므로 최신 이력을 맨 위에 쌓는다
+            const nextMemo = currentMemo.trim() ? `${line}\n${currentMemo.replace(/^\s+/, '')}` : line;
+            try {
+                const res = await apiFetch(`/api/admin/assignments/${item.assignment.id}?product=HifiTidal`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ memo: nextMemo })
+                });
+                if (res.ok) updateGridValue(item.account.id, sIdx, 'memo', nextMemo);
+            } catch {
+                // 메일은 이미 나갔으므로 메모 기록 실패로 전체를 실패 처리하지는 않는다
+            }
         }
     };
 
@@ -1535,6 +1591,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         // 종료 메일 버튼 노출 조건: 활성 배정 + 잔여 15일 이하 + 1개월 계약 제외 + 이메일 보유
                                         const daysLeft = getDaysLeft(assignment.end_date);
                                         const expiryMailTo = assignment.buyer_email || assignment.orders?.buyer_email || '';
+                                        const expiryMailLogs = getExpiryMailLogs(val.memo);
                                         const canSendExpiryMail =
                                             !isEmpty &&
                                             !assignment.is_deleted &&
@@ -1697,7 +1754,8 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                         </td>
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['period'] }}>{item.period}</td>
                                                         <td className="p-2 text-right border-r font-mono" style={{ width: columnWidths['amount'] || 80 }}>{val.amount ? val.amount.toLocaleString() : '-'}</td>
-                                                        <td className="p-1 text-center border-r" style={{ width: columnWidths['expiry_mail'] }}>
+                                                        <td className="p-1 text-center border-r align-middle" style={{ width: columnWidths['expiry_mail'] }}>
+                                                            <div className="flex flex-col items-center gap-0.5">
                                                             {canSendExpiryMail ? (
                                                                 <Button
                                                                     size="sm"
@@ -1707,11 +1765,21 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     onClick={() => openExpiryMail(assignment.id)}
                                                                 >
                                                                     <Mail size={11} />
-                                                                    {daysLeft !== null && daysLeft < 0 ? '만료' : `D-${daysLeft}`}
+                                                                    {daysLeft !== null ? formatDLabel(daysLeft) : 'D-?'}
                                                                 </Button>
                                                             ) : (
-                                                                <span className="text-gray-300 text-xs">-</span>
+                                                                expiryMailLogs.length === 0 && <span className="text-gray-300 text-xs">-</span>
                                                             )}
+                                                            {expiryMailLogs.length > 0 && (
+                                                                <span
+                                                                    className="text-[9px] text-gray-400 leading-tight"
+                                                                    title={expiryMailLogs.map(log => `${log.date} ${log.label} 종료메일 발송`).join('\n')}
+                                                                >
+                                                                    {expiryMailLogs[0].date.slice(5)} {expiryMailLogs[0].label}
+                                                                    {expiryMailLogs.length > 1 ? ` (${expiryMailLogs.length}회)` : ''}
+                                                                </span>
+                                                            )}
+                                                            </div>
                                                         </td>
                                                         <td className="p-2 text-left border-r truncate max-w-[400px] text-xs" title={val.memo || undefined} style={{ width: columnWidths['memo_col'] }}>
                                                             <span className="text-gray-500">{val.memo?.split('\n')[0] || '-'}</span>
