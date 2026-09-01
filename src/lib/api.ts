@@ -5,16 +5,25 @@ import { logger } from './logger';
 // Global session cache to avoid redundant and concurrent async calls
 let sessionCache: Session | null = null;
 let sessionPromise: Promise<Session | null> | null = null;
+let sessionInitialized = false;
 
 // Initialize session cache
 if (typeof window !== 'undefined') {
-    sessionPromise = supabase.auth.getSession().then(({ data: { session } }) => {
-        sessionCache = session;
-        return session;
-    });
+    sessionPromise = supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+            sessionCache = session;
+            sessionInitialized = true;
+            return session;
+        })
+        .catch((err) => {
+            console.error('[apiFetch] Initial getSession failed:', err);
+            sessionInitialized = true;
+            return null;
+        });
 
     supabase.auth.onAuthStateChange((_event, session) => {
         sessionCache = session;
+        sessionInitialized = true;
     });
 }
 
@@ -30,20 +39,21 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     logger.debug(`[apiFetch] Request start: ${method} ${url}`);
 
     try {
-        // Use cached session if available to avoid awaiting
-        let session = sessionCache;
-
-        // If not cached and we are in the browser, try to wait for the initial promise
-        if (!session && sessionPromise) {
-            logger.debug('[apiFetch] Waiting for supabase session...');
-            const result = await supabase.auth.getSession();
-            session = result.data.session;
-            sessionCache = session;
-            logger.debug('[apiFetch] Session retrieved:', session ? 'OK' : 'None');
+        // If session not yet initialized in browser, wait briefly for the initial check with a short timeout
+        if (typeof window !== 'undefined' && !sessionInitialized && sessionPromise) {
+            try {
+                await Promise.race([
+                    sessionPromise,
+                    new Promise((resolve) => setTimeout(resolve, 800))
+                ]);
+            } catch {
+                // Continue with whatever sessionCache we have
+            }
         }
 
+        const session = sessionCache;
         const token = session?.access_token;
-        if (!token) logger.debug('[apiFetch] Missing access token');
+        if (!token) logger.debug('[apiFetch] No active access token attached');
 
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useServices } from '@/lib/ServiceContext';
 import { apiFetch } from '@/lib/api';
 import styles from './service.module.css';
@@ -10,17 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { addDays, format, parseISO } from 'date-fns';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { toast } from 'sonner';
 import { PageLoading } from '@/components/ui/PageLoading';
 import { formatPhoneInput } from '@/lib/utils';
 
-export default function ServiceDetail({ params }: { params: Promise<{ id: string }> }) {
+export default function ServiceDetail({ params }: { params?: Promise<{ id: string }> }) {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const routeParams = useParams();
     const { user, refreshUser } = useServices();
-    const [id, setId] = useState<string | null>(null);
+    const [id, setId] = useState<string>(() => (routeParams?.id as string) || '');
+    const [pageLoading, setPageLoading] = useState(true);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
     // interfaces
     interface Plan {
@@ -84,37 +87,52 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
 
     // Unpack params
     useEffect(() => {
-        params.then(p => setId(p.id));
-    }, [params]);
+        if (routeParams?.id) {
+            setId(routeParams.id as string);
+        } else if (params) {
+            Promise.resolve(params)
+                .then(p => {
+                    if (p?.id) setId(p.id);
+                })
+                .catch(() => {});
+        }
+    }, [routeParams, params]);
 
-    // Fetch data when ID is available
-    useEffect(() => {
+    // Fetch product details
+    const fetchData = useCallback(async () => {
         if (!id) return;
 
-        const fetchData = async () => {
-            try {
-                // Fetch product details
-                const prodRes = await apiFetch(`/api/public/products/${id}`);
-                if (prodRes.ok) {
-                    const prodData = await prodRes.json();
-                    setProduct(prodData);
-                    
-                    // Unified plans from product_plans relation
-                    if (prodData.product_plans && prodData.product_plans.length > 0) {
-                        const sortedPlans = [...prodData.product_plans].sort((a, b) => a.duration_months - b.duration_months);
-                        setPlans(sortedPlans);
-                        const prefer12 = sortedPlans.find(p => p.duration_months === 12);
-                        setSelectedPeriod(prefer12 ? 12 : sortedPlans[sortedPlans.length - 1].duration_months);
-                    }
+        setPageLoading(true);
+        setFetchError(null);
+
+        try {
+            const prodRes = await apiFetch(`/api/public/products/${id}`);
+            if (prodRes.ok) {
+                const prodData = await prodRes.json();
+                setProduct(prodData);
+                
+                // Unified plans from product_plans relation
+                if (prodData.product_plans && prodData.product_plans.length > 0) {
+                    const sortedPlans = [...prodData.product_plans].sort((a, b) => a.duration_months - b.duration_months);
+                    setPlans(sortedPlans);
+                    const prefer12 = sortedPlans.find(p => p.duration_months === 12);
+                    setSelectedPeriod(prefer12 ? 12 : sortedPlans[sortedPlans.length - 1].duration_months);
                 }
-
-            } catch (err) {
-                console.error('Failed to fetch product data:', err);
+            } else {
+                const errData = await prodRes.json().catch(() => ({}));
+                setFetchError(errData.error || '상품 정보를 불러올 수 없습니다.');
             }
-        };
-
-        fetchData();
+        } catch (err) {
+            console.error('Failed to fetch product data:', err);
+            setFetchError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        } finally {
+            setPageLoading(false);
+        }
     }, [id]);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
     // Handle initial parameters from URL
     useEffect(() => {
@@ -367,7 +385,39 @@ export default function ServiceDetail({ params }: { params: Promise<{ id: string
     };
 
 
-    if (!product) return <PageLoading />;
+    if (pageLoading) {
+        return <PageLoading />;
+    }
+
+    if (fetchError || !product) {
+        return (
+            <main className="container max-w-lg mx-auto py-24 px-4 text-center">
+                <div className="bg-white/80 backdrop-blur rounded-2xl p-8 border border-red-100 shadow-sm">
+                    <div className="bg-red-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertTriangle className="w-6 h-6 text-red-500" />
+                    </div>
+                    <h2 className="text-lg font-bold mb-2 text-zinc-900">상품 정보를 불러올 수 없습니다</h2>
+                    <p className="text-sm text-muted-foreground mb-6">
+                        {fetchError || '요청하신 상품을 찾을 수 없거나 현재 이용할 수 없습니다.'}
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                        <button
+                            onClick={() => fetchData()}
+                            className="px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors shadow-sm"
+                        >
+                            다시 시도
+                        </button>
+                        <button
+                            onClick={() => router.push('/public/products')}
+                            className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors"
+                        >
+                            상품 목록으로
+                        </button>
+                    </div>
+                </div>
+            </main>
+        );
+    }
 
     const handleSelectOrderForExtension = (order: ExtensionOrder) => {
         setSelectedOrder(order);
