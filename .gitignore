@@ -45,3 +45,8 @@ supabase-migration/
 
 # sensitive sensitive
 mcp_config.json
+
+# local analysis docs (untracked working notes)
+dalbus-frontend-analysis.html
+dalbus-backend-analysis.html
+dalbus-design-improvement.html
