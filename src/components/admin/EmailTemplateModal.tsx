@@ -11,24 +11,29 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from '@/lib/api';
-import { Loader2, Send, Save, Variable, Eye, Layout } from 'lucide-react';
+import { Loader2, Send, Save, Variable, Layout } from 'lucide-react';
 import EmailEditor, { EditorRef } from 'react-email-editor';
 
-interface Placeholder {
+// Unlayer 타입은 react-email-editor가 이미 물고 있는 @unlayer/types에서 유도한다
+// (@unlayer/types를 직접 import하면 선언되지 않은 전이 의존성에 기대게 된다).
+type UnlayerEditor = NonNullable<EditorRef['editor']>;
+export type EmailDesign = Parameters<UnlayerEditor['loadDesign']>[0];
+type ExportHtmlResult = Parameters<Parameters<UnlayerEditor['exportHtml']>[0]>[0];
+
+export interface Placeholder {
     key: string;
     label: string;
 }
 
-interface EmailTemplate {
+export interface EmailTemplate {
     id?: string;
     key: string;
     name: string;
     subject: string;
     content: string;
-    design?: any;
-    placeholders: Placeholder[];
+    design?: EmailDesign;
+    placeholders?: Placeholder[];
 }
 
 interface EmailTemplateModalProps {
@@ -61,7 +66,6 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
     });
     const [saving, setSaving] = useState(false);
     const [testSending, setTestSending] = useState(false);
-    const [previewHtml, setPreviewHtml] = useState('');
     const [editorReady, setEditorReady] = useState(false);
     const emailEditorRef = React.useRef<EditorRef>(null);
 
@@ -79,36 +83,13 @@ export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailT
         }
     }, [template, isOpen]);
 
-    useEffect(() => {
-        // 프리뷰 생성 (샘플 데이터 적용)
-        const sampleData: Record<string, string> = {
-            buyer_name: '홍길동',
-            product_name: '테스트 상품',
-            plan_name: '프리미엄 1개월',
-            amount: '12,000',
-            order_id: 'ORD-12345',
-            depositor_name: '홍길동',
-            tidal_id: 'test@example.com',
-            tidal_pw: 'password!',
-            end_date: '2026-05-12',
-            message: '안녕하세요. 요청하신 서비스 배정이 완료되었습니다.'
-        };
-
-        let html = formData.content;
-        Object.keys(sampleData).forEach(key => {
-            const regex = new RegExp(`{${key}}`, 'g');
-            html = html.replace(regex, `<span style="background: #dcfce7; color: #166534; padding: 0 4px; border-radius: 4px; border: 1px solid #bbf7d0;">${sampleData[key]}</span>`);
-        });
-        setPreviewHtml(html);
-    }, [formData.content]);
-
     const handleSave = async () => {
         if (!emailEditorRef.current?.editor) return;
 
         setSaving(true);
         try {
             // Unlayer에서 HTML과 Design(JSON)을 추출
-            const exportedData = await new Promise<any>((resolve) => {
+            const exportedData = await new Promise<ExportHtmlResult>((resolve) => {
                 emailEditorRef.current?.editor?.exportHtml((data) => {
                     resolve(data);
                 });

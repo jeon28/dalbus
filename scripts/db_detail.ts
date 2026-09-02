@@ -16,7 +16,8 @@ async function detail() {
 
     console.log('\n--- 3. Duplicate Slot Assignments ---');
     const { data: assignments } = await supabase.from('order_accounts').select('id, account_id, slot_number, buyer_name, order_id');
-    const usage: Record<string, any[]> = {};
+    type AssignmentRow = NonNullable<typeof assignments>[number];
+    const usage: Record<string, AssignmentRow[]> = {};
     assignments?.forEach(a => {
         const k = `${a.account_id}_${a.slot_number}`;
         if (!usage[k]) usage[k] = [];

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api';
-import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
+import { EmailTemplateModal, type EmailDesign } from '@/components/admin/EmailTemplateModal';
 
 interface Placeholder {
     key: string;
@@ -28,7 +28,7 @@ interface EmailTemplate {
     name: string;
     subject: string;
     content: string;
-    design?: any;
+    design?: EmailDesign;
     placeholders: Placeholder[];
     updated_at: string;
 }

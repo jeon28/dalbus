@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { normalizePhone } from '@/lib/utils';
 import { getServerSession, isAdmin } from '@/lib/auth';
-import { normalizeSlots, syncUsedSlots } from '@/lib/assignment-utils';
+import { normalizeSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,15 +46,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             throw new Error('Assignment not found');
         }
 
-        const updates: Record<string, string | number | boolean | null> = {};
+        type FieldValue = string | number | boolean | null;
+        const updates: Record<string, FieldValue> = {};
         
         // Helper to check if value changed and add to updates
-        const addIfChanged = (key: string, newValue: any) => {
+        const addIfChanged = (key: string, newValue: FieldValue | undefined) => {
             if (newValue === undefined) return;
-            
-            let val = newValue;
-            if (key === 'tidal_id') val = val ? val.toLowerCase().trim() : null;
-            if (key === 'buyer_phone') val = normalizePhone(val);
+
+            let val: FieldValue = newValue;
+            if (key === 'tidal_id') val = val ? String(val).toLowerCase().trim() : null;
+            if (key === 'buyer_phone') val = normalizePhone(val === null ? null : String(val));
             if (key === 'amount' || key === 'period_months') val = val !== null ? Number(val) : null;
 
             if (current[key] !== val) {

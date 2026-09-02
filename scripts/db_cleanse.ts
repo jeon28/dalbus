@@ -67,7 +67,8 @@ async function cleanse() {
         .from('order_accounts')
         .select('id, account_id, slot_number, buyer_name, order_id, accounts(login_id)');
 
-    const usage: Record<string, any[]> = {};
+    type AssignmentRow = NonNullable<typeof assignments>[number];
+    const usage: Record<string, AssignmentRow[]> = {};
     assignments?.forEach(a => {
         const key = `${a.account_id}_${a.slot_number}`;
         if (!usage[key]) usage[key] = [];

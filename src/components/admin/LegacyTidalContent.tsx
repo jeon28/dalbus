@@ -39,7 +39,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
-import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
+import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
 
 interface Assignment {
@@ -165,7 +165,7 @@ export function LegacyTidalContent({
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
-    const [emailTemplates, setEmailTemplates] = useState<{id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[]}[]>([]);
+    const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
     const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
     const [isTemplateEditOpen, setIsTemplateEditOpen] = useState(false);
@@ -1910,7 +1910,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             <EmailTemplateModal
                 isOpen={isTemplateEditOpen}
                 onClose={() => setIsTemplateEditOpen(false)}
-                template={emailTemplates.find(t => t.key === selectedTemplateKey) as any ?? null}
+                template={emailTemplates.find(t => t.key === selectedTemplateKey) ?? null}
                 onSave={fetchTemplates}
             />
         </main>

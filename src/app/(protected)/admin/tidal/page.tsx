@@ -32,7 +32,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
-import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
+import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount } from '@/lib/slot-utils';
 
 interface Assignment {
@@ -171,7 +171,7 @@ function TidalAccountsContent() {
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
-    const [emailTemplates, setEmailTemplates] = useState<{id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[]}[]>([]);
+    const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
     const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
     const [isTemplateEditOpen, setIsTemplateEditOpen] = useState(false);
     const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
@@ -370,7 +370,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             fetchAccounts();
             fetchPendingOrders();
             apiFetch('/api/admin/email-templates').then(res => {
-                if (res.ok) res.json().then((data: {key: string, name: string, subject?: string, content?: string}[]) => {
+                if (res.ok) res.json().then((data: EmailTemplate[]) => {
                     setEmailTemplates(data);
                     const firstNonLegacy = data.find(t => !t.key.startsWith('LEGACY'));
                     if (firstNonLegacy) setSelectedTemplateKey(firstNonLegacy.key);
@@ -2566,11 +2566,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             <EmailTemplateModal
                 isOpen={isTemplateEditOpen}
                 onClose={() => setIsTemplateEditOpen(false)}
-                template={emailTemplates.find(t => t.key === selectedTemplateKey) as any ?? null}
+                template={emailTemplates.find(t => t.key === selectedTemplateKey) ?? null}
                 onSave={() => {
                     setIsTemplateEditOpen(false);
                     apiFetch('/api/admin/email-templates').then(res => {
-                        if (res.ok) res.json().then((data: {id?: string, key: string, name: string, subject?: string, content?: string, design?: any, placeholders?: any[]}[]) => {
+                        if (res.ok) res.json().then((data: EmailTemplate[]) => {
                             setEmailTemplates(data);
                         });
                     });

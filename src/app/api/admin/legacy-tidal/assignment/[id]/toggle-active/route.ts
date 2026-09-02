@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getServerSession, isAdmin } from '@/lib/auth';
-import { normalizeSlots, syncUsedSlots } from '@/lib/assignment-utils';
+import { normalizeSlots } from '@/lib/assignment-utils';
 
 export const dynamic = 'force-dynamic';
 

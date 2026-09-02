@@ -7,7 +7,6 @@ import { useServices } from '@/lib/ServiceContext';
 import { apiFetch } from '@/lib/api';
 import styles from './service.module.css';
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { addDays, format, parseISO } from 'date-fns';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
@@ -181,7 +180,6 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
         } else {
             setUserEmails([]);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     // Fetch user's tidal accounts for this product (for EXT tab)

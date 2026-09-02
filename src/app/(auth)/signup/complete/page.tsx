@@ -132,7 +132,7 @@ export default function SignupCompletePage() {
             subscription.unsubscribe();
             clearTimeout(timeout);
         };
-    }, [router, checking]);
+    }, [router, checking, isPopup]);
 
     const isFormValid =
         formData.name.trim() !== '' &&

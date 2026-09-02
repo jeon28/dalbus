@@ -258,7 +258,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     useEffect(() => {
         fetchEmailTemplates();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
