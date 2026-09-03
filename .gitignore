@@ -50,3 +50,10 @@ mcp_config.json
 dalbus-frontend-analysis.html
 dalbus-backend-analysis.html
 dalbus-design-improvement.html
+
+# QOBUZ 임포트용 원본 CSV / 리뷰 리포트 (개인정보 포함 — 커밋 금지)
+data/
+import_qobuz_review.csv
+
+# QOBUZ 임포트 전 삭제한 테스트 그룹 백업 (일회성)
+qobuz_test_group_backup.json

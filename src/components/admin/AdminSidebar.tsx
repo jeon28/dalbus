@@ -10,6 +10,7 @@ export const menuItems = [
     { title: "Tidal 계정", href: "/admin/tidal" },
     { title: "HifiTidal 관리", href: "/admin/hifitidal" },
     { title: "기존 Tidal 계정", href: "/admin/legacy-tidal" },
+    { title: "QOBUZ 관리", href: "/admin/qobuz" },
 ];
 // 서비스/공지사항/FAQ/Q&A 관리, 메일 발송 이력/템플릿 관리는 대시보드 링크로 이동
 

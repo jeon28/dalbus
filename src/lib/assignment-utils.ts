@@ -1,7 +1,10 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
 /**
- * Common utilities for handling Tidal and Legacy Tidal assignments.
+ * Common utilities for handling Tidal, Legacy Tidal and Qobuz assignments.
+ *
+ * normalizeSlots 는 마스터 슬롯(type)이 있는 Tidal 계열 전용이다. Qobuz 는 대표계정이
+ * 슬롯을 차지하지 않아 마스터 개념이 없으므로 syncUsedSlots/findFirstEmptySlot 만 쓴다.
  */
 
 /**
@@ -95,8 +98,8 @@ export function findFirstEmptySlot(
  */
 export async function syncUsedSlots(
     accountId: string,
-    accountTable: 'tidal_accounts' | 'legacy_tidal_accounts',
-    assignmentTable: 'tidal_assignments' | 'legacy_tidal_assignments'
+    accountTable: 'tidal_accounts' | 'legacy_tidal_accounts' | 'qobuz_accounts',
+    assignmentTable: 'tidal_assignments' | 'legacy_tidal_assignments' | 'qobuz_assignments'
 ) {
     const { count, error } = await supabaseAdmin
         .from(assignmentTable)

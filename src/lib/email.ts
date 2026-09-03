@@ -273,6 +273,8 @@ export const sendExpiryNotification = async (
     const dynamic = await getDynamicTemplate(templateKey, {
         buyer_name: buyerName,
         tidal_id: tidalId,
+        // QOBUZ 템플릿은 같은 값을 {qobuz_id}로 참조한다 (Tidal 템플릿에는 없는 치환자라 무해)
+        qobuz_id: tidalId,
         end_date: endDate,
         message: message // message 자체에 {buyer_name} 등이 포함되어 있을 수 있으므로 넘겨줌
     });

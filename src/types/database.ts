@@ -522,6 +522,127 @@ export interface Database {
           }
         ]
       }
+      qobuz_accounts: {
+        Row: {
+          id: string
+          login_id: string
+          login_pw: string | null
+          master_email: string | null
+          master_end_date: string | null
+          status: 'available' | 'assigned' | 'disabled' | 'deleted'
+          max_slots: number
+          used_slots: number
+          memo: string | null
+          payment_email: string | null
+          payment_day: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          login_id: string
+          login_pw?: string | null
+          master_email?: string | null
+          master_end_date?: string | null
+          status?: 'available' | 'assigned' | 'disabled' | 'deleted'
+          max_slots?: number
+          used_slots?: number
+          memo?: string | null
+          payment_email?: string | null
+          payment_day?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          login_id?: string
+          login_pw?: string | null
+          master_email?: string | null
+          master_end_date?: string | null
+          status?: 'available' | 'assigned' | 'disabled' | 'deleted'
+          max_slots?: number
+          used_slots?: number
+          memo?: string | null
+          payment_email?: string | null
+          payment_day?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      qobuz_assignments: {
+        Row: {
+          id: string
+          account_id: string
+          slot_number: number
+          qobuz_id: string | null
+          qobuz_password: string | null
+          screen_name: string | null
+          buyer_name: string | null
+          buyer_phone: string | null
+          buyer_email: string | null
+          order_number: string | null
+          start_date: string | null
+          end_date: string | null
+          period_months: number | null
+          amount: number | null
+          memo: string | null
+          is_active: boolean
+          is_deleted: boolean
+          assigned_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          slot_number?: number
+          qobuz_id?: string | null
+          qobuz_password?: string | null
+          screen_name?: string | null
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          period_months?: number | null
+          amount?: number | null
+          memo?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+          assigned_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          slot_number?: number
+          qobuz_id?: string | null
+          qobuz_password?: string | null
+          screen_name?: string | null
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_email?: string | null
+          order_number?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          period_months?: number | null
+          amount?: number | null
+          memo?: string | null
+          is_active?: boolean
+          is_deleted?: boolean
+          assigned_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qobuz_assignments_account_id_fkey"
+            columns: ["account_id"]
+            referencedRelation: "qobuz_accounts"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       orders: {
         Row: {
           amount: number
