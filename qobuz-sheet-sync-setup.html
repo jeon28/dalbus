@@ -1,0 +1,820 @@
+<title>QOBUZ 시트 연동 설정</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --paper:      #F7F8F6;
+    --surface:    #FFFFFF;
+    --surface-2:  #EEF1EE;
+    --ink:        #12181A;
+    --ink-soft:   #3A4441;
+    --muted:      #5A6360;
+    --rule:       #DCE2DE;
+    --rule-soft:  #E8ECE9;
+    --accent:     #0F6E5C;
+    --accent-ink: #0B5045;
+    --accent-bg:  #E4EFEB;
+    --warn:       #8A5A00;
+    --warn-bg:    #FBF2E0;
+    --danger:     #9B2C2C;
+    --danger-bg:  #F8E9E7;
+    --code-bg:    #11201D;
+    --code-ink:   #D7E5E0;
+    --code-dim:   #7E948E;
+
+    --sans: "IBM Plex Sans", "IBM Plex Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --kr:   "IBM Plex Sans KR", "IBM Plex Sans", system-ui, "Malgun Gothic", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+    --measure: 68ch;
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper:      #0E1413;
+      --surface:    #161D1B;
+      --surface-2:  #1D2624;
+      --ink:        #E6EDEA;
+      --ink-soft:   #C2CDC9;
+      --muted:      #8A9793;
+      --rule:       #2A3532;
+      --rule-soft:  #212B29;
+      --accent:     #4FBFA3;
+      --accent-ink: #7FD6C0;
+      --accent-bg:  #142A25;
+      --warn:       #D9A441;
+      --warn-bg:    #2A2417;
+      --danger:     #E28B84;
+      --danger-bg:  #2B1B1A;
+      --code-bg:    #0A1210;
+      --code-ink:   #D7E5E0;
+      --code-dim:   #6E837D;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:      #0E1413;
+    --surface:    #161D1B;
+    --surface-2:  #1D2624;
+    --ink:        #E6EDEA;
+    --ink-soft:   #C2CDC9;
+    --muted:      #8A9793;
+    --rule:       #2A3532;
+    --rule-soft:  #212B29;
+    --accent:     #4FBFA3;
+    --accent-ink: #7FD6C0;
+    --accent-bg:  #142A25;
+    --warn:       #D9A441;
+    --warn-bg:    #2A2417;
+    --danger:     #E28B84;
+    --danger-bg:  #2B1B1A;
+    --code-bg:    #0A1210;
+    --code-ink:   #D7E5E0;
+    --code-dim:   #6E837D;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--kr);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78ch;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ---------- header ---------- */
+
+  .masthead {
+    padding: 64px 0 32px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: clamp(30px, 5vw, 42px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0 0 16px;
+  }
+
+  .standfirst {
+    font-size: 17px;
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin-top: 32px;
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  .fact {
+    flex: 1 1 150px;
+    padding: 16px 20px 16px 0;
+    border-right: 1px solid var(--rule-soft);
+  }
+
+  .fact:last-child { border-right: 0; }
+
+  .fact dt {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 4px;
+  }
+
+  .fact dd {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { padding-top: 56px; }
+
+  h2 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 24px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  p { max-width: var(--measure); margin: 0 0 16px; }
+
+  a {
+    color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  strong { font-weight: 600; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  /* ---------- steps ---------- */
+
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .step {
+    counter-increment: step;
+    position: relative;
+    padding: 0 0 40px 56px;
+    border-left: 1px solid var(--rule);
+    margin-left: 15px;
+  }
+
+  .step:last-child { border-left-color: transparent; padding-bottom: 8px; }
+
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: -16px;
+    top: -2px;
+    width: 31px;
+    height: 31px;
+    display: grid;
+    place-items: center;
+    background: var(--paper);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .step h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+
+  .step .where {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+
+  .step ol, .step ul {
+    max-width: var(--measure);
+    margin: 0 0 16px;
+    padding-left: 20px;
+  }
+
+  .step li { margin-bottom: 7px; }
+
+  /* ---------- code ---------- */
+
+  .code {
+    position: relative;
+    margin: 0 0 18px;
+    background: var(--code-bg);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px 8px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .code-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--code-dim);
+  }
+
+  .copy {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--code-dim);
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 4px;
+    padding: 3px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 120ms ease, border-color 120ms ease;
+  }
+
+  .copy:hover { color: var(--code-ink); border-color: rgba(255,255,255,0.3); }
+  .copy[data-state="done"] { color: #7FD6C0; border-color: #7FD6C0; }
+
+  .code pre {
+    margin: 0;
+    padding: 14px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--code-ink);
+    tab-size: 2;
+  }
+
+  .code .c { color: var(--code-dim); }
+  .code .k { color: #7FD6C0; }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    max-width: var(--measure);
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-bg);
+    border-radius: 0 4px 4px 0;
+    font-size: 15px;
+  }
+
+  .note.warn   { border-left-color: var(--warn);   background: var(--warn-bg); }
+  .note.danger { border-left-color: var(--danger); background: var(--danger-bg); }
+
+  .note p { margin: 0; max-width: none; }
+  .note p + p { margin-top: 10px; }
+
+  .note-label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    color: var(--accent-ink);
+  }
+
+  .note.warn   .note-label { color: var(--warn); }
+  .note.danger .note-label { color: var(--danger); }
+
+  /* ---------- table ---------- */
+
+  .table-scroll { overflow-x: auto; margin-bottom: 20px; }
+
+  table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 14.5px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 14px 10px 0;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 14px 14px 14px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  td:first-child { width: 42%; }
+
+  td code {
+    background: none;
+    padding: 0;
+    color: var(--danger);
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: inline-block;
+  }
+
+  /* ---------- checklist ---------- */
+
+  .checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: var(--measure);
+  }
+
+  .checklist li {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .checklist li:last-child { border-bottom: 0; }
+
+  .checklist .mark {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  .foot {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--muted);
+    max-width: var(--measure);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 0 18px 72px; }
+    .masthead { padding-top: 44px; }
+    .step { padding-left: 34px; }
+    .fact { border-right: 0; padding-right: 0; flex-basis: 45%; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">달버스 · 운영 설정</p>
+    <h1>QOBUZ 시트 연동 설정</h1>
+    <p class="standfirst">
+      QOBUZ 계정 DB를 구글 시트로 자동 미러링하려면 구글 서비스 계정이 필요합니다.
+      이 문서는 GCP 콘솔에서 계정을 만들고 키를 발급받아 앱에 연결하기까지의 전 과정입니다.
+      코드는 이미 배포돼 있고, 환경변수가 채워지는 순간 동작합니다.
+    </p>
+
+    <dl class="facts">
+      <div class="fact">
+        <dt>소요 시간</dt>
+        <dd>약 15분</dd>
+      </div>
+      <div class="fact">
+        <dt>필요 권한</dt>
+        <dd>GCP 프로젝트 편집자</dd>
+      </div>
+      <div class="fact">
+        <dt>비용</dt>
+        <dd>무료</dd>
+      </div>
+      <div class="fact">
+        <dt>설정 전 상태</dt>
+        <dd>앱 정상 동작</dd>
+      </div>
+    </dl>
+  </header>
+
+  <section>
+    <h2>시작하기 전에</h2>
+    <p>
+      서비스 계정은 <strong>사람이 아닌 프로그램용 구글 계정</strong>입니다.
+      고유한 이메일 주소를 가지고, 비밀번호 대신 비밀키로 인증합니다.
+      달버스 서버가 이 계정 자격으로 시트에 접근하게 됩니다.
+    </p>
+    <p>
+      그래서 순서가 중요합니다. 계정을 먼저 만들고, 그 계정의 이메일 주소를 알아낸 다음,
+      <strong>사람에게 시트를 공유하듯 그 주소에 시트를 공유</strong>합니다.
+      이 공유 단계를 빠뜨리는 것이 가장 흔한 실패 원인입니다.
+    </p>
+
+    <div class="note">
+      <span class="note-label">설정 전에도 앱은 정상입니다</span>
+      <p>
+        환경변수가 없으면 동기화 코드가 조용히 건너뜁니다.
+        중간에 멈추셔도 관리 화면과 계정 배정은 아무 영향을 받지 않습니다.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>설정 절차</h2>
+
+    <ol class="steps">
+
+      <li class="step">
+        <h3>Google Sheets API 활성화</h3>
+        <p class="where">console.cloud.google.com</p>
+        <ol>
+          <li><a href="https://console.cloud.google.com/projectcreate">GCP 콘솔</a>에 접속해 프로젝트를 선택합니다. 없으면 새로 만듭니다 (이름은 <code>dalbus</code> 정도면 충분합니다).</li>
+          <li>상단 검색창에 <strong>Google Sheets API</strong>를 입력해 이동합니다.</li>
+          <li><strong>사용 설정</strong>(Enable) 버튼을 누릅니다.</li>
+        </ol>
+        <div class="note warn">
+          <span class="note-label">주의</span>
+          <p>
+            프로젝트를 여러 개 쓰고 계시면 <strong>지금 선택한 프로젝트</strong>를 기억해 두세요.
+            다음 단계의 서비스 계정을 같은 프로젝트에 만들어야 합니다.
+            API는 프로젝트 단위로 켜지기 때문에, 다른 프로젝트에 계정을 만들면 인증은 되는데 API 호출이 거부됩니다.
+          </p>
+        </div>
+      </li>
+
+      <li class="step">
+        <h3>서비스 계정 만들기</h3>
+        <p class="where">IAM 및 관리자 &rsaquo; 서비스 계정</p>
+        <ol>
+          <li>왼쪽 메뉴에서 <strong>IAM 및 관리자 &rsaquo; 서비스 계정</strong>으로 이동합니다.</li>
+          <li><strong>서비스 계정 만들기</strong>를 누릅니다.</li>
+          <li>이름에 <code>dalbus-sheet-sync</code>를 입력합니다. 계정 ID는 자동으로 채워집니다.</li>
+          <li><strong>만들고 계속하기</strong>를 누릅니다.</li>
+          <li>역할(Role) 부여 단계는 <strong>건너뜁니다</strong>. 아무것도 선택하지 않고 <strong>계속</strong>을 누르세요.</li>
+          <li>마지막 단계도 비워둔 채 <strong>완료</strong>를 누릅니다.</li>
+        </ol>
+        <div class="note">
+          <span class="note-label">역할을 왜 안 주나</span>
+          <p>
+            GCP 역할은 클라우드 리소스 접근을 다룹니다. 시트 접근 권한은 GCP가 아니라
+            <strong>시트 자체의 공유 설정</strong>으로 정해집니다(4단계).
+            여기서 역할을 주면 필요 없는 권한만 열리게 됩니다.
+          </p>
+        </div>
+      </li>
+
+      <li class="step">
+        <h3>JSON 키 발급</h3>
+        <p class="where">서비스 계정 &rsaquo; 키 &rsaquo; 키 추가</p>
+        <ol>
+          <li>방금 만든 서비스 계정을 클릭합니다.</li>
+          <li><strong>키</strong> 탭 &rsaquo; <strong>키 추가</strong> &rsaquo; <strong>새 키 만들기</strong>.</li>
+          <li>형식은 <strong>JSON</strong>을 선택하고 <strong>만들기</strong>를 누릅니다. 파일이 자동으로 다운로드됩니다.</li>
+        </ol>
+        <p>받은 파일을 열면 이런 모양입니다. 표시된 두 값을 5단계에서 씁니다.</p>
+        <div class="code">
+          <div class="code-head">
+            <span class="code-label">다운로드된 JSON 키</span>
+            <button class="copy" type="button">복사</button>
+          </div>
+<pre>{
+  "type": "service_account",
+  "project_id": "dalbus-xxxxxx",
+  "private_key_id": "a1b2c3...",
+  <span class="k">"private_key"</span>: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADAN...\n-----END PRIVATE KEY-----\n",
+  <span class="k">"client_email"</span>: "dalbus-sheet-sync@dalbus-xxxxxx.iam.gserviceaccount.com",
+  ...
+}</pre>
+        </div>
+        <div class="note danger">
+          <span class="note-label">이 파일은 비밀번호입니다</span>
+          <p>
+            이 키 하나로 서비스 계정에 공유된 모든 시트를 읽고 쓸 수 있습니다.
+            깃에 커밋하거나 메신저로 보내지 마세요. 환경변수에 옮긴 뒤에는 다운로드 폴더에서 삭제하시는 편이 안전합니다.
+          </p>
+          <p>
+            유출됐다면 GCP 콘솔의 같은 <strong>키</strong> 탭에서 해당 키를 삭제하고 새로 발급하면 됩니다.
+          </p>
+        </div>
+      </li>
+
+      <li class="step">
+        <h3>시트를 서비스 계정에 공유</h3>
+        <p class="where">QOBUZ 스프레드시트 &rsaquo; 공유</p>
+        <ol>
+          <li>JSON 파일의 <code>client_email</code> 값을 복사합니다. <code>...@....iam.gserviceaccount.com</code> 형태입니다.</li>
+          <li>QOBUZ 스프레드시트를 열고 우측 상단 <strong>공유</strong>를 누릅니다.</li>
+          <li>그 이메일 주소를 붙여넣고 권한을 <strong>편집자</strong>로 지정합니다.</li>
+          <li><strong>알림 보내기</strong> 체크는 해제합니다. 받는 사람이 프로그램이라 메일이 반송됩니다.</li>
+          <li><strong>공유</strong>를 누릅니다.</li>
+        </ol>
+        <div class="note warn">
+          <span class="note-label">뷰어가 아니라 편집자</span>
+          <p>
+            앱이 시트에 <em>쓰기</em> 때문에 편집자 권한이 필요합니다.
+            뷰어로 주면 인증은 통과하는데 쓰기 시점에 403으로 실패합니다.
+          </p>
+        </div>
+      </li>
+
+      <li class="step">
+        <h3>환경변수 설정</h3>
+        <p class="where">.env.local &nbsp;+&nbsp; Vercel 대시보드</p>
+        <p>프로젝트 루트의 <code>.env.local</code>에 아래 네 줄을 추가합니다.</p>
+        <div class="code">
+          <div class="code-head">
+            <span class="code-label">.env.local</span>
+            <button class="copy" type="button">복사</button>
+          </div>
+<pre><span class="c"># 3단계 JSON 의 client_email</span>
+GOOGLE_SERVICE_ACCOUNT_EMAIL=dalbus-sheet-sync@dalbus-xxxxxx.iam.gserviceaccount.com
+
+<span class="c"># 3단계 JSON 의 private_key — 큰따옴표째 그대로 붙여넣기</span>
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADAN...\n-----END PRIVATE KEY-----\n"
+
+<span class="c"># 시트 URL 의 /d/ 와 /edit 사이 문자열</span>
+QOBUZ_SHEET_ID=1TsyiyXzWNcDLbGSmIYK4Qi5HZDNQEmepnWbgRMBKh2s
+
+<span class="c"># 야간 자동 백업 보호용 — 아무 긴 랜덤 문자열</span>
+CRON_SECRET=</pre>
+        </div>
+
+        <div class="note">
+          <span class="note-label">GOOGLE_PRIVATE_KEY 붙여넣는 법</span>
+          <p>
+            JSON 파일에 있는 <code>"-----BEGIN...\n...-----END PRIVATE KEY-----\n"</code> 값을
+            <strong>큰따옴표를 포함해</strong> 통째로 복사해 붙여넣으세요.
+            줄바꿈을 실제 엔터로 바꾸지 마세요. 코드가 리터럴 <code>\n</code>을 실제 개행으로 되돌립니다.
+          </p>
+        </div>
+
+        <p>
+          <code>CRON_SECRET</code>은 야간 백업 엔드포인트를 아무나 호출하지 못하게 막는 값입니다.
+          아래 명령으로 만들어 쓰시면 됩니다.
+        </p>
+        <div class="code">
+          <div class="code-head">
+            <span class="code-label">랜덤 문자열 생성</span>
+            <button class="copy" type="button">복사</button>
+          </div>
+<pre>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</pre>
+        </div>
+
+        <p>
+          <strong>Vercel에도 같은 네 개를 등록합니다.</strong>
+          프로젝트 &rsaquo; Settings &rsaquo; Environment Variables에서 Production·Preview·Development 모두에 추가한 뒤
+          재배포해야 반영됩니다.
+        </p>
+
+        <div class="note">
+          <span class="note-label">선택 사항</span>
+          <p>
+            기록될 탭 이름은 기본값이 <code>QOBUZ_백업</code>입니다.
+            바꾸시려면 <code>QOBUZ_SHEET_TAB</code>을 추가하세요.
+            <strong>원본 QOBUZ 탭 이름과 절대 같으면 안 됩니다.</strong> 원본이 통째로 덮어써집니다.
+          </p>
+        </div>
+      </li>
+
+      <li class="step">
+        <h3>동작 확인</h3>
+        <p class="where">터미널</p>
+        <p>개발 서버를 재시작한 뒤 백업 엔드포인트를 직접 호출합니다.</p>
+        <div class="code">
+          <div class="code-head">
+            <span class="code-label">확인 명령</span>
+            <button class="copy" type="button">복사</button>
+          </div>
+<pre>curl http://localhost:3000/api/cron/qobuz-sheet-backup</pre>
+        </div>
+        <p>성공하면 기록된 행 수가 돌아옵니다.</p>
+        <div class="code">
+          <div class="code-head">
+            <span class="code-label">성공 응답</span>
+            <button class="copy" type="button">복사</button>
+          </div>
+<pre>{"ok":true,"rows":128}</pre>
+        </div>
+        <p>
+          시트를 열어보면 <code>QOBUZ_백업</code> 탭이 새로 생겨 있고,
+          원본 QOBUZ 탭과 같은 A~K 열 순서로 데이터가 들어가 있습니다.
+          그 뒤로는 관리 화면에서 계정을 배정하거나 수정할 때마다 자동으로 다시 기록됩니다.
+        </p>
+        <div class="note warn">
+          <span class="note-label">아직 설정이 안 된 경우</span>
+          <p>
+            <code>{"ok":false,"skipped":"구글 시트 환경변수 미설정 — 동기화 건너뜀"}</code>이 나오면
+            환경변수 네 개 중 하나가 비어 있거나 서버를 재시작하지 않은 것입니다.
+          </p>
+        </div>
+      </li>
+
+    </ol>
+  </section>
+
+  <section>
+    <h2>문제 해결</h2>
+    <p>실패하면 응답의 <code>error</code> 값에 원인이 그대로 나옵니다.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>응답에 나오는 말</th>
+            <th>원인과 해결</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Sheets API 403 … The caller does not have permission</code></td>
+            <td><strong>4단계 공유 누락.</strong> 서비스 계정 이메일에 시트를 편집자로 공유했는지 확인하세요. 뷰어로 돼 있어도 이 오류가 납니다.</td>
+          </tr>
+          <tr>
+            <td><code>Sheets API 404 … Requested entity was not found</code></td>
+            <td><strong><code>QOBUZ_SHEET_ID</code> 오타.</strong> 시트 URL의 <code>/d/</code>와 <code>/edit</code> 사이 문자열만 넣어야 합니다. URL 전체를 넣으면 이 오류가 납니다.</td>
+          </tr>
+          <tr>
+            <td><code>Google Sheets API has not been used in project … before or it is disabled</code></td>
+            <td><strong>1단계 누락, 또는 프로젝트 불일치.</strong> 메시지에 나온 프로젝트 번호가 서비스 계정을 만든 프로젝트와 같은지 확인하세요.</td>
+          </tr>
+          <tr>
+            <td><code>invalid_grant</code> 또는 <code>DECODER routines::unsupported</code></td>
+            <td><strong>비밀키 형식 문제.</strong> <code>GOOGLE_PRIVATE_KEY</code>가 큰따옴표로 감싸여 있는지, <code>\n</code>이 실제 엔터로 바뀌지 않았는지 확인하세요.</td>
+          </tr>
+          <tr>
+            <td><code>{"error":"Unauthorized"}</code> · HTTP 401</td>
+            <td><strong><code>CRON_SECRET</code> 불일치.</strong> 값을 설정했다면 호출할 때 <code>Authorization: Bearer &lt;값&gt;</code> 헤더가 필요합니다. Vercel Cron은 자동으로 붙입니다.</td>
+          </tr>
+          <tr>
+            <td>응답은 <code>ok:true</code>인데 시트가 그대로</td>
+            <td><strong>다른 시트를 보고 계실 가능성.</strong> <code>QOBUZ_SHEET_ID</code>가 가리키는 시트와 열어둔 시트가 같은지, <code>QOBUZ_백업</code> 탭이 아래쪽에 새로 생기지 않았는지 확인하세요.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>설정 후 알아둘 것</h2>
+    <ul class="checklist">
+      <li>
+        <span class="mark">&rsaquo;</span>
+        <div>
+          <strong>시트는 보기 전용 사본입니다.</strong>
+          원장은 DB이고, 시트에서 고친 값은 다음 동기화 때 조용히 덮어써집니다.
+          팀에 이 점을 알리거나, 해당 탭에 보호범위를 걸어 편집을 막아두시는 편이 안전합니다.
+        </div>
+      </li>
+      <li>
+        <span class="mark">&rsaquo;</span>
+        <div>
+          <strong>원본 QOBUZ 탭은 건드리지 않습니다.</strong>
+          앱은 <code>QOBUZ_백업</code> 탭에만 씁니다. 탭 이름을 바꾸실 때만 주의하시면 됩니다.
+        </div>
+      </li>
+      <li>
+        <span class="mark">&rsaquo;</span>
+        <div>
+          <strong>기록 시점은 두 가지입니다.</strong>
+          관리 화면에서 쓰기 작업(배정·수정·삭제·이동·활성 토글)을 할 때마다 즉시,
+          그리고 매일 <strong>새벽 3시</strong>(KST)에 전체 스냅샷이 한 번 더 돕니다.
+          마이그레이션이나 수동 SQL처럼 앱을 거치지 않은 변경은 이 야간 작업이 메웁니다.
+        </div>
+      </li>
+      <li>
+        <span class="mark">&rsaquo;</span>
+        <div>
+          <strong>시트 장애가 관리 업무를 막지 않습니다.</strong>
+          동기화는 응답을 보낸 뒤에 실행되고, 실패해도 예외를 던지지 않습니다.
+          구글 쪽이 죽어도 계정 배정은 정상 처리되고 실패는 서버 로그에만 남습니다.
+        </div>
+      </li>
+      <li>
+        <span class="mark">&rsaquo;</span>
+        <div>
+          <strong>삭제된 배정은 시트에 안 나옵니다.</strong>
+          활성·비활성 슬롯만 기록되고 상태 열로 구분됩니다.
+          삭제 내역은 관리 화면의 삭제 내역 페이지에서 확인하고 복구할 수 있습니다.
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <p class="foot">
+    달버스 QOBUZ 관리 모듈 · 구글 시트 단방향 미러링 설정 문서<br>
+    관련 코드 — <code>src/lib/qobuzSheetSync.ts</code>, <code>src/app/api/cron/qobuz-sheet-backup/route.ts</code>
+  </p>
+
+</div>
+
+<script>
+  document.querySelectorAll(".copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pre = btn.closest(".code").querySelector("pre");
+      var text = pre.innerText;
+
+      function flash(label) {
+        btn.textContent = label;
+        btn.dataset.state = "done";
+        setTimeout(function () {
+          btn.textContent = "복사";
+          delete btn.dataset.state;
+        }, 1800);
+      }
+
+      function selectInstead() {
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        flash("선택됨 · Ctrl+C");
+      }
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          flash("복사됨");
+        }).catch(selectInstead);
+      } else {
+        selectInstead();
+      }
+    });
+  });
+</script>
