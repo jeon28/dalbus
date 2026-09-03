@@ -1,5 +1,6 @@
 "use client";
 
+import { filterTemplatesByScope, isTemplateInScope } from '@/lib/email-template-scope';
 import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import { useServices } from '@/lib/ServiceContext';
 import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/lib/group-id-utils';
@@ -1206,7 +1207,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
         setSelectedAssignmentIds(new Set([assignmentId]));
         // 만료 안내 템플릿을 기본 선택해 바로 미리보기가 보이도록 한다
         if (!selectedTemplateKey) {
-            const expiry = emailTemplates.find(t => t.key === 'EXPIRY_NOTICE') || emailTemplates.find(t => !t.key.startsWith('LEGACY'));
+            const expiry = emailTemplates.find(t => t.key === 'EXPIRY_NOTICE') || emailTemplates.find(t => isTemplateInScope(t.key, 'tidal'));
             if (expiry) setSelectedTemplateKey(expiry.key);
         }
         setIsNotifyModalOpen(true);
@@ -2357,7 +2358,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         <SelectValue placeholder="템플릿 선택" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {emailTemplates.filter(t => !t.key.startsWith('LEGACY')).map(t => (
+                                        {filterTemplatesByScope(emailTemplates, 'tidal').map(t => (
                                             <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>
                                         ))}
                                     </SelectContent>

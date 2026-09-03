@@ -1,5 +1,6 @@
 "use client";
 
+import { filterTemplatesByScope, isTemplateInScope } from '@/lib/email-template-scope';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/lib/group-id-utils';
@@ -302,7 +303,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             if (res.ok) {
                 const data = await res.json();
                 setEmailTemplates(data);
-                const firstLegacy = data.find((t: {key: string}) => t.key.startsWith('LEGACY'));
+                const firstLegacy = data.find((t: {key: string}) => isTemplateInScope(t.key, 'legacy'));
                 if (firstLegacy) setSelectedTemplateKey(firstLegacy.key);
             }
         } catch (error) { console.error(error); }
@@ -1864,7 +1865,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         <SelectValue placeholder="템플릿 선택" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {emailTemplates.filter(t => t.key.startsWith('LEGACY')).map(t => (
+                                        {filterTemplatesByScope(emailTemplates, 'legacy').map(t => (
                                             <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>
                                         ))}
                                     </SelectContent>
