@@ -116,6 +116,9 @@ const DEFAULT_AMOUNT = 75000;
 /** 대표계정 1개당 하부계정 5개 */
 const DEFAULT_MAX_SLOTS = 5;
 
+/** 진입 시 기본 정렬: 구독 종료일 오름차순 */
+const DEFAULT_SORT: { key: string; direction: 'asc' | 'desc' } = { key: 'end_date', direction: 'asc' };
+
 /**
  * 그룹의 슬롯 렌더 범위.
  *
@@ -194,7 +197,7 @@ export function QobuzContent({
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(DEFAULT_SORT);
     const [newAccount, setNewAccount] = useState({
         login_id: '', login_pw: '', master_email: '', master_end_date: '',
         payment_email: '', payment_day: 1, memo: '', max_slots: DEFAULT_MAX_SLOTS
@@ -249,6 +252,19 @@ export function QobuzContent({
             setTimeout(() => setCopiedId(null), 2000);
         });
         window.open('https://www.qobuz.com/profile/household/', '_blank');
+    };
+
+    /**
+     * 하부계정 ID(이메일) 클립보드 복사.
+     * 셀에 select-all 을 걸어 클릭/드래그 선택도 이메일 한 덩어리로 잡히게 한다.
+     */
+    const handleQobuzIdClick = (e: React.MouseEvent, email: string | null | undefined, key: string) => {
+        if (!email || email === '-') return;
+        e.stopPropagation();
+        navigator.clipboard.writeText(email).then(() => {
+            setCopiedId(key);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
     };
 
     const startResizing = (id: string, e: React.MouseEvent) => {
@@ -868,7 +884,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             variant={sortConfig?.key === 'updated_at' ? "default" : "outline"}
                             size="sm"
                             onClick={() => {
-                                if (sortConfig?.key === 'updated_at') setSortConfig(null);
+                                if (sortConfig?.key === 'updated_at') setSortConfig(DEFAULT_SORT);
                                 else setSortConfig({ key: 'updated_at', direction: 'desc' });
                             }}
                             className="h-9 px-3 text-xs gap-1.5"
@@ -1294,7 +1310,20 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                             <td colSpan={10} className="px-2 text-center text-slate-400 italic whitespace-nowrap">빈 슬롯 ({acc.login_id}-{assignment.slot_number + 1})</td>
                                                                         ) : (
                                                                             <>
-                                                                                <td className="px-2 truncate whitespace-nowrap">{val.qobuz_id || '-'}</td>
+                                                                                <td className="px-2 whitespace-nowrap relative">
+                                                                                    {val.qobuz_id ? (
+                                                                                        <span
+                                                                                            className="inline-block max-w-[180px] truncate align-middle select-all cursor-pointer font-semibold text-blue-600 hover:underline"
+                                                                                            title={`${val.qobuz_id} (클릭하면 복사)`}
+                                                                                            onClick={(e) => handleQobuzIdClick(e, val.qobuz_id, `qid_${assignment.id}`)}
+                                                                                        >
+                                                                                            {val.qobuz_id}
+                                                                                        </span>
+                                                                                    ) : '-'}
+                                                                                    {copiedId === `qid_${assignment.id}` && (
+                                                                                        <span className="absolute -top-4 left-2 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg z-10 whitespace-nowrap">복사됨!</span>
+                                                                                    )}
+                                                                                </td>
                                                                                 <td className="px-2 truncate max-w-[110px] whitespace-nowrap">{val.screen_name || '-'}</td>
                                                                                 <td className="px-2 truncate max-w-[80px] whitespace-nowrap">{val.buyer_name || '-'}</td>
                                                                                 <td className="px-2 font-mono whitespace-nowrap">{val.buyer_phone || '-'}</td>
