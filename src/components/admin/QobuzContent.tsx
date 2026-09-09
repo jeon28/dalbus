@@ -1444,10 +1444,6 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                 <Input type="date" value={editingAccount.master_end_date || ''} onChange={e => setEditingAccount({ ...editingAccount, master_end_date: e.target.value })} className="col-span-3 h-9" />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right text-xs">결제 이메일</Label>
-                                <Input value={editingAccount.payment_email || ''} onChange={e => setEditingAccount({ ...editingAccount, payment_email: e.target.value })} className="col-span-3 h-9" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">메모</Label>
                                 <Input value={editingAccount.memo || ''} onChange={e => setEditingAccount({ ...editingAccount, memo: e.target.value })} className="col-span-3 h-9" />
                             </div>
