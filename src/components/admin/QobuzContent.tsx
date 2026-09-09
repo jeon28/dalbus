@@ -1420,7 +1420,15 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             {/* [MODAL: EDIT GROUP] */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>대표계정(그룹) 수정</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <div className="flex items-center justify-between gap-4 pr-8">
+                            <DialogTitle>대표계정(그룹) 수정</DialogTitle>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setIsEditModalOpen(false)}>취소</Button>
+                                <Button size="sm" onClick={handleUpdateAccount}>수정 완료</Button>
+                            </div>
+                        </div>
+                    </DialogHeader>
                     {editingAccount && (
                         <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
@@ -1436,20 +1444,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                 <Input type="date" value={editingAccount.master_end_date || ''} onChange={e => setEditingAccount({ ...editingAccount, master_end_date: e.target.value })} className="col-span-3 h-9" />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right text-xs">대표계정 비번</Label>
-                                <Input value={editingAccount.login_pw || ''} onChange={e => setEditingAccount({ ...editingAccount, login_pw: e.target.value })} className="col-span-3 h-9" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">결제 이메일</Label>
                                 <Input value={editingAccount.payment_email || ''} onChange={e => setEditingAccount({ ...editingAccount, payment_email: e.target.value })} className="col-span-3 h-9" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right text-xs">결제일</Label>
-                                <Input type="number" min="1" max="31" value={editingAccount.payment_day} onChange={e => setEditingAccount({ ...editingAccount, payment_day: parseInt(e.target.value) || 1 })} className="col-span-3 h-9" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right text-xs">슬롯 정원</Label>
-                                <Input type="number" min="1" max="20" value={editingAccount.max_slots} onChange={e => setEditingAccount({ ...editingAccount, max_slots: parseInt(e.target.value) || DEFAULT_MAX_SLOTS })} className="col-span-3 h-9" />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">메모</Label>
@@ -1457,10 +1453,6 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             </div>
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>취소</Button>
-                        <Button onClick={handleUpdateAccount}>수정 완료</Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
