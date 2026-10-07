@@ -6,7 +6,7 @@ import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/l
 import {
     Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil,
     LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText,
-    Zap, UserPlus, Settings
+    Zap, UserPlus, Settings, Copy
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
@@ -252,6 +252,17 @@ export function QobuzContent({
             setTimeout(() => setCopiedId(null), 2000);
         });
         window.open('https://www.qobuz.com/profile/household/', '_blank');
+    };
+
+    /** 대표계정 이메일의 @ 앞부분으로 `***@dalbus.com` 주소를 만들어 복사 */
+    const handleDalbusEmailCopy = (e: React.MouseEvent, email: string | null | undefined, key: string) => {
+        e.stopPropagation();
+        const local = (email || '').split('@')[0].trim();
+        if (!local || local === '-') return;
+        navigator.clipboard.writeText(`${local}@dalbus.com`).then(() => {
+            setCopiedId(key);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
     };
 
     /**
@@ -1193,8 +1204,21 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                 onClick={(e) => handleMasterEmailClick(e, acc.master_email)}
                                             >
                                                 <span className="font-semibold text-blue-600">{masterEmail}</span>
+                                                {acc.master_email && (
+                                                    <button
+                                                        type="button"
+                                                        className="ml-1 inline-flex items-center justify-center h-5 w-5 align-middle rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                        title={`${acc.master_email.split('@')[0]}@dalbus.com 복사`}
+                                                        onClick={(e) => handleDalbusEmailCopy(e, acc.master_email, `dalbus_${acc.id}`)}
+                                                    >
+                                                        <Copy size={11} />
+                                                    </button>
+                                                )}
                                                 {copiedId === acc.master_email && (
                                                     <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">복사됨!</span>
+                                                )}
+                                                {copiedId === `dalbus_${acc.id}` && (
+                                                    <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">@dalbus.com 복사됨!</span>
                                                 )}
                                             </div>
                                             <div className={`col-span-2 font-mono whitespace-nowrap ${isWarning ? 'text-red-500 font-bold' : 'text-slate-600'}`} onClick={() => toggleRow(acc.id)}>{masterEnd}</div>
