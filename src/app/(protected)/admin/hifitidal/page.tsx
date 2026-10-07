@@ -263,19 +263,15 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     useEffect(() => {
         if (isHydrated && !isAdmin) router.push('/admin');
-        else if (isHydrated && isAdmin) {
-            fetchAccounts();
-            fetchPendingOrders();
-        }
+        else if (isHydrated && isAdmin) fetchPendingOrders();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, isHydrated, router]);
 
+    // 진입 시 1회 + 삭제 데이터 보기 전환 시에만 계정 목록 조회 (진입 시 중복 호출 방지)
     useEffect(() => {
-        if (isHydrated && isAdmin) {
-            fetchAccounts();
-        }
+        if (isHydrated && isAdmin) fetchAccounts();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showDeletedOnly]);
+    }, [isAdmin, isHydrated, showDeletedOnly]);
 
 
     useEffect(() => {
@@ -346,7 +342,9 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
 
     const fetchPendingOrders = async () => {
         try {
-            const res = await apiFetch('/api/admin/orders', { cache: 'no-store' });
+            // 입금확인(미배정) 주문만 서버에서 걸러 받는다. 전체 주문을 조인째 받지 않도록.
+            const params = new URLSearchParams({ status: '입금확인', limit: '500' });
+            const res = await apiFetch(`/api/admin/orders?${params.toString()}`, { cache: 'no-store' });
             if (res.ok) {
                 const responseData = await res.json();
                 const ordersArray = Array.isArray(responseData) ? responseData : responseData.data;
