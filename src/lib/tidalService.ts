@@ -32,6 +32,8 @@ export const tidalService = {
       query = query.neq('status', 'disabled');
     } else {
       query = query.neq('status', 'disabled').neq('status', 'deleted');
+      // 삭제된 배정은 이 모드에서 쓰지 않으므로 DB 단계에서 제외한다 (배정마다 붙는 주문 조인 비용 절감)
+      query = query.or('is_deleted.is.null,is_deleted.eq.false', { referencedTable: 'tidal_assignments' });
     }
 
     const { data, error } = await query;
