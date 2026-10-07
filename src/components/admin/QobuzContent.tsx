@@ -181,7 +181,7 @@ export function QobuzContent({
 
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-    const [isGridView, setIsGridView] = useState(true);
+    const [isGridView, setIsGridView] = useState(false);
     const [gridValues, setGridValues] = useState<Record<string, GridValue>>({});
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
