@@ -243,7 +243,7 @@ export function QobuzContent({
 
     const apiBase = '/api' + basePath;
 
-    /** 대표계정 이메일 복사 + Qobuz 패밀리 멤버 관리 페이지 열기 */
+    /** 대표계정 이메일 복사 후, 확인 시에만 Qobuz 패밀리 멤버 관리 페이지 열기 */
     const handleMasterEmailClick = (e: React.MouseEvent, email: string | null | undefined) => {
         if (!email || email === '-') return;
         e.stopPropagation();
@@ -251,7 +251,9 @@ export function QobuzContent({
             setCopiedId(email);
             setTimeout(() => setCopiedId(null), 2000);
         });
-        window.open('https://www.qobuz.com/profile/household/', '_blank');
+        if (confirm(`${email} 복사됨.\n\nQobuz 패밀리 관리 페이지를 열까요?`)) {
+            window.open('https://www.qobuz.com/profile/household/', '_blank');
+        }
     };
 
     /** 대표계정 이메일의 @ 앞부분으로 `***@dalbus.com` 주소를 만들어 복사 */
@@ -1200,7 +1202,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             <div className="col-span-1 text-slate-900 font-bold truncate cursor-pointer whitespace-nowrap" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
                                             <div
                                                 className="col-span-3 flex items-center min-w-0 text-slate-700 cursor-pointer hover:text-blue-600 relative overflow-visible whitespace-nowrap"
-                                                title={`${masterEmail} (클릭하면 복사)`}
+                                                title={`${masterEmail} (클릭하면 복사, 패밀리 페이지 열기 선택)`}
                                                 onClick={(e) => handleMasterEmailClick(e, acc.master_email)}
                                             >
                                                 <span className="font-semibold text-blue-600 truncate min-w-0">{masterEmail}</span>
