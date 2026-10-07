@@ -1199,15 +1199,15 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         <div className="grid grid-cols-13 gap-1.5 p-2.5 items-center text-[11px] hover:bg-slate-50 transition-colors whitespace-nowrap">
                                             <div className="col-span-1 text-slate-900 font-bold truncate cursor-pointer whitespace-nowrap" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
                                             <div
-                                                className="col-span-3 text-slate-700 truncate cursor-pointer hover:text-blue-600 relative overflow-visible whitespace-nowrap"
+                                                className="col-span-3 flex items-center min-w-0 text-slate-700 cursor-pointer hover:text-blue-600 relative overflow-visible whitespace-nowrap"
                                                 title={`${masterEmail} (클릭하면 복사)`}
                                                 onClick={(e) => handleMasterEmailClick(e, acc.master_email)}
                                             >
-                                                <span className="font-semibold text-blue-600">{masterEmail}</span>
+                                                <span className="font-semibold text-blue-600 truncate min-w-0">{masterEmail}</span>
                                                 {acc.master_email && (
                                                     <button
                                                         type="button"
-                                                        className="ml-1 inline-flex items-center justify-center h-5 w-5 align-middle rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                        className="ml-1 shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                                                         title={`${acc.master_email.split('@')[0]}@dalbus.com 복사`}
                                                         onClick={(e) => handleDalbusEmailCopy(e, acc.master_email, `dalbus_${acc.id}`)}
                                                     >
