@@ -264,7 +264,6 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
     useEffect(() => {
         if (isHydrated && !isAdmin) router.push('/admin');
         else if (isHydrated && isAdmin) fetchPendingOrders();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin, isHydrated, router]);
 
     // 진입 시 1회 + 삭제 데이터 보기 전환 시에만 계정 목록 조회 (진입 시 중복 호출 방지)
