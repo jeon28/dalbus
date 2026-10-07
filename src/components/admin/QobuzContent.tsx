@@ -6,7 +6,7 @@ import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/l
 import {
     Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil,
     LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText,
-    Zap, UserPlus, Settings
+    Zap, UserPlus, Settings, Copy
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
@@ -181,7 +181,7 @@ export function QobuzContent({
 
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-    const [isGridView, setIsGridView] = useState(true);
+    const [isGridView, setIsGridView] = useState(false);
     const [gridValues, setGridValues] = useState<Record<string, GridValue>>({});
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -243,7 +243,7 @@ export function QobuzContent({
 
     const apiBase = '/api' + basePath;
 
-    /** 대표계정 이메일 복사 + Qobuz 패밀리 멤버 관리 페이지 열기 */
+    /** 대표계정 이메일 복사 후, 확인 시에만 Qobuz 패밀리 멤버 관리 페이지 열기 */
     const handleMasterEmailClick = (e: React.MouseEvent, email: string | null | undefined) => {
         if (!email || email === '-') return;
         e.stopPropagation();
@@ -251,7 +251,20 @@ export function QobuzContent({
             setCopiedId(email);
             setTimeout(() => setCopiedId(null), 2000);
         });
-        window.open('https://www.qobuz.com/profile/household/', '_blank');
+        if (confirm(`${email} 복사됨.\n\nQobuz 패밀리 관리 페이지를 열까요?`)) {
+            window.open('https://www.qobuz.com/profile/household/', '_blank');
+        }
+    };
+
+    /** 대표계정 이메일의 @ 앞부분으로 `***@dalbus.com` 주소를 만들어 복사 */
+    const handleDalbusEmailCopy = (e: React.MouseEvent, email: string | null | undefined, key: string) => {
+        e.stopPropagation();
+        const local = (email || '').split('@')[0].trim();
+        if (!local || local === '-') return;
+        navigator.clipboard.writeText(`${local}@dalbus.com`).then(() => {
+            setCopiedId(key);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
     };
 
     /**
@@ -885,7 +898,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             size="sm"
                             onClick={() => {
                                 if (sortConfig?.key === 'updated_at') setSortConfig(DEFAULT_SORT);
-                                else setSortConfig({ key: 'updated_at', direction: 'desc' });
+                                else {
+                                    // 변경일 조회: 잔여일 필터 해제 + 그리드 모드로 결과 출력
+                                    setShowExpiredOnly(false);
+                                    setIsGridView(true);
+                                    setSortConfig({ key: 'updated_at', direction: 'desc' });
+                                }
                             }}
                             className="h-9 px-3 text-xs gap-1.5"
                         >
@@ -1183,13 +1201,26 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         <div className="grid grid-cols-13 gap-1.5 p-2.5 items-center text-[11px] hover:bg-slate-50 transition-colors whitespace-nowrap">
                                             <div className="col-span-1 text-slate-900 font-bold truncate cursor-pointer whitespace-nowrap" title={acc.login_id} onClick={() => toggleRow(acc.id)}>{acc.login_id}</div>
                                             <div
-                                                className="col-span-3 text-slate-700 truncate cursor-pointer hover:text-blue-600 relative overflow-visible whitespace-nowrap"
-                                                title={`${masterEmail} (클릭하면 복사)`}
+                                                className="col-span-3 flex items-center min-w-0 text-slate-700 cursor-pointer hover:text-blue-600 relative overflow-visible whitespace-nowrap"
+                                                title={`${masterEmail} (클릭하면 복사, 패밀리 페이지 열기 선택)`}
                                                 onClick={(e) => handleMasterEmailClick(e, acc.master_email)}
                                             >
-                                                <span className="font-semibold text-blue-600">{masterEmail}</span>
+                                                <span className="font-semibold text-blue-600 truncate min-w-0">{masterEmail}</span>
+                                                {acc.master_email && (
+                                                    <button
+                                                        type="button"
+                                                        className="ml-1 shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                        title={`${acc.master_email.split('@')[0]}@dalbus.com 복사`}
+                                                        onClick={(e) => handleDalbusEmailCopy(e, acc.master_email, `dalbus_${acc.id}`)}
+                                                    >
+                                                        <Copy size={11} />
+                                                    </button>
+                                                )}
                                                 {copiedId === acc.master_email && (
                                                     <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">복사됨!</span>
+                                                )}
+                                                {copiedId === `dalbus_${acc.id}` && (
+                                                    <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">@dalbus.com 복사됨!</span>
                                                 )}
                                             </div>
                                             <div className={`col-span-2 font-mono whitespace-nowrap ${isWarning ? 'text-red-500 font-bold' : 'text-slate-600'}`} onClick={() => toggleRow(acc.id)}>{masterEnd}</div>
