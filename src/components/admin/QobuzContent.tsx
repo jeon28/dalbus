@@ -885,7 +885,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             size="sm"
                             onClick={() => {
                                 if (sortConfig?.key === 'updated_at') setSortConfig(DEFAULT_SORT);
-                                else setSortConfig({ key: 'updated_at', direction: 'desc' });
+                                else {
+                                    // 변경일 조회: 잔여일 필터 해제 + 그리드 모드로 결과 출력
+                                    setShowExpiredOnly(false);
+                                    setIsGridView(true);
+                                    setSortConfig({ key: 'updated_at', direction: 'desc' });
+                                }
                             }}
                             className="h-9 px-3 text-xs gap-1.5"
                         >
