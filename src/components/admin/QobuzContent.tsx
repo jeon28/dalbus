@@ -205,6 +205,8 @@ export function QobuzContent({
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
+    // 마지막으로 클릭한 행 (강조 표시용)
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
@@ -1061,7 +1063,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             const isDeactivated = val.is_active === false;
 
                                             return (
-                                                <tr key={assignment.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDeactivated ? 'bg-red-50 text-red-500' : (isExpired ? 'bg-red-50/30' : (isEmpty ? 'bg-emerald-50/50 text-emerald-700' : ''))} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                                <tr key={assignment.id} onClick={() => setActiveRowId(assignment.id)} className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b border-slate-100 transition-colors ${isDeactivated ? 'bg-red-50 text-red-500' : (isExpired ? 'bg-red-50/30' : (isEmpty ? 'bg-emerald-50/50 text-emerald-700' : ''))} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                     <td className="text-center py-2 border-r border-slate-100 whitespace-nowrap">
                                                         <input
                                                             type="checkbox"
@@ -1292,8 +1294,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                 return (
                                                                     <tr
                                                                         key={assignment.id}
+                                                                        onClick={() => setActiveRowId(assignment.id)}
                                                                         title={isOverCapacity ? `정원 초과 슬롯 (정원 ${acc.max_slots}개). 중복 배정 여부를 확인하세요.` : undefined}
-                                                                        className={`border-b last:border-0 border-slate-100 h-10 ${isDeactivated ? 'bg-red-50 text-red-500' : (isEmpty ? 'bg-emerald-50/20 text-emerald-600' : (isOverCapacity ? 'bg-amber-50 text-amber-700' : 'bg-white'))}`}
+                                                                        className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b last:border-0 border-slate-100 h-10 ${isDeactivated ? 'bg-red-50 text-red-500' : (isEmpty ? 'bg-emerald-50/20 text-emerald-600' : (isOverCapacity ? 'bg-amber-50 text-amber-700' : 'bg-white'))}`}
                                                                     >
                                                                         <td className="text-center whitespace-nowrap">
                                                                             <Popover>

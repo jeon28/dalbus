@@ -164,6 +164,8 @@ function HifiTidalAccountsContent() {
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
+    // 마지막으로 클릭한 행 (강조 표시용)
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1599,7 +1601,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                             !!expiryMailTo;
 
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} onClick={() => setActiveRowId(assignment.id)} className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b ${!isActive ? 'bg-red-50 text-red-600' : isExpired ? 'bg-red-50/30' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                 <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
@@ -1991,7 +1993,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const isEmpty = assignment.id.startsWith('empty_');
 
                                                                     return (
-                                                                        <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : ''}`}>
+                                                                        <tr key={assignment.id} onClick={() => setActiveRowId(assignment.id)} className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b last:border-0 h-10 ${!isActive ? 'bg-red-50 text-red-600' : ''}`}>
                                                                             <td className="text-center text-[10px] font-bold">
                                                                                 <span className={!isActive ? 'text-red-700 font-bold' : isEmpty ? "text-green-700" : "text-gray-900"}>
                                                                                     {acc.login_id}-{assignment.slot_number + 1}
