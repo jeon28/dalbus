@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/lib/group-id-utils';
 import { 
     Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil, Upload, 
-    LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText,
+    History, PowerOff, Filter, Mail, Search, MessageSquareText,
     Zap, UserPlus, Settings
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -40,6 +40,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
 
@@ -860,10 +861,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">{titlePrefix}</span>
                             기존 Tidal 계정 관리
                         </h1>
-                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-9">
-                            {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                            {isGridView ? 'List View' : 'Grid View'}
-                        </Button>
+                        <ViewModeToggle isGridView={isGridView} onChange={setIsGridView} />
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end">
@@ -1067,7 +1065,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                         className={`text-center font-bold px-2 border-r border-slate-100 whitespace-nowrap cursor-pointer hover:text-blue-600 hover:underline ${sIdx >= acc.max_slots ? 'text-amber-600' : 'text-slate-700'}`}
                                                         title={sIdx >= acc.max_slots
                                                             ? `정원 초과 슬롯 (정원 ${acc.max_slots}개). 중복 배정 여부를 확인하세요.`
-                                                            : "리스트 뷰에서 그룹 열기"}
+                                                            : "그룹 보기에서 열기"}
                                                         onClick={() => {
                                                             setIsGridView(false);
                                                             setExpandedRows(new Set([acc.id]));

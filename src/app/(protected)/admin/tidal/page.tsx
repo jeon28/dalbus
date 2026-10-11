@@ -7,7 +7,7 @@ import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/l
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount } from '@/lib/slot-utils';
 
@@ -1402,10 +1403,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <h1 className={`${styles.title} text-xl md:text-2xl`}>Tidal 계정 관리</h1>
-                                <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-9">
-                                    {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                                    <span className="hidden sm:inline">{isGridView ? 'List View' : 'Grid View'}</span>
-                                </Button>
+                                <ViewModeToggle isGridView={isGridView} onChange={setIsGridView} />
                             </div>
                             <div className="md:hidden">
                                 <Button onClick={() => setIsAddModalOpen(true)} size="sm" className="h-9 gap-2">
@@ -1476,7 +1474,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         </div>
                     </div>
                     
-                    {/* 모바일 하단 알림 보내기 버튼 (Grid View 선택 시) */}
+                    {/* 모바일 하단 알림 보내기 버튼 (개별 보기 선택 시) */}
                     {isGridView && selectedAssignmentIds.size > 0 && (
                         <div className="mt-4 flex animate-in slide-in-from-top duration-300">
                              <Button

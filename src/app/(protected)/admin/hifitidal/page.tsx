@@ -7,9 +7,10 @@ import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/l
 import styles from '@/app/(protected)/admin/admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
+import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
 import {
     Dialog,
@@ -1337,10 +1338,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                             <h1 className="text-xl font-bold text-gray-800 whitespace-nowrap">HifiTidal 관리</h1>
-                            <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-9 rounded-full px-4 shadow-sm hover:shadow-md transition-all">
-                                {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                                <span className="hidden sm:inline">{isGridView ? 'List View' : 'Grid View'}</span>
-                            </Button>
+                            <ViewModeToggle isGridView={isGridView} onChange={setIsGridView} />
                         </div>
 
                         <div className="flex items-center gap-2">
