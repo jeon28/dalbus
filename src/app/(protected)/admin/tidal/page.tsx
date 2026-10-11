@@ -7,7 +7,7 @@ import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/l
 import styles from '../admin.module.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, LayoutGrid, List, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount } from '@/lib/slot-utils';
 
@@ -169,6 +170,8 @@ function TidalAccountsContent() {
     const [editDeletedGroup, setEditDeletedGroup] = useState<Account | null>(null);
     const [editDeletedGroupForm, setEditDeletedGroupForm] = useState({ login_id: '', payment_email: '', payment_day: 1, memo: '' });
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
+    // 마지막으로 클릭한 행 (강조 표시용)
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [isSendingNotify, setIsSendingNotify] = useState(false);
@@ -1400,10 +1403,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <h1 className={`${styles.title} text-xl md:text-2xl`}>Tidal 계정 관리</h1>
-                                <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-9">
-                                    {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                                    <span className="hidden sm:inline">{isGridView ? 'List View' : 'Grid View'}</span>
-                                </Button>
+                                <ViewModeToggle isGridView={isGridView} onChange={setIsGridView} />
                             </div>
                             <div className="md:hidden">
                                 <Button onClick={() => setIsAddModalOpen(true)} size="sm" className="h-9 gap-2">
@@ -1474,7 +1474,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                         </div>
                     </div>
                     
-                    {/* 모바일 하단 알림 보내기 버튼 (Grid View 선택 시) */}
+                    {/* 모바일 하단 알림 보내기 버튼 (개별 보기 선택 시) */}
                     {isGridView && selectedAssignmentIds.size > 0 && (
                         <div className="mt-4 flex animate-in slide-in-from-top duration-300">
                              <Button
@@ -1651,7 +1651,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                         const isEmpty = assignment.id.startsWith('empty_');
 
                                         return (
-                                            <tr key={assignment.id} className={`border-b hover:bg-gray-50 ${isExpired ? 'bg-red-50/30' : ''} ${!isActive ? 'bg-red-50 text-red-600' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={assignment.id} onClick={() => setActiveRowId(assignment.id)} className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b ${isExpired ? 'bg-red-50/30' : ''} ${!isActive ? 'bg-red-50 text-red-600' : ''} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                 <td className={`text-center py-1 border-r border-gray-100 bg-gray-50/10 ${resizingCol ? '' : 'transition-all'}`} style={{ width: columnWidths['checkbox'] }}>
                                                     <input
                                                         type="checkbox"
@@ -2030,7 +2030,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                                     const isEmpty = assignment.id.startsWith('empty_');
 
                                                                     return (
-                                                                        <tr key={assignment.id} className={`border-b last:border-0 h-10 hover:bg-gray-50 ${!isActive ? 'bg-red-50 text-red-600' : ''}`}>
+                                                                        <tr key={assignment.id} onClick={() => setActiveRowId(assignment.id)} className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b last:border-0 h-10 ${!isActive ? 'bg-red-50 text-red-600' : ''}`}>
                                                                             <td className="text-center text-[10px] font-bold">
                                                                                 <span className={!isActive ? 'text-red-700 font-bold' : isEmpty ? "text-green-700" : "text-gray-900"}>
                                                                                     {acc.login_id}-{assignment.slot_number + 1}

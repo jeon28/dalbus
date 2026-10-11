@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { describeGroupIdSuggestion, normalizeGroupId, suggestGroupId } from '@/lib/group-id-utils';
 import { 
     Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Download, Pencil, Upload, 
-    LayoutGrid, List, History, PowerOff, Filter, Mail, Search, MessageSquareText,
+    History, PowerOff, Filter, Mail, Search, MessageSquareText,
     Zap, UserPlus, Settings
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -40,6 +40,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
 
@@ -164,6 +165,8 @@ export function LegacyTidalContent({
     const [editingAccount, setEditingAccount] = useState<Account | null>(null);
     const [slotPasswordModal, setSlotPasswordModal] = useState('');
     const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
+    // 마지막으로 클릭한 행 (강조 표시용)
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
@@ -858,10 +861,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             <span className="bg-orange-100 text-orange-600 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-orange-200">{titlePrefix}</span>
                             기존 Tidal 계정 관리
                         </h1>
-                        <Button variant="outline" size="sm" onClick={() => setIsGridView(!isGridView)} className="h-9">
-                            {isGridView ? <List size={16} className="mr-2" /> : <LayoutGrid size={16} className="mr-2" />}
-                            {isGridView ? 'List View' : 'Grid View'}
-                        </Button>
+                        <ViewModeToggle isGridView={isGridView} onChange={setIsGridView} />
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end">
@@ -1052,7 +1052,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                             const isMasterSlot = findMasterAssignment(acc.order_accounts)?.id === assignment.id;
 
                                             return (
-                                                <tr key={assignment.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDeactivated ? 'bg-red-50 text-red-500' : (isExpired ? 'bg-red-50/30' : (isEmpty ? 'bg-emerald-50/50 text-emerald-700' : ''))} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
+                                                <tr key={assignment.id} onClick={() => setActiveRowId(assignment.id)} className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b border-slate-100 transition-colors ${isDeactivated ? 'bg-red-50 text-red-500' : (isExpired ? 'bg-red-50/30' : (isEmpty ? 'bg-emerald-50/50 text-emerald-700' : ''))} ${selectedAssignmentIds.has(assignment.id) ? 'bg-blue-50/50' : ''}`}>
                                                     <td className="text-center py-2 border-r border-slate-100 whitespace-nowrap">
                                                         <input 
                                                             type="checkbox" 
@@ -1065,7 +1065,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                         className={`text-center font-bold px-2 border-r border-slate-100 whitespace-nowrap cursor-pointer hover:text-blue-600 hover:underline ${sIdx >= acc.max_slots ? 'text-amber-600' : 'text-slate-700'}`}
                                                         title={sIdx >= acc.max_slots
                                                             ? `정원 초과 슬롯 (정원 ${acc.max_slots}개). 중복 배정 여부를 확인하세요.`
-                                                            : "리스트 뷰에서 그룹 열기"}
+                                                            : "그룹 보기에서 열기"}
                                                         onClick={() => {
                                                             setIsGridView(false);
                                                             setExpandedRows(new Set([acc.id]));
@@ -1322,8 +1322,9 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                 return (
                                                                     <tr
                                                                         key={assignment.id}
+                                                                        onClick={() => setActiveRowId(assignment.id)}
                                                                         title={isOverCapacity ? `정원 초과 슬롯 (정원 ${acc.max_slots}개). 중복 배정 여부를 확인하세요.` : undefined}
-                                                                        className={`border-b last:border-0 border-slate-100 h-10 ${isDeactivated ? 'bg-red-50 text-red-500' : (isEmpty ? 'bg-emerald-50/20 text-emerald-600' : (isOverCapacity ? 'bg-amber-50 text-amber-700' : 'bg-white'))}`}
+                                                                        className={`admin-row ${activeRowId === assignment.id ? 'admin-row-active' : ''} border-b last:border-0 border-slate-100 h-10 ${isDeactivated ? 'bg-red-50 text-red-500' : (isEmpty ? 'bg-emerald-50/20 text-emerald-600' : (isOverCapacity ? 'bg-amber-50 text-amber-700' : 'bg-white'))}`}
                                                                     >
                                                                         <td className="text-center whitespace-nowrap">
                                                                             <Popover>
