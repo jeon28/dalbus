@@ -887,7 +887,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         <Button
                             variant={showExpiredOnly ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                            onClick={() => {
+                                // 잔여일 조회를 켜면 개별 보기로 전환해 결과를 한 줄씩 표시
+                                if (!showExpiredOnly) setIsGridView(true);
+                                setShowExpiredOnly(!showExpiredOnly);
+                            }}
                             className="h-9 px-3 text-xs gap-1.5"
                         >
                             <Filter className="w-3.5 h-3.5" /> 잔여일

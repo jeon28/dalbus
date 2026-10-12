@@ -1439,7 +1439,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 <Button
                                     variant={showExpiredOnly ? "default" : "outline"}
                                     size="sm"
-                                    onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                    onClick={() => {
+                                        // 잔여일 조회를 켜면 개별 보기로 전환해 결과를 한 줄씩 표시
+                                        if (!showExpiredOnly) setIsGridView(true);
+                                        setShowExpiredOnly(!showExpiredOnly);
+                                    }}
                                     className="h-9 gap-1 text-xs"
                                 >
                                     <Filter className="w-4 h-4" />

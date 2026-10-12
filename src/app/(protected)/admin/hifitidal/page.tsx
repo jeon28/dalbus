@@ -1390,7 +1390,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 />
                                 <span className="text-xs text-gray-500 mr-2">일</span>
                                 <button
-                                    onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                    onClick={() => {
+                                        // 잔여일 조회를 켜면 개별 보기로 전환해 결과를 한 줄씩 표시
+                                        if (!showExpiredOnly) setIsGridView(true);
+                                        setShowExpiredOnly(!showExpiredOnly);
+                                    }}
                                     className={`p-1.5 rounded-md transition-all ${showExpiredOnly ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-400'}`}
                                     title="잔여일 조회"
                                 >
