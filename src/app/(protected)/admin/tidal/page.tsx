@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { PhoneLink } from '@/components/admin/PhoneLink';
 import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount } from '@/lib/slot-utils';
@@ -1799,7 +1800,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                             {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
                                                         </td>
                                                         <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
-                                                            {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
+                                                            <PhoneLink phone={assignment.buyer_phone || assignment.orders?.buyer_phone} />
                                                         </td>
 
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>

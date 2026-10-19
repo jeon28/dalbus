@@ -39,6 +39,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { PhoneLink } from '@/components/admin/PhoneLink';
 import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { filterTemplatesByScope, isTemplateInScope } from '@/lib/email-template-scope';
@@ -1142,7 +1143,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                     </td>
                                                     <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate max-w-[110px]" title={assignment.screen_name || undefined}>{assignment.screen_name || '-'}</td>
                                                     <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate max-w-[80px]">{assignment.buyer_name || '-'}</td>
-                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate text-slate-500 font-mono">{assignment.buyer_phone || '-'}</td>
+                                                    <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate text-slate-500 font-mono"><PhoneLink phone={assignment.buyer_phone} /></td>
                                                     <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center text-slate-500 font-mono">{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
                                                     <td className="px-2 py-2 border-r border-slate-100 whitespace-nowrap text-center font-mono">
                                                         <span className={isExpired ? "text-red-500 font-bold" : "text-slate-700"}>
@@ -1362,7 +1363,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                                                                 </td>
                                                                                 <td className="px-2 truncate max-w-[110px] whitespace-nowrap">{val.screen_name || '-'}</td>
                                                                                 <td className="px-2 truncate max-w-[80px] whitespace-nowrap">{val.buyer_name || '-'}</td>
-                                                                                <td className="px-2 font-mono whitespace-nowrap">{val.buyer_phone || '-'}</td>
+                                                                                <td className="px-2 font-mono whitespace-nowrap"><PhoneLink phone={val.buyer_phone} /></td>
                                                                                 <td className="px-2 text-center font-mono whitespace-nowrap">{val.start_date || '-'}</td>
                                                                                 <td className="px-2 text-center font-mono whitespace-nowrap">{val.end_date || '-'}</td>
                                                                                 <td className="text-center font-medium whitespace-nowrap">{period ? `${period}개월` : '-'}</td>
