@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
+import { PhoneLink } from '@/components/admin/PhoneLink';
 import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount } from '@/lib/slot-utils';
@@ -1439,7 +1440,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 <Button
                                     variant={showExpiredOnly ? "default" : "outline"}
                                     size="sm"
-                                    onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                    onClick={() => {
+                                        // 잔여일 조회를 켜면 개별 보기로 전환해 결과를 한 줄씩 표시
+                                        if (!showExpiredOnly) setIsGridView(true);
+                                        setShowExpiredOnly(!showExpiredOnly);
+                                    }}
                                     className="h-9 gap-1 text-xs"
                                 >
                                     <Filter className="w-4 h-4" />
@@ -1795,7 +1800,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                             {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
                                                         </td>
                                                         <td className="p-2 border-r truncate max-w-[100px]" title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
-                                                            {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
+                                                            <PhoneLink phone={assignment.buyer_phone || assignment.orders?.buyer_phone} />
                                                         </td>
 
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>

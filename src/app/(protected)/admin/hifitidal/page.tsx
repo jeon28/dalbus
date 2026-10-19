@@ -10,6 +10,7 @@ import { apiFetch } from '@/lib/api';
 import { Plus, ChevronDown, ChevronUp, Trash2, ArrowRightLeft, Save, Download, Pencil, Upload, History, PowerOff, Filter, Mail, X, Search, MessageSquareText, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button";
+import { PhoneLink } from '@/components/admin/PhoneLink';
 import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal } from '@/components/admin/EmailTemplateModal';
 import {
@@ -1390,7 +1391,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                 />
                                 <span className="text-xs text-gray-500 mr-2">일</span>
                                 <button
-                                    onClick={() => setShowExpiredOnly(!showExpiredOnly)}
+                                    onClick={() => {
+                                        // 잔여일 조회를 켜면 개별 보기로 전환해 결과를 한 줄씩 표시
+                                        if (!showExpiredOnly) setIsGridView(true);
+                                        setShowExpiredOnly(!showExpiredOnly);
+                                    }}
                                     className={`p-1.5 rounded-md transition-all ${showExpiredOnly ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-400'}`}
                                     title="잔여일 조회"
                                 >
@@ -1740,7 +1745,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                             {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
                                                         </td>
                                                         <td className={`p-2 border-r truncate max-w-[100px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.buyer_phone || assignment.orders?.buyer_phone || undefined} style={{ width: columnWidths['buyer_phone'] }}>
-                                                            {assignment.buyer_phone || assignment.orders?.buyer_phone || '-'}
+                                                            <PhoneLink phone={assignment.buyer_phone || assignment.orders?.buyer_phone} />
                                                         </td>
 
                                                         <td className="p-2 text-center border-r font-mono" style={{ width: columnWidths['start_date'] }}>{assignment.start_date ? format(parseISO(assignment.start_date), 'yy-MM-dd') : '-'}</td>
