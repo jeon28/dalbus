@@ -3,10 +3,7 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CheckCircle2, Home, UserPlus, Lock, Mail, Eye, EyeOff, Copy, Clock, AlertTriangle } from 'lucide-react';
-import { useServices } from '@/lib/ServiceContext';
+import { CheckCircle2, Home, Copy, Clock, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -90,7 +87,6 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
 function SuccessContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { user } = useServices();
 
     const orderId = searchParams.get('orderId');
 
@@ -131,54 +127,6 @@ function SuccessContent() {
         if (!paymentInfo) return '';
         return paymentInfo.depositor_name || paymentInfo.buyer_name || '';
     }, [paymentInfo]);
-
-    // === Guest → Member 원클릭 전환 (주문 이메일/이름/전화 재사용, 비밀번호만 입력) ===
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [isJoined, setIsJoined] = useState(false);
-
-    const guestEmail = paymentInfo?.buyer_email || '';
-    const guestName = paymentInfo?.buyer_name || '';
-
-    const handleSignup = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!password || password.length < 6) {
-            toast.error('비밀번호는 6자 이상이어야 합니다.');
-            return;
-        }
-        if (password !== confirmPassword) {
-            toast.error('비밀번호가 일치하지 않습니다.');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            // 이메일/이름/전화는 방금 접수한 주문 정보를 그대로 사용 (별도 입력 불필요)
-            const response = await apiFetch('/api/auth/guest-signup', {
-                method: 'POST',
-                body: JSON.stringify({
-                    email: guestEmail,
-                    password,
-                    name: guestName,
-                    phone: paymentInfo?.buyer_phone || ''
-                })
-            });
-            const result = await response.json();
-            if (response.ok) {
-                setIsJoined(true);
-                toast.success('회원가입이 완료되었습니다! 이제 주문 내역을 마이페이지에서 확인하실 수 있습니다.');
-            } else {
-                toast.error(result.error || '회원가입 처리 중 오류가 발생했습니다.');
-            }
-        } catch (error) {
-            console.error('Signup error:', error);
-            toast.error('서버와의 통신 중 오류가 발생했습니다.');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     if (loadingInfo) {
         return (
@@ -325,85 +273,6 @@ function SuccessContent() {
                     </div>
                 )}
             </div>
-
-            {/* Guest to Member Conversion Section (기존 기능 유지) */}
-            {!user && !isJoined && guestEmail && (
-                <div className="bg-blue-50/50 rounded-2xl p-6 text-left border border-blue-100 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="flex items-center gap-2 mb-4">
-                        <UserPlus className="w-5 h-5 text-blue-600" />
-                        <h2 className="text-lg font-bold text-blue-900">회원가입하고 혜택받기</h2>
-                    </div>
-                    <p className="text-sm text-blue-700 mb-2 leading-relaxed">
-                        비밀번호만 설정하면 가입 완료! 방금 하신 주문과 계정 상태를 마이페이지에서 조회하고,
-                        만료 알림도 받아보실 수 있습니다.
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-blue-900/70 bg-white/60 rounded-lg px-3 py-2 mb-5 border border-blue-100">
-                        <Mail className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                        <span className="truncate"><b>{guestEmail}</b> 으로 가입됩니다 (로그인 아이디)</span>
-                    </div>
-
-                    <form onSubmit={handleSignup} className="space-y-4">
-                        <div className="space-y-1.5">
-                            <Label className="text-xs">비밀번호 (6자 이상)</Label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="비밀번호 입력"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="pl-9 pr-10 bg-white"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-blue-600 transition-colors"
-                                >
-                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label className="text-xs">비밀번호 확인</Label>
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="비밀번호 다시 입력"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="pl-9 bg-white"
-                                />
-                            </div>
-                        </div>
-
-                        <Button
-                            type="submit"
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-11"
-                            disabled={loading}
-                        >
-                            {loading ? '가입 처리 중...' : '비밀번호 설정하고 가입 완료'}
-                        </Button>
-                        <p className="text-[10px] text-center text-blue-600/60">
-                            생년월일·추가 정보는 마이페이지에서 언제든 입력할 수 있습니다.
-                        </p>
-                    </form>
-                </div>
-            )}
-
-            {isJoined && (
-                <div className="bg-green-50 rounded-2xl p-8 text-center border border-green-100 mb-8 animate-in zoom-in-95 duration-500">
-                    <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
-                    <h2 className="text-xl font-bold text-green-900 mb-2">가입을 축하드립니다!</h2>
-                    <p className="text-sm text-green-700 mb-6">
-                        이제 로그인을 통해 주문 상세 내역을 확인하실 수 있습니다.
-                    </p>
-                    <Button onClick={() => router.push('/login')} className="w-full bg-green-600 hover:bg-green-700">
-                        로그인하러 가기
-                    </Button>
-                </div>
-            )}
 
             <div className="space-y-3">
                 <Button

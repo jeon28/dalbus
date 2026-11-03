@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendAdminOrderNotification, sendUserOrderNotification } from '@/lib/email';
-import { getServerSession } from '@/lib/auth';
+import { getMemberFromRequest } from '@/lib/auth';
 import { normalizePhone } from '@/lib/utils';
 import { validateEmail } from '@/lib/emailValidation';
 
@@ -10,11 +10,21 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
     try {
-        // getServerSession for logging or optional user info, but allow guests
-        await getServerSession(req);
+        // 주문은 회원만 가능 — 로그인 세션(Bearer 토큰)의 사용자로만 주문을 만든다.
+        // (관리자 Quick 토큰은 회원이 아니므로 무시)
+        const session = await getMemberFromRequest(req);
+        if (!session) {
+            return NextResponse.json(
+                { error: '로그인 후 주문할 수 있습니다.', code: 'LOGIN_REQUIRED' },
+                { status: 401 }
+            );
+        }
 
         const body = await req.json();
-        const { orderData, product_name, plan_name, extend_tidal_id } = body;
+        const { product_name, plan_name, extend_tidal_id } = body;
+        // 클라이언트가 보낸 user_id·is_guest 는 신뢰하지 않고 세션 값으로 덮어쓴다
+        const { user_id: _ignoredUserId, is_guest: _ignoredIsGuest, ...clientOrderData } = body.orderData || {};
+        const orderData = { ...clientOrderData, user_id: session.id, is_guest: false };
 
         // 0. 구매자 이메일 검증 (형식 + 차단 도메인 + 실제 수신 가능 여부)
         //    메일을 받을 수 없는 도메인으로는 주문이 완료되지 않도록 서버에서 차단

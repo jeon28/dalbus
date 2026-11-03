@@ -101,6 +101,25 @@ export async function getServerSession(req: NextRequest): Promise<ServerSessionU
 }
 
 /**
+ * 로그인한 실제 회원(Supabase Bearer 토큰)만 확인한다.
+ * 관리자 Quick 토큰(X-Quick-Token)은 회원이 아니므로 무시한다 — 주문처럼 "회원 본인" 이 필요한 곳에서 사용.
+ * 회원이면 { id, email }, 아니면 null.
+ */
+export async function getMemberFromRequest(req: NextRequest): Promise<{ id: string; email?: string } | null> {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) return null;
+    const token = authHeader.slice('Bearer '.length).trim();
+    if (!token) return null;
+    try {
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        if (error || !user) return null;
+        return { id: user.id, email: user.email };
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Simple helper to check if a session user is an admin.
  */
 export function isAdmin(session: ServerSessionUser | null): boolean {

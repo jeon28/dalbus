@@ -14,6 +14,7 @@ import DOMPurify from 'dompurify';
 import { toast } from 'sonner';
 import { PageLoading } from '@/components/ui/PageLoading';
 import { formatPhoneInput } from '@/lib/utils';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function ServiceDetail({ params }: { params?: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -70,9 +71,8 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
     const [loading, setLoading] = useState(false);
     const [orderMode, setOrderMode] = useState<'NEW' | 'EXT'>('NEW');
     const [selectedOrder, setSelectedOrder] = useState<ExtensionOrder | null>(null);
-    const [lookupLoading, setLookupLoading] = useState(false);
-    const [lookupResults, setLookupResults] = useState<ExtensionOrder[]>([]);
-    const [lookupMessage, setLookupMessage] = useState('');
+    // 주문은 회원만 가능 — 비로그인 상태에서 주문/연장을 시도하면 로그인 선택 창을 띄운다
+    const [loginPromptOpen, setLoginPromptOpen] = useState(false);
     const [userEmails, setUserEmails] = useState<string[]>([]);
     const [userTidalAccounts, setUserTidalAccounts] = useState<UserTidalAccount[]>([]);
 
@@ -136,14 +136,8 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
     // Handle initial parameters from URL
     useEffect(() => {
         const mode = searchParams.get('mode');
-        const tidalId = searchParams.get('tidalId');
-        // const orderId = searchParams.get('orderId');
-
         if (mode === 'EXT') {
             setOrderMode('EXT');
-        }
-        if (tidalId) {
-            setGuestInfo(prev => ({ ...prev, tidalId }));
         }
     }, [searchParams]);
 
@@ -197,45 +191,11 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
         fetchUserTidalAccounts();
     }, [user, id]);
 
-    const handleLookup = useCallback(async () => {
-        if (!guestInfo.tidalId) {
-            toast.error('Tidal ID를 입력해주세요.');
-            return;
-        }
-
-        setLookupLoading(true);
-        setLookupMessage('');
-        setLookupResults([]);
-        setSelectedOrder(null);
-
-        try {
-            const res = await apiFetch('/api/orders/lookup', {
-                method: 'POST',
-                body: JSON.stringify({ tidalId: guestInfo.tidalId, productId: id })
-            });
-            const data = await res.json();
-
-            if (res.ok) {
-                const orders = data.orders || [];
-                setLookupResults(orders);
-                if (orders.length === 0) {
-                    setLookupMessage('연장 가능한 주문 내역이 없습니다.');
-                }
-            } else {
-                setLookupMessage('조회 중 오류가 발생했습니다.');
-            }
-        } catch (err) {
-            console.error('Lookup failed:', err);
-            setLookupMessage('조회에 실패했습니다.');
-        } finally {
-            setLookupLoading(false);
-        }
-    }, [guestInfo.tidalId, id]);
-
     // SNS(카카오/구글) 간편가입 — 주문 페이지를 떠나지 않도록 팝업 창에서 진행한다.
     // 팝업에서 로그인이 끝나면 BroadcastChannel(SIGNED_IN)로 이 창의 user 가 채워져
     // 입력 중인 주문 정보를 유지한 채 회원 정보가 자동 입력된다.
     const handleSnsSignup = async (provider: 'kakao' | 'google') => {
+        setLoginPromptOpen(false);
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
@@ -263,7 +223,7 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
     useEffect(() => {
         const onMessage = (e: MessageEvent) => {
             if (e.origin === window.location.origin && e.data?.type === 'dalbus-sns-auth-complete') {
-                toast.success('가입이 완료되었습니다. 회원 정보가 자동으로 입력됩니다.');
+                toast.success('로그인되었습니다. 회원 정보를 확인하고 주문해 주세요.');
                 refreshUser?.();
             }
         };
@@ -272,8 +232,19 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // 이메일 로그인/가입은 별도 페이지 — 돌아올 주소(현재 주문 페이지)를 넘긴다
+    const currentPath = () => `${window.location.pathname}${window.location.search}`;
+    const goEmailLogin = () => router.push(`/login?redirect=${encodeURIComponent(currentPath())}`);
+    const goEmailSignup = () => router.push(`/signup?redirect=${encodeURIComponent(currentPath())}`);
+
     const handleSubscribe = async () => {
         if (!product) return;
+
+        // 주문은 회원만 가능 — 비로그인이면 로그인/가입 선택 창
+        if (!user) {
+            setLoginPromptOpen(true);
+            return;
+        }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!guestInfo.name || !guestInfo.phone || !guestInfo.email || !guestInfo.depositor) {
@@ -307,13 +278,11 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
             return;
         }
 
-        // 비회원도 가입 없이 즉시 주문한다. (회원 전환은 결제완료 페이지에서 권유)
         await createOrder();
     };
 
-    // 실제 주문 생성 + 결제 안내 페이지 이동
-    // userIdOverride: 회원가입 직후 주문을 이어갈 때 새 사용자 ID를 전달
-    const createOrder = async (userIdOverride?: string) => {
+    // 실제 주문 생성 + 결제 안내 페이지 이동 (회원 전용 — user_id 는 서버가 세션에서 채운다)
+    const createOrder = async () => {
         if (!product) return;
 
         const selectedPlan = plans.find(p => p.duration_months === selectedPeriod);
@@ -325,7 +294,6 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
         setLoading(true);
 
         const amount = selectedPlan.price;
-        const effectiveUserId = userIdOverride || user?.id || null;
 
         const orderData: Record<string, string | number | boolean | null> = {
             product_id: product.id,
@@ -333,7 +301,6 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
             amount: amount,
             payment_status: 'pending',
             assignment_status: 'waiting',
-            is_guest: !effectiveUserId,
             buyer_name: guestInfo.name,
             buyer_phone: guestInfo.phone,
             buyer_email: guestInfo.email,
@@ -341,10 +308,6 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
             order_type: orderMode,
             related_order_id: selectedOrder?.id || null,
         };
-
-        if (effectiveUserId) {
-            orderData.user_id = effectiveUserId;
-        }
 
         try {
             const response = await apiFetch('/api/orders', {
@@ -359,7 +322,12 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
 
             const result = await response.json();
 
-            if (!response.ok || result.error) {
+            if (response.status === 401) {
+                // 세션 만료 등 — 다시 로그인하도록 안내
+                toast.error('로그인이 필요합니다. 다시 로그인해 주세요.');
+                setLoginPromptOpen(true);
+                setLoading(false);
+            } else if (!response.ok || result.error) {
                 const errorMsg = result.error || 'Failed to create order';
                 console.error('Error creating order:', errorMsg);
                 toast.error('주문 생성 실패: ' + errorMsg);
@@ -432,6 +400,45 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
     const calculatedPrice = currentPlan
         ? currentPlan.price.toLocaleString()
         : product.original_price.toLocaleString();
+
+    // 로그인/가입 선택지 — 카카오·구글은 팝업(주문 화면 유지), 이메일은 로그인 페이지로 이동 후 복귀
+    const loginOptions = (
+        <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+                <button
+                    type="button"
+                    onClick={() => handleSnsSignup('kakao')}
+                    className="flex items-center justify-center gap-2 py-3 rounded-lg bg-[#FEE500] text-[#191919] text-sm font-bold hover:brightness-95 transition-all"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 3C6.48 3 2 6.58 2 11c0 2.84 1.86 5.33 4.64 6.74-.2.75-.74 2.72-.85 3.14-.13.52.19.51.4.37.17-.11 2.66-1.81 3.74-2.55.66.1 1.35.15 2.07.15 5.52 0 10-3.58 10-8s-4.48-8-10-8z" />
+                    </svg>
+                    카카오로 시작
+                </button>
+                <button
+                    type="button"
+                    onClick={() => handleSnsSignup('google')}
+                    className="flex items-center justify-center gap-2 py-3 rounded-lg bg-white border border-input text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
+                        <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z" />
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
+                    </svg>
+                    구글로 시작
+                </button>
+            </div>
+            <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pt-1">
+                <button type="button" className="underline hover:text-primary" onClick={goEmailLogin}>이메일로 로그인</button>
+                <span aria-hidden="true">·</span>
+                <button type="button" className="underline hover:text-primary" onClick={goEmailSignup}>이메일로 가입</button>
+            </div>
+            <p className="text-[11px] text-center text-muted-foreground">
+                이미 가입하셨다면 처음 가입한 방법으로 로그인해 주세요.
+            </p>
+        </div>
+    );
 
     return (
         <main className={styles.main}>
@@ -518,7 +525,6 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
                             onClick={() => {
                                 setOrderMode('NEW');
                                 setSelectedOrder(null);
-                                setLookupResults([]);
                             }}
                         >
                             신규 신청
@@ -568,52 +574,27 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
                                         ))}
                                     </>
                                 ) : (
-                                    <p className="text-sm text-center text-muted-foreground py-4">
-                                        배정된 계정 정보가 없습니다.
-                                    </p>
+                                    <div className="text-center py-4 space-y-1">
+                                        <p className="text-sm text-muted-foreground">배정된 계정 정보가 없습니다.</p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            예전에 다른 방법(카카오·구글·이메일)이나 비회원으로 주문하셨다면 1:1 문의로 알려주세요. 계정에 연결해 드립니다.
+                                        </p>
+                                    </div>
                                 )
                             ) : (
-                                // 비로그인: Tidal ID 직접 입력 후 조회
-                                <>
-                                    <p className="text-sm font-medium text-center text-primary">기존 정보를 입력하여 연장할 주문을 조회하세요.</p>
-                                    <div className="space-y-4">
-                                        <Input
-                                            placeholder="구매 시 사용한 Tidal ID (예: tidalid@hifitidal.com)"
-                                            value={guestInfo.tidalId}
-                                            onChange={(e) => setGuestInfo({ ...guestInfo, tidalId: e.target.value })}
-                                        />
-                                        <button
-                                            className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
-                                            onClick={handleLookup}
-                                            disabled={lookupLoading}
-                                        >
-                                            {lookupLoading ? '조회 중...' : '기존 주문 조회하기'}
-                                        </button>
-                                    </div>
-
-                                    {lookupMessage && <p className="text-xs text-center text-red-500 mt-2">{lookupMessage}</p>}
-
-                                    {lookupResults.length > 0 && (
-                                        <div className="mt-2 space-y-2">
-                                            <p className="text-xs font-bold text-muted-foreground">연장 가능한 내역 ({lookupResults.length})</p>
-                                            {lookupResults.map((o) => (
-                                                <div
-                                                    key={o.id}
-                                                    className="flex items-center justify-between p-3 border border-input rounded-lg hover:border-primary cursor-pointer bg-white transition-all shadow-sm"
-                                                    onClick={() => handleSelectOrderForExtension(o)}
-                                                >
-                                                    <div>
-                                                        <p className="text-sm font-bold text-primary">{o.tidal_id || o.order_number}</p>
-                                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                                            종료일: {o.end_date || '정보없음'}
-                                                        </p>
-                                                    </div>
-                                                    <span className="text-xs text-primary font-bold shrink-0 ml-2">선택하기 →</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
+                                // 비로그인: 연장도 회원만 — 로그인하면 내 구독 목록이 바로 보인다
+                                <div className="text-center space-y-3 py-2">
+                                    <p className="text-sm font-medium text-primary">로그인하면 연장할 구독이 바로 표시됩니다.</p>
+                                    <button
+                                        className="w-full py-3 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-colors"
+                                        onClick={() => setLoginPromptOpen(true)}
+                                    >
+                                        로그인하고 연장하기
+                                    </button>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        처음 주문하실 때 사용한 방법(카카오·구글·이메일)으로 로그인해 주세요.
+                                    </p>
+                                </div>
                             )}
                         </div>
                     )}
@@ -648,80 +629,60 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
                                     </div>
                                 </div>
                             )}
-                            <Input
-                                placeholder="성함을 입력해 주세요."
-                                value={guestInfo.name}
-                                readOnly={!!user}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                    const newName = e.target.value;
-                                    setGuestInfo(prev => ({
-                                        ...prev,
-                                        name: newName,
-                                        depositor: prev.depositor === prev.name ? newName : prev.depositor
-                                    }));
-                                }}
-                            />
-                            <Input
-                                type="tel"
-                                placeholder="휴대폰번호를 입력해 주세요."
-                                value={guestInfo.phone}
-                                readOnly={!!user}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: formatPhoneInput(e.target.value) })}
-                            />
-                            {user && userEmails.length > 1 ? (
-                                <select
-                                    className="w-full p-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none"
-                                    value={guestInfo.email}
-                                    onChange={(e) => setGuestInfo({ ...guestInfo, email: e.target.value })}
-                                >
-                                    {userEmails.map((email) => (
-                                        <option key={email} value={email}>
-                                            {email}
-                                        </option>
-                                    ))}
-                                </select>
+                            {user ? (
+                                <>
+                                    {/* 회원 정보 — 프로필에 값이 있으면 고정, 비어 있으면(예: SNS 가입 직후 전화번호) 직접 입력 */}
+                                    <Input
+                                        placeholder="성함을 입력해 주세요."
+                                        value={guestInfo.name}
+                                        readOnly={!!user.name}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                            const newName = e.target.value;
+                                            setGuestInfo(prev => ({
+                                                ...prev,
+                                                name: newName,
+                                                depositor: prev.depositor === prev.name ? newName : prev.depositor
+                                            }));
+                                        }}
+                                    />
+                                    <Input
+                                        type="tel"
+                                        placeholder="휴대폰번호를 입력해 주세요."
+                                        value={guestInfo.phone}
+                                        readOnly={!!user.phone}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, phone: formatPhoneInput(e.target.value) })}
+                                    />
+                                    {userEmails.length > 1 ? (
+                                        <select
+                                            className="w-full p-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none"
+                                            value={guestInfo.email}
+                                            onChange={(e) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                                        >
+                                            {userEmails.map((email) => (
+                                                <option key={email} value={email}>
+                                                    {email}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <Input
+                                            type="email"
+                                            placeholder="이메일을 입력해 주세요."
+                                            value={guestInfo.email}
+                                            readOnly={!!user.email}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
+                                        />
+                                    )}
+                                    <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
+                                </>
                             ) : (
-                                <Input
-                                    type="email"
-                                    placeholder="이메일을 입력해 주세요."
-                                    value={guestInfo.email}
-                                    readOnly={!!user}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGuestInfo({ ...guestInfo, email: e.target.value })}
-                                />
-                            )}
-                            <p className="text-xs text-green-600 font-medium">* 정보가 틀릴 시 제품 전달에 문제가 생길 수 있으니 정확히 기입해주세요.</p>
-
-                            {/* SNS 간편가입 유도 — 가입하면 이름·이메일이 자동 입력된다 (주문은 가입 없이도 가능) */}
-                            {!user && (
-                                <div className="pt-1">
-                                    <p className="text-xs text-muted-foreground text-center mb-2">
-                                        SNS로 가입하면 회원 정보가 자동으로 입력되고, 만료 알림·이용내역 조회를 이용할 수 있어요.
+                                // 비로그인 — 주문은 회원만 가능. 로그인하면 이름·전화·이메일이 자동 입력된다
+                                <div className="glass p-5 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
+                                    <p className="text-sm font-bold text-center">주문하려면 로그인이 필요해요</p>
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        로그인하면 회원 정보가 자동으로 입력되고, 만료 알림·이용내역 조회를 이용할 수 있어요.
                                     </p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSnsSignup('kakao')}
-                                            className="flex items-center justify-center gap-2 py-3 rounded-lg bg-[#FEE500] text-[#191919] text-sm font-bold hover:brightness-95 transition-all"
-                                        >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                                <path d="M12 3C6.48 3 2 6.58 2 11c0 2.84 1.86 5.33 4.64 6.74-.2.75-.74 2.72-.85 3.14-.13.52.19.51.4.37.17-.11 2.66-1.81 3.74-2.55.66.1 1.35.15 2.07.15 5.52 0 10-3.58 10-8s-4.48-8-10-8z" />
-                                            </svg>
-                                            카카오로 가입
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSnsSignup('google')}
-                                            className="flex items-center justify-center gap-2 py-3 rounded-lg bg-white border border-input text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
-                                        >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
-                                                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
-                                                <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z" />
-                                                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
-                                            </svg>
-                                            구글로 가입
-                                        </button>
-                                    </div>
+                                    {loginOptions}
                                 </div>
                             )}
                         </div>
@@ -758,7 +719,7 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
                     disabled={loading || (orderMode === 'EXT' && !selectedOrder)}
                     onClick={handleSubscribe}
                 >
-                    {loading ? '처리 중...' : (user ? '구독하기' : '동의하고 주문하기')}
+                    {loading ? '처리 중...' : (user ? '동의하고 주문하기' : '로그인하고 주문하기')}
                 </button>
                 <p className="text-[11px] text-muted-foreground text-center mt-3 pb-24 md:pb-0">
                     주문 시{' '}
@@ -781,9 +742,22 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
                     disabled={loading || (orderMode === 'EXT' && !selectedOrder)}
                     onClick={handleSubscribe}
                 >
-                    {loading ? '처리 중...' : (user ? '구독하기' : '동의하고 주문하기')}
+                    {loading ? '처리 중...' : (user ? '동의하고 주문하기' : '로그인하고 주문하기')}
                 </button>
             </div>
+
+            {/* 비로그인 상태에서 주문/연장 버튼을 누르면 뜨는 로그인 선택 창 */}
+            <Dialog open={loginPromptOpen} onOpenChange={setLoginPromptOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>로그인 후 주문할 수 있어요</DialogTitle>
+                        <DialogDescription>
+                            주문 내역·계정 정보·만료 알림을 회원 계정으로 관리합니다. 선택하신 기간은 그대로 유지됩니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {loginOptions}
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }

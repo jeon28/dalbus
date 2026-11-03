@@ -9,6 +9,15 @@ import styles from '../../app/(auth)/login/auth.module.css';
 import { toast } from 'sonner';
 import { formatPhoneInput } from '@/lib/utils';
 
+// 쿼리스트링 redirect 값(내부 경로만 허용). 주문 화면에서 가입하러 온 경우 가입 후 주문 화면으로 돌려보낸다.
+function getSafeRedirect(): string | null {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search).get('redirect');
+    if (p && p.startsWith('/') && !p.startsWith('//')) return p;
+    return null;
+}
+
+
 export interface SignupFormProps {
     /** 이메일/이름/전화번호 사전 입력값 (비회원 주문 정보에서 전달) */
     initialValues?: { email?: string; name?: string; phone?: string };
@@ -286,7 +295,8 @@ export default function SignupForm({
         if (error) {
             if (error.message.includes('already registered') || error.message.includes('already exists')) {
                 toast.error('이미 가입된 이메일입니다. 로그인 페이지로 이동합니다.');
-                router.push('/login');
+                const r = getSafeRedirect();
+                router.push(r ? `/login?redirect=${encodeURIComponent(r)}` : '/login');
             } else if (error.message.includes('rate limit')) {
                 toast.error('이메일 전송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
             } else {
@@ -307,10 +317,11 @@ export default function SignupForm({
 
             if (data.session) {
                 toast.success('회원가입이 완료되었습니다! 자동으로 로그인합니다.');
-                window.location.replace('/');
+                window.location.replace(getSafeRedirect() || '/');
             } else {
                 toast.success('회원가입이 완료되었습니다. 이메일 인증이 필요한 경우 메일을 확인해주세요.');
-                router.push('/login');
+                const r = getSafeRedirect();
+                router.push(r ? `/login?redirect=${encodeURIComponent(r)}` : '/login');
             }
         }
         setLoading(false);
