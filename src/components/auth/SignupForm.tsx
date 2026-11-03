@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api';
 import styles from '../../app/(auth)/login/auth.module.css';
 import { toast } from 'sonner';
 import { formatPhoneInput } from '@/lib/utils';
+import { setLastLoginMethod } from '@/lib/lastLogin';
 
 // 쿼리스트링 redirect 값(내부 경로만 허용). 주문 화면에서 가입하러 온 경우 가입 후 주문 화면으로 돌려보낸다.
 function getSafeRedirect(): string | null {
@@ -271,6 +272,21 @@ export default function SignupForm({
         if (passErr) { passwordRef.current?.focus(); return; }
         if (confErr) { confirmPasswordRef.current?.focus(); return; }
 
+        // 1인 1계정 — 같은 전화번호로 가입된 계정(카카오·구글·이메일)이 있으면 가입 대신 로그인 안내
+        try {
+            const dupRes = await apiFetch('/api/auth/check-phone', {
+                method: 'POST',
+                body: JSON.stringify({ phone: formData.phone })
+            });
+            const dup = await dupRes.json();
+            if (dup?.duplicate) {
+                setErrors(prev => ({ ...prev, phone: dup.message }));
+                toast.error(dup.message);
+                phoneRef.current?.focus();
+                return;
+            }
+        } catch { /* 확인 실패 시 DB 유니크 인덱스가 최종 방어 */ }
+
         const canProceed = await checkGuestDiscrepancy();
         if (!canProceed) return;
 
@@ -297,6 +313,9 @@ export default function SignupForm({
                 toast.error('이미 가입된 이메일입니다. 로그인 페이지로 이동합니다.');
                 const r = getSafeRedirect();
                 router.push(r ? `/login?redirect=${encodeURIComponent(r)}` : '/login');
+            } else if (error.message.includes('Database error')) {
+                // 트리거의 프로필 생성 실패 — 대부분 전화번호 중복(유니크 인덱스)
+                toast.error('이미 가입된 전화번호일 수 있습니다. 처음 가입한 방법으로 로그인해 주세요.');
             } else if (error.message.includes('rate limit')) {
                 toast.error('이메일 전송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
             } else {
@@ -307,6 +326,7 @@ export default function SignupForm({
         }
 
         if (data.user) {
+            setLastLoginMethod('email');
             // 커스텀 성공 핸들러가 있으면 (모달에서 주문 이어가기 등) 위임
             if (onSignupSuccess) {
                 toast.success('회원가입이 완료되었습니다!');
@@ -329,6 +349,7 @@ export default function SignupForm({
 
     const handleSocialLogin = async (provider: 'google' | 'kakao') => {
         setLoading(true);
+        setLastLoginMethod(provider);
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider,

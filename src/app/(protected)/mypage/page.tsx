@@ -226,6 +226,19 @@ export default function MyPage() {
         if (!user) return;
         setUpdating(true);
         try {
+            // 1인 1계정 — 다른 계정이 쓰는 전화번호로는 바꿀 수 없다 (본인 계정은 서버에서 제외)
+            if (profileForm.phone && profileForm.phone !== user.phone) {
+                const dupRes = await apiFetch('/api/auth/check-phone', {
+                    method: 'POST',
+                    body: JSON.stringify({ phone: profileForm.phone })
+                });
+                const dup = await dupRes.json().catch(() => null);
+                if (dup?.duplicate) {
+                    toast.error('이 전화번호는 다른 계정에 등록되어 있습니다. 1:1 문의로 계정 통합을 요청해 주세요.');
+                    return;
+                }
+            }
+
             const { error } = await supabase
                 .from('profiles')
                 .update({
@@ -242,7 +255,11 @@ export default function MyPage() {
             toast.success('개인정보가 수정되었습니다.');
         } catch (error) {
             console.error('Profile update error:', error);
-            toast.error('수정 중 오류가 발생했습니다.');
+            if ((error as { code?: string })?.code === '23505') {
+                toast.error('이 전화번호는 다른 계정에 등록되어 있습니다. 1:1 문의로 계정 통합을 요청해 주세요.');
+            } else {
+                toast.error('수정 중 오류가 발생했습니다.');
+            }
         } finally {
             setUpdating(false);
         }

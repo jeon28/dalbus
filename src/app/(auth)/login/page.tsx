@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api';
 import styles from './auth.module.css';
 import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 import { toast } from 'sonner';
+import { getLastLoginMethod, setLastLoginMethod, type LoginMethod } from '@/lib/lastLogin';
 
 // 쿼리스트링의 redirect 값을 읽되, 내부 경로(/...)만 허용해 오픈 리다이렉트를 방지한다.
 function getSafeRedirect(): string | null {
@@ -22,6 +23,9 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    // 이 브라우저에서 마지막으로 쓴 로그인 수단 — 다른 수단으로 새 계정을 만드는 실수 방지용 표시
+    const [lastMethod, setLastMethod] = useState<LoginMethod | null>(null);
+    useEffect(() => { setLastMethod(getLastLoginMethod()); }, []);
 
     // 이미 로그인된 경우 리다이렉트 (redirect 지정 시 해당 경로, 없으면 홈)
     useEffect(() => {
@@ -86,6 +90,7 @@ export default function LoginPage() {
                 }
 
                 console.log('Login: Forcing navigation...');
+                setLastLoginMethod('email');
                 const targetUrl = data.role === 'admin' ? '/admin' : (getSafeRedirect() || '/');
                 window.location.replace(targetUrl);
             } else {
@@ -108,6 +113,7 @@ export default function LoginPage() {
 
     const handleSocialLogin = async (provider: 'google' | 'kakao') => {
         setIsLoading(true);
+        setLastLoginMethod(provider);
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider,
@@ -133,7 +139,7 @@ export default function LoginPage() {
                 <div className={styles.socialGroup}>
                     <button
                         type="button"
-                        className={`${styles.socialBtn} ${styles.kakaoBtn}`}
+                        className={`${styles.socialBtn} ${styles.kakaoBtn} relative`}
                         onClick={() => handleSocialLogin('kakao')}
                         disabled={isLoading}
                     >
@@ -141,11 +147,12 @@ export default function LoginPage() {
                             <path d="M12 3C6.477 3 2 6.552 2 10.932c0 2.825 1.83 5.3 4.61 6.643l-1 3.5c-.066.236.216.417.412.28l4.084-2.736c.602.08 1.236.124 1.894.124 5.523 0 10-3.553 10-7.933C22 6.552 17.523 3 12 3z"/>
                         </svg>
                         Kakao로 계속하기
+                        {lastMethod === 'kakao' && <span className="absolute -top-2 right-2 rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 shadow">최근 사용</span>}
                     </button>
                     
                     <button
                         type="button"
-                        className={`${styles.socialBtn} ${styles.googleBtn}`}
+                        className={`${styles.socialBtn} ${styles.googleBtn} relative`}
                         onClick={() => handleSocialLogin('google')}
                         disabled={isLoading}
                     >
@@ -156,11 +163,16 @@ export default function LoginPage() {
                             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                         </svg>
                         Google로 계속하기
+                        {lastMethod === 'google' && <span className="absolute -top-2 right-2 rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 shadow">최근 사용</span>}
                     </button>
                 </div>
 
+                <p className="text-[11px] text-center text-muted-foreground -mt-1 mb-2">
+                    처음 가입한 방법으로 로그인해 주세요. 같은 전화번호로는 한 계정만 만들 수 있어요.
+                </p>
+
                 <div className={styles.divider}>
-                    <span className={styles.dividerText}>또는 이메일로 로그인</span>
+                    <span className={styles.dividerText}>또는 이메일로 로그인{lastMethod === 'email' && ' (최근 사용)'}</span>
                 </div>
 
                 <form className={styles.form} onSubmit={handleSubmit}>

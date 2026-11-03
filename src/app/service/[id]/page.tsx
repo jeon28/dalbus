@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { PageLoading } from '@/components/ui/PageLoading';
 import { formatPhoneInput } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getLastLoginMethod, setLastLoginMethod, type LoginMethod } from '@/lib/lastLogin';
 
 export default function ServiceDetail({ params }: { params?: Promise<{ id: string }> }) {
     const router = useRouter();
@@ -74,6 +75,9 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
     // 주문은 회원만 가능 — 비로그인 상태에서 주문/연장을 시도하면 로그인 선택 창을 띄운다
     const [loginPromptOpen, setLoginPromptOpen] = useState(false);
     const [userEmails, setUserEmails] = useState<string[]>([]);
+    // 이 브라우저에서 마지막으로 쓴 로그인 수단 — 버튼에 "최근 사용" 표시
+    const [lastMethod, setLastMethod] = useState<LoginMethod | null>(null);
+    useEffect(() => { setLastMethod(getLastLoginMethod()); }, []);
     const [userTidalAccounts, setUserTidalAccounts] = useState<UserTidalAccount[]>([]);
 
     const [guestInfo, setGuestInfo] = useState({
@@ -196,6 +200,7 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
     // 입력 중인 주문 정보를 유지한 채 회원 정보가 자동 입력된다.
     const handleSnsSignup = async (provider: 'kakao' | 'google') => {
         setLoginPromptOpen(false);
+        setLastLoginMethod(provider);
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
@@ -225,6 +230,12 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
             if (e.origin === window.location.origin && e.data?.type === 'dalbus-sns-auth-complete') {
                 toast.success('로그인되었습니다. 회원 정보를 확인하고 주문해 주세요.');
                 refreshUser?.();
+            }
+            // 팝업에서 전화번호 중복이 확인되어 빈 계정을 지우고 로그아웃한 경우 — 기존 계정으로 로그인 안내
+            if (e.origin === window.location.origin && e.data?.type === 'dalbus-sns-duplicate') {
+                toast.error(e.data.message || '이미 가입된 전화번호입니다. 처음 가입한 방법으로 로그인해 주세요.', { duration: 8000 });
+                refreshUser?.();
+                setLoginPromptOpen(true);
             }
         };
         window.addEventListener('message', onMessage);
@@ -270,6 +281,22 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
         } catch {
             toast.error('이메일 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
             return;
+        }
+
+        // 1인 1계정 — 프로필에 전화번호가 없어 직접 입력한 경우, 그 번호가 다른 계정 것이면
+        // 중복 계정으로 주문하는 것이므로 기존 계정으로 로그인하도록 막는다
+        if (!user.phone) {
+            try {
+                const dupRes = await apiFetch('/api/auth/check-phone', {
+                    method: 'POST',
+                    body: JSON.stringify({ phone: guestInfo.phone })
+                });
+                const dup = await dupRes.json();
+                if (dup?.duplicate) {
+                    toast.error(dup.message, { duration: 8000 });
+                    return;
+                }
+            } catch { /* 확인 실패 시 주문은 진행 */ }
         }
 
         const selectedPlan = plans.find(p => p.duration_months === selectedPeriod);
@@ -408,17 +435,18 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
                 <button
                     type="button"
                     onClick={() => handleSnsSignup('kakao')}
-                    className="flex items-center justify-center gap-2 py-3 rounded-lg bg-[#FEE500] text-[#191919] text-sm font-bold hover:brightness-95 transition-all"
+                    className="relative flex items-center justify-center gap-2 py-3 rounded-lg bg-[#FEE500] text-[#191919] text-sm font-bold hover:brightness-95 transition-all"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M12 3C6.48 3 2 6.58 2 11c0 2.84 1.86 5.33 4.64 6.74-.2.75-.74 2.72-.85 3.14-.13.52.19.51.4.37.17-.11 2.66-1.81 3.74-2.55.66.1 1.35.15 2.07.15 5.52 0 10-3.58 10-8s-4.48-8-10-8z" />
                     </svg>
                     카카오로 시작
+                    {lastMethod === 'kakao' && <span className="absolute -top-2 -right-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 shadow">최근 사용</span>}
                 </button>
                 <button
                     type="button"
                     onClick={() => handleSnsSignup('google')}
-                    className="flex items-center justify-center gap-2 py-3 rounded-lg bg-white border border-input text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                    className="relative flex items-center justify-center gap-2 py-3 rounded-lg bg-white border border-input text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
                         <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
@@ -427,10 +455,11 @@ export default function ServiceDetail({ params }: { params?: Promise<{ id: strin
                         <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
                     </svg>
                     구글로 시작
+                    {lastMethod === 'google' && <span className="absolute -top-2 -right-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 shadow">최근 사용</span>}
                 </button>
             </div>
             <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pt-1">
-                <button type="button" className="underline hover:text-primary" onClick={goEmailLogin}>이메일로 로그인</button>
+                <button type="button" className="underline hover:text-primary" onClick={goEmailLogin}>이메일로 로그인{lastMethod === 'email' && <span className="ml-1 text-primary font-bold no-underline">(최근 사용)</span>}</button>
                 <span aria-hidden="true">·</span>
                 <button type="button" className="underline hover:text-primary" onClick={goEmailSignup}>이메일로 가입</button>
             </div>

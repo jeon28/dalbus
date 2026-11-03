@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendAdminOrderNotification, sendUserOrderNotification } from '@/lib/email';
 import { getMemberFromRequest } from '@/lib/auth';
+import { findPhoneOwner } from '@/lib/phoneDuplicate';
 import { normalizePhone } from '@/lib/utils';
 import { validateEmail } from '@/lib/emailValidation';
 
@@ -100,7 +101,11 @@ export async function POST(req: NextRequest) {
                     .maybeSingle();
                 if (profile) {
                     const patch: Record<string, string> = {};
-                    if (!profile.phone && normalizedOrderData.buyer_phone) patch.phone = normalizedOrderData.buyer_phone;
+                    // 1인 1계정 — 다른 회원이 이미 쓰는 번호는 프로필에 넣지 않는다
+                    if (!profile.phone && normalizedOrderData.buyer_phone
+                        && !(await findPhoneOwner(normalizedOrderData.buyer_phone, order.user_id))) {
+                        patch.phone = normalizedOrderData.buyer_phone;
+                    }
                     if (!profile.name && normalizedOrderData.buyer_name) patch.name = normalizedOrderData.buyer_name;
                     if (Object.keys(patch).length > 0) {
                         await supabaseAdmin.from('profiles').update(patch).eq('id', order.user_id);

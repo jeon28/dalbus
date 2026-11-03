@@ -7,6 +7,7 @@ import { User, Phone, Calendar, CheckCircle } from 'lucide-react';
 import styles from '../../login/auth.module.css';
 import { toast } from 'sonner';
 import { formatPhoneInput } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
 
 export default function SignupCompletePage() {
     const router = useRouter();
@@ -27,6 +28,9 @@ export default function SignupCompletePage() {
         birthdate: '',
         phone: ''
     });
+
+    // 1인 1계정 — 입력한 전화번호가 다른 계정에 이미 있으면 안내 문구를 담는다
+    const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
 
     const nameRef = useRef<HTMLInputElement>(null);
     const birthdateRef = useRef<HTMLSelectElement>(null);
@@ -162,6 +166,7 @@ export default function SignupCompletePage() {
         const { name } = e.target;
         const value = name === 'phone' ? formatPhoneInput(e.target.value) : e.target.value;
         setFormData(prev => ({ ...prev, [name]: value }));
+        if (name === 'phone') setDuplicateMessage(null);
 
         if (errors[name as keyof typeof errors]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
@@ -193,6 +198,20 @@ export default function SignupCompletePage() {
         setLoading(true);
 
         try {
+            // 같은 전화번호로 가입된 다른 계정이 있으면 가입을 멈추고 기존 계정으로 안내
+            try {
+                const dupRes = await apiFetch('/api/auth/check-phone', {
+                    method: 'POST',
+                    body: JSON.stringify({ phone: formData.phone })
+                });
+                const dup = await dupRes.json();
+                if (dup?.duplicate) {
+                    setDuplicateMessage(dup.message);
+                    setLoading(false);
+                    return;
+                }
+            } catch { /* 확인 실패 시 DB 유니크 인덱스가 최종 방어 */ }
+
             const birthDate = `${formData.birthYear}.${formData.birthMonth.padStart(2, '0')}.${formData.birthDay.padStart(2, '0')}`;
 
             const { error } = await supabase
@@ -204,6 +223,12 @@ export default function SignupCompletePage() {
                 })
                 .eq('id', userId);
 
+            if (error?.code === '23505') {
+                // 전화번호 유니크 인덱스 위반 — 사전 확인을 지나쳐도 여기서 걸린다
+                setDuplicateMessage('이 전화번호는 이미 다른 계정으로 가입되어 있습니다. 처음 가입한 방법으로 로그인해 주세요.');
+                setLoading(false);
+                return;
+            }
             if (error) {
                 console.error('Profile update error:', error);
                 toast.error('프로필 업데이트 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -223,6 +248,24 @@ export default function SignupCompletePage() {
             toast.error('오류가 발생했습니다. 다시 시도해주세요.');
             setLoading(false);
         }
+    };
+
+    // 중복 확인 후 "기존 계정으로 로그인" — 방금 만든 빈 계정을 지우고 로그아웃한 뒤 로그인으로 보낸다
+    const handleUseExistingAccount = async () => {
+        setLoading(true);
+        try {
+            await apiFetch('/api/auth/abandon-signup', { method: 'POST' });
+        } catch { /* 삭제 실패해도 로그아웃은 진행 — 빈 계정은 관리자 중복 정리 대상 */ }
+        await supabase.auth.signOut();
+        if (isPopup) {
+            try {
+                window.opener?.postMessage({ type: 'dalbus-sns-duplicate', message: duplicateMessage }, window.location.origin);
+            } catch { /* opener 접근 불가 시 무시 */ }
+            window.close();
+            return;
+        }
+        toast.info(duplicateMessage || '처음 가입한 방법으로 로그인해 주세요.');
+        window.location.replace('/login');
     };
 
     if (checking) {
@@ -352,6 +395,31 @@ export default function SignupCompletePage() {
                         </div>
                         {errors.phone && <span className={styles.errorText}>{errors.phone}</span>}
                     </div>
+
+                    {duplicateMessage && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3 text-left">
+                            <p className="text-sm font-semibold text-amber-900">이미 가입된 전화번호예요</p>
+                            <p className="text-xs text-amber-800 leading-relaxed">{duplicateMessage}</p>
+                            <p className="text-[11px] text-amber-700">
+                                같은 전화번호로는 한 계정만 만들 수 있어요. 지금 만든 빈 계정은 삭제됩니다.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleUseExistingAccount}
+                                disabled={loading}
+                                className="w-full h-11 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors disabled:opacity-60"
+                            >
+                                기존 계정으로 로그인하기
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setDuplicateMessage(null); phoneRef.current?.focus(); }}
+                                className="w-full text-xs text-amber-800 underline"
+                            >
+                                번호를 잘못 입력했어요
+                            </button>
+                        </div>
+                    )}
 
                     <button
                         type="submit"
