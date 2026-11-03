@@ -44,6 +44,9 @@ import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { filterTemplatesByScope, isTemplateInScope } from '@/lib/email-template-scope';
 
+/** 잔여일 조회 시 복사하는 연장 문의 안내 문구 */
+const EXTENSION_INQUIRY_TEXT = `안녕하세요 코부즈 연장 문의 드립니다\n연장시 일년 7만5천원 입금 후 확인 부탁드립니다,\n3333064888988 카카오뱅크 전성현 입니다`;
+
 /** 하부계정(슬롯) */
 interface Assignment {
     id: string;
@@ -953,6 +956,37 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             )}
+
+                            <Button
+
+                                variant="outline"
+
+                                size="sm"
+
+                                onClick={() => {
+
+                                    navigator.clipboard.writeText(EXTENSION_INQUIRY_TEXT).then(() => {
+
+                                        setCopiedId('__extension_inquiry__');
+
+                                        setTimeout(() => setCopiedId(null), 2000);
+
+                                    });
+
+                                }}
+
+                                className="h-9 px-2.5 text-xs gap-1"
+
+                                title="연장 문의 안내 문구 복사"
+
+                            >
+
+                                <Copy className="w-3.5 h-3.5" />
+
+                                {copiedId === '__extension_inquiry__' ? '복사됨' : '연장문의'}
+
+                            </Button>
+
 
                             {isGridView && (
                                 <Button

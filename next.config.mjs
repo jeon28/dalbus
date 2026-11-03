@@ -11,7 +11,10 @@ const nextConfig = {
                 has: [{ type: 'host', value: 'dalbus.vercel.app' }],
                 destination: 'https://www.dalbus.com/:path*',
                 permanent: true
-            }
+            },
+            // 구 퀵 관리 화면(/quick/*)은 폐기 — 관리자 페이지로 이동
+            { source: '/quick', destination: '/admin', permanent: true },
+            { source: '/quick/:path*', destination: '/admin', permanent: true }
         ];
     }
 };
