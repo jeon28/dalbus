@@ -551,19 +551,15 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     };
 
     const handleToggleActive = async (assignment: Assignment, accountId?: string) => {
-        // 마스터 슬롯(그룹 대표)은 비활성화 금지: 비활성 시 그룹 전체가 화면에서 사라짐 (재활성화는 허용)
-        const isMaster = assignment.type === 'master' || assignment.slot_number === 0;
-        if (isMaster && (assignment.is_active ?? true)) {
-            alert('마스터 슬롯은 비활성할 수 없습니다.');
-            return;
-        }
-
         // 활성 → 비활성 전환 시 클릭 실수 방지 확인 (재활성화는 확인 없이 진행)
+        // 마스터 슬롯도 비활성 가능: 비활성 내역에서 삭제하면 다음 슬롯이 마스터로 승격된다.
         const isCurrentlyActive = assignment.is_active ?? true;
         if (isCurrentlyActive) {
+            const isMaster = assignment.type === 'master' || assignment.slot_number === 0;
             const slotLabel = assignment.accounts?.login_id ? `${assignment.accounts.login_id}-${assignment.slot_number + 1}` : '';
             const label = `${slotLabel}${assignment.buyer_name ? ` (${assignment.buyer_name})` : ''}`.trim();
-            if (!confirm(`${label ? `[${label}] ` : ''}배정을 비활성화하시겠습니까?\n비활성 내역으로 이동됩니다.`)) return;
+            const masterNote = isMaster ? '\n마스터 슬롯입니다. 비활성 내역에서 삭제하면 남은 그룹원 중 가장 앞 슬롯이 새 마스터가 됩니다.' : '';
+            if (!confirm(`${label ? `[${label}] ` : ''}배정을 비활성화하시겠습니까?\n비활성 내역으로 이동됩니다.${masterNote}`)) return;
         }
 
         // Optimistic update
@@ -767,22 +763,11 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     };
 
     const handleBulkDeactivate = async () => {
-        if (!confirm('일괄 비활성/활성 하시겠습니까?')) return;
-
-        // 마스터 슬롯은 비활성 토글 대상에서 제외 (비활성 시 그룹 전체가 사라짐)
-        const allAssignments = accounts.flatMap(acc => acc.order_accounts || []);
-        const masterIds = new Set(
-            allAssignments
-                .filter(oa => (oa.type === 'master' || oa.slot_number === 0) && (oa.is_active ?? true))
-                .map(oa => oa.id)
-        );
-        const targetIds = Array.from(selectedAssignmentIds).filter(id => !masterIds.has(id));
-        const skipped = selectedAssignmentIds.size - targetIds.length;
+        if (!confirm('일괄 비활성/활성 하시겠습니까?\n(마스터 슬롯도 함께 처리됩니다)')) return;
 
         try {
-            await Promise.all(targetIds.map(id => fetchFn(`/api/admin/legacy-tidal/assignment/${id}/toggle-active`, { method: 'POST' })));
+            await Promise.all(Array.from(selectedAssignmentIds).map(id => fetchFn(`/api/admin/legacy-tidal/assignment/${id}/toggle-active`, { method: 'POST' })));
             fetchAccounts();
-            if (skipped > 0) alert(`마스터 슬롯 ${skipped}건은 비활성할 수 없어 제외되었습니다.`);
         } catch { alert('일괄 처리 실패'); }
     };
 

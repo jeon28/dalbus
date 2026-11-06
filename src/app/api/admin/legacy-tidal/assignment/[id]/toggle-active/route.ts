@@ -23,7 +23,7 @@ export async function POST(
         // 1. Get current status and account_id
         const { data: current, error: fetchError } = await supabaseAdmin
             .from(assignmentTable)
-            .select('is_active, account_id, type, slot_number')
+            .select('is_active, account_id')
             .eq('id', id)
             .single();
 
@@ -31,15 +31,8 @@ export async function POST(
             throw new Error('Assignment not found');
         }
 
-        // 마스터 슬롯(그룹 대표)은 비활성화 금지: 비활성 시 그룹 전체가 화면에서 사라짐
-        // (재활성화는 허용)
-        const isMaster = current.type === 'master' || current.slot_number === 0;
-        if (isMaster && current.is_active) {
-            return NextResponse.json(
-                { error: '마스터 슬롯은 비활성할 수 없습니다.' },
-                { status: 400 }
-            );
-        }
+        // 마스터 슬롯도 비활성 가능. 목록은 항상 showInactive=true 로 조회하므로 비활성 마스터가
+        // 있어도 그룹은 그대로 보이고, 비활성 내역에서 삭제하면 normalizeSlots 가 다음 슬롯을 승격한다.
 
         const nextStatus = !current.is_active;
 
