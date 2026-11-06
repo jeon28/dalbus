@@ -175,7 +175,6 @@ function HifiTidalAccountsContent() {
     const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
     const [isTemplateEditOpen, setIsTemplateEditOpen] = useState(false);
     const [isSendingNotify, setIsSendingNotify] = useState(false);
-    const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
     
     // Quick Edit Feature State
     const [isQuickEditModalOpen, setIsQuickEditModalOpen] = useState(false);
@@ -753,13 +752,12 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             }
         }
 
-        if (isMaster && hasUsers) {
-            alert('그룹원이 존재하여 마스터 삭제 불가능 합니다');
-            setPendingDeleteIds(prev => new Set(prev).add(assignmentId));
-            return;
-        }
-
-        if (!confirm('해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)')) return;
+        // 마스터도 삭제 가능: 비활성 처리 후 삭제된 데이터로 이동하고, 남은 그룹원 중
+        // 가장 작은 슬롯 번호가 자동으로 마스터로 승격된다 (서버 normalizeSlots).
+        const message = isMaster && hasUsers
+            ? '마스터 계정입니다. 비활성 처리 후 삭제되며, 남은 그룹원 중 가장 앞 슬롯이 새 마스터가 됩니다.\n삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)'
+            : '해당 기록을 삭제하시겠습니까? (삭제된 데이터 보기에 저장되며, 메인 페이지에서 관리 가능합니다)';
+        if (!confirm(message)) return;
         try {
             const res = await apiFetch(`/api/admin/assignments/${assignmentId}?product=HifiTidal`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Delete failed');
@@ -1735,11 +1733,11 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
                                                 ) : (
                                                     <>
                                                         <td className={`p-2 border-r truncate max-w-[120px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
-                                                            <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.tidal_id || '-'}</span>
+                                                            <span>{assignment.tidal_id || '-'}</span>
                                                         </td>
 
                                                         <td className={`p-2 border-r truncate max-w-[80px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
-                                                            <span className={pendingDeleteIds.has(assignment.id) ? "text-red-500 font-bold" : ""}>{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</span>
+                                                            <span>{assignment.buyer_name || assignment.orders?.buyer_name || '-'}</span>
                                                         </td>
                                                         <td className={`p-2 border-r truncate max-w-[120px] ${!isActive ? 'text-red-600' : ''}`} title={assignment.buyer_email || assignment.orders?.buyer_email || undefined} style={{ width: columnWidths['buyer_email'] }}>
                                                             {assignment.buyer_email || assignment.orders?.buyer_email || '-'}
