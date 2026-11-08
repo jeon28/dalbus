@@ -44,7 +44,7 @@ import { PhoneLink } from '@/components/admin/PhoneLink';
 import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
-import { generateTidalPassword } from '@/lib/password-utils';
+import { fetchDerivedPassword } from '@/lib/password-client';
 import { PasswordGenerateButton } from '@/components/admin/PasswordGenerateButton';
 
 /** 잔여일 조회 시 복사하는 연장 문의 안내 문구 */
@@ -511,12 +511,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     useEffect(() => {
         if (!isAddModalOpen) return;
-        setNewAccount(prev => ({
-            ...prev,
-            login_id: prev.login_id.trim() ? prev.login_id : groupIdSuggestion.id,
-            // 신규 그룹(마스터 계정) 초기 비밀번호: hifitidal.com 규칙(6자리 숫자) 자동 생성
-            login_pw: prev.login_pw.trim() ? prev.login_pw : generateTidalPassword(),
-        }));
+        setNewAccount(prev => (prev.login_id.trim() ? prev : { ...prev, login_id: groupIdSuggestion.id }));
     }, [isAddModalOpen, groupIdSuggestion.id]);
 
     const handleCreateAccount = async () => {
@@ -611,11 +606,17 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
     const handleDirectAssign = async () => {
         if (!selectedAccount || selectedSlot === null) return;
         if (!directForm.buyer_name && !directForm.buyer_email) { alert('이름 또는 이메일을 입력해주세요.'); return; }
+        // 초기 비밀번호: 직접 입력했으면 그 값, 비워 두었으면 Tidal ID 기준 규칙 계산
+        let password = slotPasswordModal.trim();
+        if (!password && directForm.tidal_id.trim()) {
+            try { password = await fetchDerivedPassword(directForm.tidal_id, fetchFn); }
+            catch (e) { alert(e instanceof Error ? e.message : String(e)); return; }
+        }
         try {
             const res = await fetchFn(`${apiBase}/assign/${selectedAccount.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...directForm, slot_number: selectedSlot, tidal_password: slotPasswordModal, type: selectedSlot === 0 ? 'master' : 'user' })
+                body: JSON.stringify({ ...directForm, slot_number: selectedSlot, tidal_password: password, type: selectedSlot === 0 ? 'master' : 'user' })
             });
             if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Create failed'); }
             setIsAssignModalOpen(false);
@@ -683,7 +684,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     const openAssignModal = (account: Account, slotIndex: number) => {
         setSelectedAccount(account); setSelectedSlot(slotIndex);
-        setSlotPasswordModal(generateTidalPassword());
+        setSlotPasswordModal('');
         if (useDirectInput) {
             setAssignTab('direct');
             setDeletedSearch('');
@@ -694,11 +695,22 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
         setIsAssignModalOpen(true);
     };
 
-    const handleAssign = (orderId: string) => {
+    const handleAssign = async (orderId: string) => {
         if (!selectedAccount || selectedSlot === null) return;
         const order = pendingOrders.find(o => o.id === orderId); if (!order) return;
         const key = `${selectedAccount.id}_${selectedSlot}`;
         const emailPrefix = order.buyer_email?.split('@')[0] || '';
+        const tidalId = emailPrefix ? `${emailPrefix}@hifitidal.com` : null;
+        // 초기 비밀번호: 직접 입력했으면 그 값, 비워 두었으면 Tidal ID 기준 규칙 계산
+        let password = slotPasswordModal.trim();
+        if (!password && tidalId) {
+            try {
+                password = await fetchDerivedPassword(tidalId, fetchFn);
+            } catch (e) {
+                alert(e instanceof Error ? e.message : String(e));
+                return;
+            }
+        }
         setGridValues(prev => ({
             ...prev,
             [key]: {
@@ -710,8 +722,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                 start_date: order.start_date || '',
                 end_date: order.end_date || '',
                 order_number: order.order_number || '',
-                tidal_id: emailPrefix ? `${emailPrefix}@hifitidal.com` : null,
-                tidal_password: slotPasswordModal || '',
+                tidal_id: tidalId,
+                tidal_password: password,
                 full_order: order
             }
         }));
@@ -1472,8 +1484,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-xs">비밀번호</Label>
                             <div className="col-span-3 flex gap-2">
-                                <Input value={newAccount.login_pw} onChange={e => setNewAccount(prev => ({ ...prev, login_pw: e.target.value }))} className="flex-1 h-9 font-mono" placeholder="6자리 숫자 (자동 생성)" />
-                                <PasswordGenerateButton onGenerate={(pw) => setNewAccount(prev => ({ ...prev, login_pw: pw }))} />
+                                <Input value={newAccount.login_pw} onChange={e => setNewAccount(prev => ({ ...prev, login_pw: e.target.value }))} className="flex-1 h-9 font-mono" placeholder="마스터 배정 후 Tidal ID 기준 계산" />
+                                <PasswordGenerateButton fetchFn={fetchFn} onGenerate={(pw) => setNewAccount(prev => ({ ...prev, login_pw: pw }))} disabledHint="마스터 슬롯에 Tidal ID가 배정된 뒤 그룹 수정에서 계산할 수 있습니다" />
                             </div>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
@@ -1510,6 +1522,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                     <PasswordGenerateButton
                                         tidalId={findMasterAssignment(editingAccount.order_accounts || [])?.tidal_id}
                                         onGenerate={(pw) => setEditingAccount(prev => prev ? { ...prev, login_pw: pw } : null)}
+                                        fetchFn={fetchFn}
+                                        disabledHint="마스터 슬롯에 Tidal ID가 아직 없습니다"
                                     />
                                 </div>
                             </div>
@@ -1559,8 +1573,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border">
                                     <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap w-14">초기 비번</Label>
-                                    <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-8 flex-1 bg-white text-xs font-mono" />
-                                    <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs shrink-0" onClick={() => setSlotPasswordModal(generateTidalPassword(directForm.tidal_id))}>재생성</Button>
+                                    <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-8 flex-1 bg-white text-xs font-mono" placeholder="비워두면 Tidal ID 기준 자동 계산" />
+                                    <PasswordGenerateButton tidalId={directForm.tidal_id} fetchFn={fetchFn} className="h-8" onGenerate={setSlotPasswordModal} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
@@ -1676,8 +1690,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         <div className="py-4 space-y-4">
                             <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border">
                                 <Label className="text-xs font-bold text-slate-500 whitespace-nowrap">초기 비번</Label>
-                                <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-9 bg-white font-mono" />
-                                <PasswordGenerateButton onGenerate={setSlotPasswordModal} />
+                                <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-9 bg-white font-mono" placeholder="비워두면 Tidal ID 기준 자동 계산" />
                             </div>
                             <div className="border rounded-xl overflow-hidden shadow-inner bg-white min-h-[200px] max-h-[400px] overflow-y-auto">
                                 {pendingOrders.length === 0 ? (
@@ -1724,6 +1737,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                         <Input value={quickEditValues.tidal_password || ''} onChange={e => setQuickEditValues({ ...quickEditValues, tidal_password: e.target.value })} className="h-10 font-mono min-w-0" placeholder="135792" />
                                         <PasswordGenerateButton
                                             iconOnly
+                                            fetchFn={fetchFn}
                                             className="h-10"
                                             tidalId={quickEditValues.tidal_id}
                                             onGenerate={(pw) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: pw } : null)}
