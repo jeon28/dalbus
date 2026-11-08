@@ -47,9 +47,17 @@ export function PasswordField({
     const [historyOpen, setHistoryOpen] = useState(false);
     const locked = hasStored && unlockedFor !== lockKey;
 
+    /** 잠겨 있으면 확인창을 띄우고, 승인 시 잠금을 푼다. 계속 진행해도 되면 true */
+    const ensureUnlocked = (): boolean => {
+        if (!locked) return true;
+        if (!window.confirm(UNLOCK_MESSAGE)) return false;
+        setUnlockedFor(lockKey);
+        return true;
+    };
+
     const toggleLock = () => {
         if (locked) {
-            if (window.confirm(UNLOCK_MESSAGE)) setUnlockedFor(lockKey);
+            ensureUnlocked();
         } else {
             // 다시 잠그면 원래 값으로 되돌린다
             onChange(initialValue || '');
@@ -83,8 +91,8 @@ export function PasswordField({
                 iconOnly
                 tidalId={tidalId}
                 fetchFn={fetchFn}
-                disabled={locked}
-                disabledHint={locked ? '잠금을 해제한 뒤 계산할 수 있습니다' : disabledHint}
+                beforeGenerate={ensureUnlocked}
+                disabledHint={disabledHint}
                 className={buttonClassName}
                 onGenerate={onChange}
             />

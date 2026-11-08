@@ -1731,8 +1731,8 @@ await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditV
                     </DialogHeader>
                     {quickEditValues && (
                         <div className="grid gap-5 py-4">
-                            <div className="grid grid-cols-[0.8fr_1.4fr_0.9fr] gap-3">
-                                <div className="space-y-1.5">
+                            <div className="grid grid-cols-[0.8fr_1.6fr] gap-3">
+<div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">이름</Label>
                                     <Input value={quickEditValues.buyer_name || ''} onChange={e => setQuickEditValues({ ...quickEditValues, buyer_name: e.target.value })} className="h-10" />
                                 </div>
@@ -1740,9 +1740,10 @@ await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditV
                                     <Label className="text-xs text-slate-500 font-semibold">Tidal ID</Label>
                                     <Input value={quickEditValues.tidal_id || ''} onChange={e => setQuickEditValues({ ...quickEditValues, tidal_id: e.target.value })} className="h-10" />
                                 </div>
-                                <div className="space-y-1.5">
+                            </div>
+                            <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">PW</Label>
-                                    <PasswordField
+<PasswordField
                                         value={quickEditValues.tidal_password || ''}
                                         onChange={(pw) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: pw } : null)}
                                         initialValue={initialQuickEditValues?.tidal_password}
@@ -1753,10 +1754,9 @@ await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditV
                                         placeholder="135792"
                                         history={{ source: 'legacy', assignmentId: quickEditValues.assignment_id, accountId: memoTargetAccountId || undefined, label: quickEditValues.tidal_id || undefined }}
                                     />
-</div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
+<div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">전화번호</Label>
                                     <Input value={quickEditValues.buyer_phone || ''} onChange={e => setQuickEditValues({ ...quickEditValues, buyer_phone: e.target.value })} className="h-10" />
                                 </div>

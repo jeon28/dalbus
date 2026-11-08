@@ -17,18 +17,25 @@ interface PasswordGenerateButtonProps {
     fetchFn?: FetchLike;
     /** ID가 없을 때 보여줄 안내 (기본: ID를 먼저 입력하라는 문구) */
     disabledHint?: string;
-    /** 외부에서 강제로 비활성화 (예: 잠금 상태) */
+    /** 외부에서 강제로 비활성화 */
     disabled?: boolean;
+    /** 계산 직전에 호출. false 를 돌려주면 계산하지 않는다 (예: 잠금 해제 확인) */
+    beforeGenerate?: () => boolean;
 }
 
 /** Tidal ID 기준 비밀번호 계산 버튼. 입력란 옆에 붙여서 쓴다. */
-export function PasswordGenerateButton({ tidalId, onGenerate, className = '', iconOnly = false, fetchFn, disabledHint, disabled: forceDisabled = false }: PasswordGenerateButtonProps) {
+export function PasswordGenerateButton({ tidalId, onGenerate, className = '', iconOnly = false, fetchFn, disabledHint, disabled: forceDisabled = false, beforeGenerate }: PasswordGenerateButtonProps) {
     const [busy, setBusy] = useState(false);
     const id = tidalId?.trim() || '';
-    const disabled = forceDisabled || !id || busy;
+    const disabled = forceDisabled || busy;
 
     const handleClick = async () => {
-        if (!id) return;
+        // ID가 없으면 버튼을 죽이지 않고 이유를 알려준다 (비활성 버튼은 왜 안 되는지 알기 어려움)
+        if (!id) {
+            alert(disabledHint || 'Tidal ID를 먼저 입력하세요.');
+            return;
+        }
+        if (beforeGenerate && !beforeGenerate()) return;
         setBusy(true);
         try {
             onGenerate(await fetchDerivedPassword(id, fetchFn));
@@ -46,7 +53,8 @@ export function PasswordGenerateButton({ tidalId, onGenerate, className = '', ic
             variant="outline"
             disabled={disabled}
             title={(forceDisabled || !id) && disabledHint ? disabledHint : describePasswordRule(id)}
-            className={`h-9 shrink-0 gap-1 px-2 text-xs ${className}`}
+            aria-disabled={!id || undefined}
+            className={`h-9 shrink-0 gap-1 px-2 text-xs ${!id ? 'opacity-60' : ''} ${className}`}
             onClick={handleClick}
         >
             {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}

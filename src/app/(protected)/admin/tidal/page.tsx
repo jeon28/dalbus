@@ -2668,18 +2668,18 @@ try {
                                     placeholder="전성현"
                                 />
                             </div>
-                            <div className="col-span-6 space-y-1">
+                            <div className="col-span-9 space-y-1">
                                 <Label className="text-[11px] font-semibold text-gray-500 ml-1">Tidal ID</Label>
-                                <Input 
+<Input 
                                     className="h-10 rounded-xl border-gray-200 focus:ring-1 focus:ring-blue-500 bg-white"
                                     value={quickEditValues?.tidal_id || ''} 
                                     onChange={(e) => setQuickEditValues(prev => prev ? { ...prev, tidal_id: e.target.value } : null)}
                                     placeholder="sjeon2801@gmail.com"
                                 />
                             </div>
-                            <div className="col-span-3 space-y-1">
+                            <div className="col-span-12 space-y-1">
                                 <Label className="text-[11px] font-semibold text-gray-500 ml-1">PW</Label>
-                                <PasswordField
+<PasswordField
                                     value={quickEditValues?.tidal_password || ''}
                                     onChange={(pw) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: pw } : null)}
                                     initialValue={initialQuickEditValues?.tidal_password}
