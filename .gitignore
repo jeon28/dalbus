@@ -57,3 +57,6 @@ import_qobuz_review.csv
 
 # QOBUZ 임포트 전 삭제한 테스트 그룹 백업 (일회성)
 qobuz_test_group_backup.json
+
+.vercel
+.env*
