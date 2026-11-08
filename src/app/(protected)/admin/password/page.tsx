@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, Copy, KeyRound, Loader2, Search, X } from 'lucide-react';
+import { Check, Copy, History, KeyRound, Loader2, Search, X } from 'lucide-react';
 import { useServices } from '@/lib/ServiceContext';
 import { apiFetch } from '@/lib/api';
 import { fetchDerivedPassword } from '@/lib/password-client';
@@ -11,6 +11,7 @@ import { describePasswordRule, isHifiTidalId } from '@/lib/password-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordHistoryDialog, type PasswordHistoryTarget } from '@/components/admin/PasswordHistoryDialog';
 import styles from '../admin.module.css';
 
 interface LookupRow {
@@ -73,6 +74,7 @@ export default function PasswordLookupPage() {
     const [rows, setRows] = useState<LookupRow[] | null>(null);
     const [searchBusy, setSearchBusy] = useState(false);
     const [secretConfigured, setSecretConfigured] = useState<boolean | null>(null);
+    const [historyTarget, setHistoryTarget] = useState<PasswordHistoryTarget | null>(null);
 
     useEffect(() => {
         if (isHydrated && !isAdmin) router.push('/admin');
@@ -215,11 +217,12 @@ export default function PasswordLookupPage() {
                                 <th className="py-2 px-2 text-left">전화번호</th>
                                 <th className="py-2 px-2 text-left">종료일</th>
                                 <th className="py-2 px-2 text-center">상태</th>
+                                <th className="py-2 px-2 text-center">이력</th>
                             </tr>
                         </thead>
                         <tbody>
                             {rows.length === 0 ? (
-                                <tr><td colSpan={10} className="p-8 text-center text-gray-400">검색 결과가 없습니다.</td></tr>
+                                <tr><td colSpan={11} className="p-8 text-center text-gray-400">검색 결과가 없습니다.</td></tr>
                             ) : rows.map((r) => {
                                 const href = r.source === 'tidal'
                                     ? `/admin/tidal?accountId=${r.account_id}&slotIdx=${r.slot_number}`
@@ -264,7 +267,17 @@ export default function PasswordLookupPage() {
                                         <td className="px-2 text-center whitespace-nowrap">
                                             {r.is_deleted ? '삭제' : r.is_active ? '활성' : '비활성'}
                                         </td>
-                                    </tr>
+                                        <td className="px-2 text-center">
+                                            <button
+                                                type="button"
+                                                title="비밀번호 변경 이력"
+                                                className="inline-flex items-center text-gray-400 hover:text-blue-600"
+                                                onClick={() => setHistoryTarget({ source: r.source, assignmentId: r.assignment_id, accountId: r.account_id, label: `${r.group_id}-${r.slot_number + 1}` })}
+                                            >
+                                                <History size={14} />
+                                            </button>
+                                        </td>
+</tr>
                                 );
                             })}
                         </tbody>
@@ -274,6 +287,8 @@ export default function PasswordLookupPage() {
                     </div>
                 </div>
             )}
+
+            <PasswordHistoryDialog open={!!historyTarget} onOpenChange={(o) => { if (!o) setHistoryTarget(null); }} target={historyTarget} />
         </div>
     );
 }

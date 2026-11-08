@@ -20,3 +20,21 @@ export function describePasswordRule(tidalId?: string | null): string {
     if (isHifiTidalId(tidalId)) return `${HIFITIDAL_DOMAIN} 계정: ID 기준 6자리 숫자 계산`;
     return '외부 메일 계정: ID 기준 영문·숫자·기호 8자리 계산';
 }
+
+/**
+ * 저장 직전 비밀번호 변경 확인. 바뀌지 않았거나 처음 넣는 값이면 묻지 않는다.
+ * (브라우저 전용: window.confirm 사용)
+ */
+export function confirmPasswordChange(
+    oldValue: string | null | undefined,
+    newValue: string | null | undefined,
+    label = '비밀번호',
+): boolean {
+    const o = (oldValue || '').trim();
+    const n = (newValue || '').trim();
+    if (o === n || !o) return true;
+    return window.confirm(
+        `${label}가 변경됩니다.\n\n이전: ${o}\n새 값: ${n || '(빈 값)'}\n\n` +
+        'Tidal(실제 계정)에서도 같은 값으로 변경했는지 확인했습니까?',
+    );
+}

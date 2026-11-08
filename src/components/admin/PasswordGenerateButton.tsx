@@ -17,13 +17,15 @@ interface PasswordGenerateButtonProps {
     fetchFn?: FetchLike;
     /** ID가 없을 때 보여줄 안내 (기본: ID를 먼저 입력하라는 문구) */
     disabledHint?: string;
+    /** 외부에서 강제로 비활성화 (예: 잠금 상태) */
+    disabled?: boolean;
 }
 
 /** Tidal ID 기준 비밀번호 계산 버튼. 입력란 옆에 붙여서 쓴다. */
-export function PasswordGenerateButton({ tidalId, onGenerate, className = '', iconOnly = false, fetchFn, disabledHint }: PasswordGenerateButtonProps) {
+export function PasswordGenerateButton({ tidalId, onGenerate, className = '', iconOnly = false, fetchFn, disabledHint, disabled: forceDisabled = false }: PasswordGenerateButtonProps) {
     const [busy, setBusy] = useState(false);
     const id = tidalId?.trim() || '';
-    const disabled = !id || busy;
+    const disabled = forceDisabled || !id || busy;
 
     const handleClick = async () => {
         if (!id) return;
@@ -43,7 +45,7 @@ export function PasswordGenerateButton({ tidalId, onGenerate, className = '', ic
             size="sm"
             variant="outline"
             disabled={disabled}
-            title={!id && disabledHint ? disabledHint : describePasswordRule(id)}
+            title={(forceDisabled || !id) && disabledHint ? disabledHint : describePasswordRule(id)}
             className={`h-9 shrink-0 gap-1 px-2 text-xs ${className}`}
             onClick={handleClick}
         >

@@ -46,6 +46,8 @@ import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/Email
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
 import { fetchDerivedPassword } from '@/lib/password-client';
 import { PasswordGenerateButton } from '@/components/admin/PasswordGenerateButton';
+import { PasswordField } from '@/components/admin/PasswordField';
+import { confirmPasswordChange } from '@/lib/password-utils';
 
 /** 잔여일 조회 시 복사하는 연장 문의 안내 문구 */
 const EXTENSION_INQUIRY_TEXT = `안녕하세요 타이달 연장 문의 드립니다\n연장시 일년8만5천원 입금 후 확인 부탁드립니다,\n3333064888988 카카오뱅크 전성현 입니다`;
@@ -532,7 +534,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     const handleUpdateMasterAccount = async () => {
         if (!editingAccount) return;
-        try {
+        if (!confirmPasswordChange(accounts.find(a => a.id === editingAccount.id)?.login_pw, editingAccount.login_pw, '그룹 비밀번호')) return;
+try {
             const res = await fetchFn(`/api/admin/legacy-tidal/${editingAccount.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingAccount) });
             if (!res.ok) {
                 const detail = await res.json().catch(() => null);
@@ -831,7 +834,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     const handleSaveQuickEdit = async () => {
         if (!quickEditValues) return;
-        await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditValues);
+        if (!confirmPasswordChange(initialQuickEditValues?.tidal_password, quickEditValues.tidal_password)) return;
+await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditValues);
         setIsQuickEditModalOpen(false);
     };
 
@@ -1518,14 +1522,19 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">비밀번호</Label>
                                 <div className="col-span-3 flex gap-2">
-                                    <Input value={editingAccount.login_pw || ''} onChange={e => setEditingAccount(prev => prev ? { ...prev, login_pw: e.target.value } : null)} className="flex-1 h-9 font-mono" placeholder="마스터 계정 비밀번호" />
-                                    <PasswordGenerateButton
+                                    <PasswordField
+                                        className="flex-1"
+                                        value={editingAccount.login_pw || ''}
+                                        onChange={(pw) => setEditingAccount(prev => prev ? { ...prev, login_pw: pw } : null)}
+                                        initialValue={accounts.find(a => a.id === editingAccount.id)?.login_pw}
                                         tidalId={findMasterAssignment(editingAccount.order_accounts || [])?.tidal_id}
-                                        onGenerate={(pw) => setEditingAccount(prev => prev ? { ...prev, login_pw: pw } : null)}
                                         fetchFn={fetchFn}
+                                        inputClassName="h-9"
                                         disabledHint="마스터 슬롯에 Tidal ID가 아직 없습니다"
+                                        placeholder="마스터 계정 비밀번호"
+                                        history={{ source: 'legacy', accountId: editingAccount.id, label: editingAccount.login_id }}
                                     />
-                                </div>
+</div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">결제 이메일 <span className="text-red-500">*</span></Label>
@@ -1733,17 +1742,18 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">PW</Label>
-                                    <div className="flex gap-1">
-                                        <Input value={quickEditValues.tidal_password || ''} onChange={e => setQuickEditValues({ ...quickEditValues, tidal_password: e.target.value })} className="h-10 font-mono min-w-0" placeholder="135792" />
-                                        <PasswordGenerateButton
-                                            iconOnly
-                                            fetchFn={fetchFn}
-                                            className="h-10"
-                                            tidalId={quickEditValues.tidal_id}
-                                            onGenerate={(pw) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: pw } : null)}
-                                        />
-                                    </div>
-                                </div>
+                                    <PasswordField
+                                        value={quickEditValues.tidal_password || ''}
+                                        onChange={(pw) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: pw } : null)}
+                                        initialValue={initialQuickEditValues?.tidal_password}
+                                        tidalId={quickEditValues.tidal_id}
+                                        fetchFn={fetchFn}
+                                        inputClassName="h-10"
+                                        buttonClassName="h-10"
+                                        placeholder="135792"
+                                        history={{ source: 'legacy', assignmentId: quickEditValues.assignment_id, accountId: memoTargetAccountId || undefined, label: quickEditValues.tidal_id || undefined }}
+                                    />
+</div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
