@@ -44,6 +44,8 @@ import { PhoneLink } from '@/components/admin/PhoneLink';
 import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
+import { generateTidalPassword } from '@/lib/password-utils';
+import { PasswordGenerateButton } from '@/components/admin/PasswordGenerateButton';
 
 /** 잔여일 조회 시 복사하는 연장 문의 안내 문구 */
 const EXTENSION_INQUIRY_TEXT = `안녕하세요 타이달 연장 문의 드립니다\n연장시 일년8만5천원 입금 후 확인 부탁드립니다,\n3333064888988 카카오뱅크 전성현 입니다`;
@@ -509,7 +511,12 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
 
     useEffect(() => {
         if (!isAddModalOpen) return;
-        setNewAccount(prev => (prev.login_id.trim() ? prev : { ...prev, login_id: groupIdSuggestion.id }));
+        setNewAccount(prev => ({
+            ...prev,
+            login_id: prev.login_id.trim() ? prev.login_id : groupIdSuggestion.id,
+            // 신규 그룹(마스터 계정) 초기 비밀번호: hifitidal.com 규칙(6자리 숫자) 자동 생성
+            login_pw: prev.login_pw.trim() ? prev.login_pw : generateTidalPassword(),
+        }));
     }, [isAddModalOpen, groupIdSuggestion.id]);
 
     const handleCreateAccount = async () => {
@@ -672,13 +679,6 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             }
         };
         reader.readAsArrayBuffer(file); e.target.value = '';
-    };
-
-    const generateTidalPassword = () => {
-        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$";
-        let pass = "";
-        for (let i = 0; i < 8; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
-        return pass;
     };
 
     const openAssignModal = (account: Account, slotIndex: number) => {
@@ -1471,7 +1471,10 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-xs">비밀번호</Label>
-                            <Input value={newAccount.login_pw} onChange={e => setNewAccount({ ...newAccount, login_pw: e.target.value })} className="col-span-3 h-9" placeholder="그룹 계정 비번" />
+                            <div className="col-span-3 flex gap-2">
+                                <Input value={newAccount.login_pw} onChange={e => setNewAccount(prev => ({ ...prev, login_pw: e.target.value }))} className="flex-1 h-9 font-mono" placeholder="6자리 숫자 (자동 생성)" />
+                                <PasswordGenerateButton onGenerate={(pw) => setNewAccount(prev => ({ ...prev, login_pw: pw }))} />
+                            </div>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right text-xs">결제 이메일 <span className="text-red-500">*</span></Label>
@@ -1499,6 +1502,16 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">그룹 ID <span className="text-red-500">*</span></Label>
                                 <Input value={editingAccount.login_id} onChange={e => setEditingAccount({ ...editingAccount, login_id: e.target.value.toUpperCase() })} className="col-span-3 h-9" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right text-xs">비밀번호</Label>
+                                <div className="col-span-3 flex gap-2">
+                                    <Input value={editingAccount.login_pw || ''} onChange={e => setEditingAccount(prev => prev ? { ...prev, login_pw: e.target.value } : null)} className="flex-1 h-9 font-mono" placeholder="마스터 계정 비밀번호" />
+                                    <PasswordGenerateButton
+                                        tidalId={findMasterAssignment(editingAccount.order_accounts || [])?.tidal_id}
+                                        onGenerate={(pw) => setEditingAccount(prev => prev ? { ...prev, login_pw: pw } : null)}
+                                    />
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right text-xs">결제 이메일 <span className="text-red-500">*</span></Label>
@@ -1547,7 +1560,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                 <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-lg border">
                                     <Label className="text-xs font-semibold text-slate-500 whitespace-nowrap w-14">초기 비번</Label>
                                     <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-8 flex-1 bg-white text-xs font-mono" />
-                                    <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs shrink-0" onClick={() => setSlotPasswordModal(generateTidalPassword())}>재생성</Button>
+                                    <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs shrink-0" onClick={() => setSlotPasswordModal(generateTidalPassword(directForm.tidal_id))}>재생성</Button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
@@ -1663,7 +1676,8 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                         <div className="py-4 space-y-4">
                             <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border">
                                 <Label className="text-xs font-bold text-slate-500 whitespace-nowrap">초기 비번</Label>
-                                <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-9 bg-white" />
+                                <Input value={slotPasswordModal} onChange={e => setSlotPasswordModal(e.target.value)} className="h-9 bg-white font-mono" />
+                                <PasswordGenerateButton onGenerate={setSlotPasswordModal} />
                             </div>
                             <div className="border rounded-xl overflow-hidden shadow-inner bg-white min-h-[200px] max-h-[400px] overflow-y-auto">
                                 {pendingOrders.length === 0 ? (
@@ -1695,7 +1709,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                     </DialogHeader>
                     {quickEditValues && (
                         <div className="grid gap-5 py-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-[0.8fr_1.4fr_0.9fr] gap-3">
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">이름</Label>
                                     <Input value={quickEditValues.buyer_name || ''} onChange={e => setQuickEditValues({ ...quickEditValues, buyer_name: e.target.value })} className="h-10" />
@@ -1703,6 +1717,18 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
                                 <div className="space-y-1.5">
                                     <Label className="text-xs text-slate-500 font-semibold">Tidal ID</Label>
                                     <Input value={quickEditValues.tidal_id || ''} onChange={e => setQuickEditValues({ ...quickEditValues, tidal_id: e.target.value })} className="h-10" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-slate-500 font-semibold">PW</Label>
+                                    <div className="flex gap-1">
+                                        <Input value={quickEditValues.tidal_password || ''} onChange={e => setQuickEditValues({ ...quickEditValues, tidal_password: e.target.value })} className="h-10 font-mono min-w-0" placeholder="135792" />
+                                        <PasswordGenerateButton
+                                            iconOnly
+                                            className="h-10"
+                                            tidalId={quickEditValues.tidal_id}
+                                            onGenerate={(pw) => setQuickEditValues(prev => prev ? { ...prev, tidal_password: pw } : null)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
