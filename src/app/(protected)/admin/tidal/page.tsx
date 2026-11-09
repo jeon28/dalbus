@@ -1984,7 +1984,7 @@ try {
                                             <div className="col-span-1 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
                                                 {acc.memo}
                                             </div>
-                                            <div className="col-span-2 text-gray-700 text-sm truncate cursor-pointer hover:text-blue-600 relative overflow-visible" title={tidalId} onClick={(e) => handleIdCopyClick(e, tidalId, masterSlot?.tidal_password)}>
+                                            <div className="col-span-2 text-gray-700 text-sm truncate cursor-pointer hover:text-blue-600 relative overflow-visible" title={tidalId} onClick={(e) => { toggleRow(acc.id); handleIdCopyClick(e, tidalId, masterSlot?.tidal_password); }}>
                                                 {tidalId}
                                                 {copiedId === tidalId && (
                                                     <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10 whitespace-nowrap">{copiedWithPw ? 'ID/PW 복사됨!' : 'ID만 복사됨'}</span>

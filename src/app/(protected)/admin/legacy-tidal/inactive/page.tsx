@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import styles from '../../admin.module.css';
 import * as XLSX from 'xlsx';
 import { apiFetch } from '@/lib/api';
-import { copyCredentials } from '@/lib/copy-credentials';
+import { copyStoredCredentials } from '@/lib/copy-credentials';
 
 interface LegacyTidalHistory {
     id: string;
@@ -120,12 +120,12 @@ function LegacyTidalInactiveContent() {
         e.stopPropagation();
         if (!id || id === '-') return;
 
-        window.open('https://account.tidal.com/family', '_blank');
-        copyCredentials(id).then((withPw) => {
+        copyStoredCredentials(id).then((withPw) => {
             setCopiedId(id);
             setCopiedWithPw(withPw);
             setTimeout(() => setCopiedId(null), 2000);
         }).catch(() => {});
+        window.open('https://account.tidal.com/family', '_blank');
     };
 
     useEffect(() => {

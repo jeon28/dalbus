@@ -20,7 +20,18 @@ export function formatCredentials(tidalId: string, password: string): string {
 }
 
 /**
- * 아이디+비밀번호를 클립보드에 복사한다.
+ * 저장된 비밀번호만 사용해 즉시 복사한다 (서버 계산 없음).
+ * 클릭 직후 다른 창을 열어 포커스를 잃는 화면에서 사용. 비밀번호가 없으면 아이디만 복사.
+ * 반환값: 비밀번호가 함께 복사됐는지 여부
+ */
+export function copyStoredCredentials(tidalId: string, stored?: string | null): Promise<boolean> {
+    const id = tidalId.trim();
+    const password = (stored || '').trim();
+    return navigator.clipboard.writeText(formatCredentials(id, password)).then(() => Boolean(password));
+}
+
+/**
+ * 아이디+비밀번호를 클립보드에 복사한다 (저장값 없으면 Tidal ID 규칙으로 계산).
  * 반환값: 비밀번호가 함께 복사됐는지 여부
  */
 export async function copyCredentials(tidalId: string, stored?: string | null): Promise<boolean> {

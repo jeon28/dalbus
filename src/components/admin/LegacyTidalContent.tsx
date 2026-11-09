@@ -45,7 +45,7 @@ import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
 import { fetchDerivedPassword } from '@/lib/password-client';
-import { copyCredentials } from '@/lib/copy-credentials';
+import { copyStoredCredentials } from '@/lib/copy-credentials';
 import { PasswordGenerateButton } from '@/components/admin/PasswordGenerateButton';
 import { PasswordField } from '@/components/admin/PasswordField';
 import { confirmPasswordChange } from '@/lib/password-utils';
@@ -213,12 +213,12 @@ export function LegacyTidalContent({
     const handleMasterIdClick = (e: React.MouseEvent, id: string | null | undefined, storedPassword?: string | null) => {
         if (!id || id === '-') return;
         e.stopPropagation();
-        window.open('https://account.tidal.com/family', '_blank');
-        copyCredentials(id, storedPassword).then((withPw) => {
+        copyStoredCredentials(id, storedPassword).then((withPw) => {
             setCopiedId(id);
             setCopiedWithPw(withPw);
             setTimeout(() => setCopiedId(null), 2000);
         }).catch(() => {});
+        window.open('https://account.tidal.com/family', '_blank');
     };
 
     const startResizing = (id: string, e: React.MouseEvent) => {
