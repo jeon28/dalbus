@@ -45,6 +45,7 @@ import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount, findMasterAssignment } from '@/lib/slot-utils';
 import { fetchDerivedPassword } from '@/lib/password-client';
+import { copyCredentials } from '@/lib/copy-credentials';
 import { PasswordGenerateButton } from '@/components/admin/PasswordGenerateButton';
 import { PasswordField } from '@/components/admin/PasswordField';
 import { confirmPasswordChange } from '@/lib/password-utils';
@@ -199,6 +200,7 @@ export function LegacyTidalContent({
     const [, setResizingCol] = useState<string | null>(null);
 
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [copiedWithPw, setCopiedWithPw] = useState(false);
     const [extendMsgCopied, setExtendMsgCopied] = useState(false);
 
     // 직접입력/삭제복원 배정 모달용 상태
@@ -208,14 +210,15 @@ export function LegacyTidalContent({
     const [isLoadingDeleted, setIsLoadingDeleted] = useState(false);
     const [deletedSearch, setDeletedSearch] = useState('');
 
-    const handleMasterIdClick = (e: React.MouseEvent, id: string | null | undefined) => {
+    const handleMasterIdClick = (e: React.MouseEvent, id: string | null | undefined, storedPassword?: string | null) => {
         if (!id || id === '-') return;
         e.stopPropagation();
-        navigator.clipboard.writeText(id).then(() => {
-            setCopiedId(id);
-            setTimeout(() => setCopiedId(null), 2000);
-        });
         window.open('https://account.tidal.com/family', '_blank');
+        copyCredentials(id, storedPassword).then((withPw) => {
+            setCopiedId(id);
+            setCopiedWithPw(withPw);
+            setTimeout(() => setCopiedId(null), 2000);
+        }).catch(() => {});
     };
 
     const startResizing = (id: string, e: React.MouseEvent) => {
@@ -1167,12 +1170,12 @@ await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditV
                                                     <td
                                                         className={`px-2 py-2 border-r border-slate-100 whitespace-nowrap truncate ${isMasterSlot ? 'bg-violet-50 text-violet-700 font-bold cursor-pointer hover:text-blue-600' : ''}`}
                                                         title={assignment.tidal_id || undefined}
-                                                        onClick={(e) => isMasterSlot && handleMasterIdClick(e, assignment.tidal_id)}
+                                                        onClick={(e) => isMasterSlot && handleMasterIdClick(e, assignment.tidal_id, assignment.tidal_password)}
                                                     >
                                                         <div className="relative">
                                                             {assignment.tidal_id || '-'}
                                                             {isMasterSlot && copiedId === assignment.tidal_id && (
-                                                                <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">ID 복사됨!</span>
+                                                                <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">{copiedWithPw ? 'ID/PW 복사됨!' : 'ID만 복사됨'}</span>
                                                             )}
                                                         </div>
                                                     </td>
@@ -1260,11 +1263,11 @@ await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditV
                                             <div 
                                                 className="col-span-2 text-slate-700 truncate cursor-pointer hover:text-blue-600 relative overflow-visible whitespace-nowrap" 
                                                 title={tidalId} 
-                                                onClick={(e) => handleMasterIdClick(e, tidalId)}
+                                                onClick={(e) => handleMasterIdClick(e, tidalId, masterSlot?.tidal_password)}
                                             >
                                                 {tidalId}
                                                 {copiedId === tidalId && (
-                                                    <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">ID 복사됨!</span>
+                                                    <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10">{copiedWithPw ? 'ID/PW 복사됨!' : 'ID만 복사됨'}</span>
                                                 )}
                                             </div>
                                             <div className={`col-span-1 font-mono whitespace-nowrap ${isWarning ? 'text-red-500 font-bold' : 'text-slate-600'}`} onClick={() => toggleRow(acc.id)}>{endDate}</div>

@@ -38,6 +38,7 @@ import { ViewModeToggle } from '@/components/admin/ViewModeToggle';
 import { EmailTemplateModal, type EmailTemplate } from '@/components/admin/EmailTemplateModal';
 import { getSlotRenderCount } from '@/lib/slot-utils';
 import { fetchDerivedPassword } from '@/lib/password-client';
+import { copyCredentials } from '@/lib/copy-credentials';
 import { PasswordGenerateButton } from '@/components/admin/PasswordGenerateButton';
 import { PasswordField } from '@/components/admin/PasswordField';
 import { confirmPasswordChange } from '@/lib/password-utils';
@@ -221,6 +222,17 @@ function TidalAccountsContent() {
         'memo_col': 400
     });
     const [resizingCol, setResizingCol] = useState<string | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [copiedWithPw, setCopiedWithPw] = useState(false);
+    const handleIdCopyClick = (e: React.MouseEvent, id: string | null | undefined, storedPassword?: string | null) => {
+        if (!id || id === '-') return;
+        e.stopPropagation();
+        copyCredentials(id, storedPassword).then((withPw) => {
+            setCopiedId(id);
+            setCopiedWithPw(withPw);
+            setTimeout(() => setCopiedId(null), 2000);
+        }).catch(() => {});
+    };
 
     const startResizing = (id: string, e: React.MouseEvent) => {
         e.preventDefault();
@@ -1797,8 +1809,13 @@ try {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="p-2 border-r truncate max-w-[120px]" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }}>
-                                                            <span>{assignment.tidal_id || '-'}</span>
+                                                        <td className="p-2 border-r truncate max-w-[120px] cursor-pointer hover:text-blue-600" title={assignment.tidal_id || undefined} style={{ width: columnWidths['tidal_id'] }} onClick={(e) => handleIdCopyClick(e, assignment.tidal_id, assignment.tidal_password)}>
+                                                            <span className="relative">
+                                                                {assignment.tidal_id || '-'}
+                                                                {copiedId === assignment.tidal_id && (
+                                                                    <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10 whitespace-nowrap">{copiedWithPw ? 'ID/PW 복사됨!' : 'ID만 복사됨'}</span>
+                                                                )}
+                                                            </span>
                                                         </td>
 
                                                         <td className="p-2 border-r truncate max-w-[80px]" title={assignment.buyer_name || assignment.orders?.buyer_name || undefined} style={{ width: columnWidths['buyer_name'] }}>
@@ -1967,8 +1984,11 @@ try {
                                             <div className="col-span-1 text-gray-500 text-xs text-left truncate cursor-pointer" title={acc.memo} onClick={() => toggleRow(acc.id)}>
                                                 {acc.memo}
                                             </div>
-                                            <div className="col-span-2 text-gray-700 text-sm truncate cursor-pointer" title={tidalId} onClick={() => toggleRow(acc.id)}>
+                                            <div className="col-span-2 text-gray-700 text-sm truncate cursor-pointer hover:text-blue-600 relative overflow-visible" title={tidalId} onClick={(e) => handleIdCopyClick(e, tidalId, masterSlot?.tidal_password)}>
                                                 {tidalId}
+                                                {copiedId === tidalId && (
+                                                    <span className="absolute -top-6 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded shadow-lg animate-bounce z-10 whitespace-nowrap">{copiedWithPw ? 'ID/PW 복사됨!' : 'ID만 복사됨'}</span>
+                                                )}
                                             </div>
                                             <div className={`col-span-2 font-mono text-sm cursor-pointer ${isWarning ? 'text-red-600 font-bold' : 'text-gray-900'}`} onClick={() => toggleRow(acc.id)}>
                                                 {endDate}

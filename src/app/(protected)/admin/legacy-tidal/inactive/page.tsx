@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import styles from '../../admin.module.css';
 import * as XLSX from 'xlsx';
 import { apiFetch } from '@/lib/api';
+import { copyCredentials } from '@/lib/copy-credentials';
 
 interface LegacyTidalHistory {
     id: string;
@@ -93,6 +94,7 @@ function LegacyTidalInactiveContent() {
     const [activeEditAccountId, setActiveEditAccountId] = useState<string | null>(null);
     const [activeEditSlotIdx, setActiveEditSlotIdx] = useState<number | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [copiedWithPw, setCopiedWithPw] = useState(false);
     const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
 
     // Tidal Login Popup state
@@ -117,12 +119,13 @@ function LegacyTidalInactiveContent() {
     const handleMasterIdClick = (e: React.MouseEvent, id?: string) => {
         e.stopPropagation();
         if (!id || id === '-') return;
-        
-        navigator.clipboard.writeText(id);
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
-        
+
         window.open('https://account.tidal.com/family', '_blank');
+        copyCredentials(id).then((withPw) => {
+            setCopiedId(id);
+            setCopiedWithPw(withPw);
+            setTimeout(() => setCopiedId(null), 2000);
+        }).catch(() => {});
     };
 
     useEffect(() => {
@@ -523,7 +526,7 @@ function LegacyTidalInactiveContent() {
                                                 >
                                                     <span className="hover:underline hover:text-blue-600 transition-colors">{a.master_id || '-'}</span>
                                                     {copiedId === a.master_id && (
-                                                        <span className="absolute -top-4 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce whitespace-nowrap z-10">Copied!</span>
+                                                        <span className="absolute -top-4 left-2 bg-blue-600 text-white text-[9px] px-1 rounded animate-bounce whitespace-nowrap z-10">{copiedWithPw ? 'ID/PW 복사됨!' : 'ID만 복사됨'}</span>
                                                     )}
                                                 </td>
                                             )}
