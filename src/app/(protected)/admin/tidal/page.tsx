@@ -663,6 +663,7 @@ ${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBL
             switch (sortConfig.key) {
                 case 'login_id': aVal = a.login_id; bVal = b.login_id; break;
                 case 'used_slots': aVal = a.order_accounts?.length || 0; bVal = b.order_accounts?.length || 0; break;
+                case 'payment_day': aVal = Number(a.payment_day) || 0; bVal = Number(b.payment_day) || 0; break;
                 case 'end_date':
                     aVal = a.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
                     bVal = b.order_accounts?.find(oa => oa.type === 'master')?.end_date || '0000-00-00';
@@ -1857,7 +1858,9 @@ try {
                                 GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </div>
                             <div className="col-span-2">결제계좌</div>
-                            <div className="col-span-1 text-center font-bold">결제일</div>
+                            <div className="col-span-1 text-center font-bold cursor-pointer hover:bg-gray-100 flex items-center justify-center gap-1" onClick={() => handleSort('payment_day')}>
+                                결제일 {sortConfig?.key === 'payment_day' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                            </div>
                             <div className="col-span-1 text-left">메모</div>
                             <div className="col-span-2 text-left">마스터계정</div>
                             <div className="col-span-2 text-left text-gray-900 cursor-pointer hover:bg-gray-100 flex items-center gap-1" onClick={() => handleSort('end_date')}>

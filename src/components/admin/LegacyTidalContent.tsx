@@ -462,6 +462,7 @@ ${typeof window !== 'undefined' ? window.location.origin : ''}/public`, []);
             switch (sortConfig.key) {
                 case 'login_id': aVal = a.login_id; bVal = b.login_id; break;
                 case 'used_slots': aVal = a.order_accounts?.length || 0; bVal = b.order_accounts?.length || 0; break;
+                case 'payment_day': aVal = Number(a.payment_day) || 0; bVal = Number(b.payment_day) || 0; break;
                 case 'updated_at':
                     aVal = a.order_accounts?.reduce((max, oa) => { const date = oa.updated_at || oa.assigned_at || '1970-01-01'; return date > max ? date : max; }, '1970-01-01') || '1970-01-01';
                     bVal = b.order_accounts?.reduce((max, oa) => { const date = oa.updated_at || oa.assigned_at || '1970-01-01'; return date > max ? date : max; }, '1970-01-01') || '1970-01-01';
@@ -1222,7 +1223,7 @@ await handleSaveRow(memoTargetAccountId, memoTargetSlotIdx as number, quickEditV
                         <div className="grid grid-cols-13 gap-1.5 p-2.5 bg-slate-50 font-bold border-b text-slate-500 text-[10px] uppercase tracking-wider whitespace-nowrap">
                             <div className="col-span-1 cursor-pointer hover:text-slate-800 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('login_id')}>GroupID {sortConfig?.key === 'login_id' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
                             <div className="col-span-2 whitespace-nowrap">결제계좌</div>
-                            <div className="col-span-1 text-center font-bold whitespace-nowrap">결제일</div>
+                            <div className="col-span-1 text-center font-bold whitespace-nowrap cursor-pointer hover:text-slate-800 flex items-center justify-center gap-1" onClick={() => handleSort('payment_day')}>결제일 {sortConfig?.key === 'payment_day' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
                             <div className="col-span-2 text-left whitespace-nowrap">마스터계정</div>
                             <div className="col-span-1 text-left cursor-pointer hover:text-slate-800 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('end_date')}>종료일 {sortConfig?.key === 'end_date' && (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}</div>
                             <div className="col-span-1 text-center whitespace-nowrap">개월</div>
