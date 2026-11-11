@@ -487,3 +487,95 @@ export const sendPasswordResetCode = async (
         mailType: '비밀번호 초기화 인증번호'
     });
 };
+
+interface DepositRequestProps {
+    buyerName: string;
+    orderNumber: string;
+    productName: string;
+    planName: string;
+    amount: number;
+    depositorName: string;
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+    paymentDueAt?: string | null;
+}
+
+/**
+ * 입금 요청 안내 메일의 제목/본문을 생성한다 (발송하지 않음).
+ * 관리자가 주문내역에서 "입금요청" 버튼을 눌렀을 때 미리보기/편집 용도로 사용한다.
+ * DB 템플릿 키: DEPOSIT_REQUEST (없으면 아래 기본 본문 사용)
+ */
+export const buildDepositRequestEmail = async (
+    details: DepositRequestProps
+): Promise<{ subject: string; html: string }> => {
+    const {
+        buyerName, orderNumber, productName, planName, amount, depositorName,
+        bankName, accountNumber, accountHolder, paymentDueAt
+    } = details;
+
+    const dueText = paymentDueAt ? paymentDueAt : '';
+
+    const dynamic = await getDynamicTemplate('DEPOSIT_REQUEST', {
+        buyer_name: buyerName,
+        order_id: orderNumber,
+        product_name: productName,
+        plan_name: planName,
+        amount: amount.toLocaleString(),
+        depositor_name: depositorName,
+        bank_name: bankName,
+        account_number: accountNumber,
+        account_holder: accountHolder,
+        payment_due_at: dueText
+    });
+
+    const subject = dynamic?.subject || `[Dalbus] 입금 요청 안내 - ${buyerName}님`;
+    const html = dynamic?.content || `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">입금 요청 안내</h2>
+          <p>안녕하세요, <strong>${buyerName}</strong>님! Dalbus를 이용해 주셔서 감사합니다.</p>
+          <p>주문하신 서비스의 입금이 아직 확인되지 않았습니다. 아래 계좌로 입금해 주시면 확인 후 바로 계정 세팅을 진행해 드리겠습니다.</p>
+
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>주문 번호:</strong> ${orderNumber}</p>
+            <p style="margin: 5px 0;"><strong>상품명:</strong> ${productName}</p>
+            <p style="margin: 5px 0;"><strong>요금제:</strong> ${planName}</p>
+            <p style="margin: 5px 0;"><strong>입금 금액:</strong> ${amount.toLocaleString()}원</p>
+            <p style="margin: 5px 0;"><strong>입금자명:</strong> ${depositorName}</p>
+          </div>
+
+          <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0; font-weight: bold; color: #1d4ed8;">입금 계좌</p>
+            <p style="margin: 5px 0;"><strong>은행:</strong> ${bankName}</p>
+            <p style="margin: 5px 0;"><strong>계좌번호:</strong> ${accountNumber}</p>
+            <p style="margin: 5px 0;"><strong>예금주:</strong> ${accountHolder}</p>
+            ${dueText ? `<p style="margin: 5px 0;"><strong>입금 기한:</strong> ${dueText}</p>` : ''}
+          </div>
+
+          <p>입금자명이 주문 시 입력하신 이름과 다를 경우 확인이 지연될 수 있으니, 가능하면 <strong>${depositorName}</strong> 명의로 입금해 주세요.</p>
+          <p>이미 입금하셨다면 이 메일은 무시하셔도 됩니다. 확인 후 안내 메일을 보내드리겠습니다.</p>
+
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 0.8rem; color: #666;">
+            본 메일은 발신전용입니다. 문의사항은 관리자 페이지 또는 고객센터를 이용해 주세요.
+          </p>
+        </div>
+      `;
+
+    return { subject, html };
+};
+
+export const sendDepositRequestEmail = async (
+    targetEmail: string,
+    details: DepositRequestProps
+) => {
+    const { subject, html } = await buildDepositRequestEmail(details);
+
+    return sendEmail({
+        recipient_email: targetEmail,
+        recipient_name: details.buyerName,
+        subject,
+        html,
+        mailType: '입금 요청 안내'
+    });
+};

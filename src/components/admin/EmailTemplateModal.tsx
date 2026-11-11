@@ -53,7 +53,11 @@ const DEFAULT_PLACEHOLDERS: Placeholder[] = [
     { key: 'tidal_id', label: '타이달ID' },
     { key: 'tidal_pw', label: '타이달PW' },
     { key: 'end_date', label: '만료예정일' },
-    { key: 'message', label: '추가메시지' }
+    { key: 'message', label: '추가메시지' },
+    { key: 'bank_name', label: '은행명' },
+    { key: 'account_number', label: '계좌번호' },
+    { key: 'account_holder', label: '예금주' },
+    { key: 'payment_due_at', label: '입금기한' }
 ];
 
 export function EmailTemplateModal({ isOpen, onClose, template, onSave }: EmailTemplateModalProps) {

@@ -64,6 +64,7 @@ interface Order {
     is_deleted?: boolean;
     depositor_name?: string;
     end_date?: string;
+    deposit_requested_at?: string | null;
 }
 
 interface OrderAccount {
@@ -186,7 +187,7 @@ export default function OrderHistoryPage() {
     // Completion / Resend Email Preview Modal State
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [emailOrderId, setEmailOrderId] = useState<string | null>(null);
-    const [emailMode, setEmailMode] = useState<'complete' | 'resend'>('complete');
+    const [emailMode, setEmailMode] = useState<'complete' | 'resend' | 'deposit'>('complete');
     const [emailRecipient, setEmailRecipient] = useState('');
     const [emailSubject, setEmailSubject] = useState('');
     const [emailHtml, setEmailHtml] = useState('');
@@ -582,8 +583,8 @@ export default function OrderHistoryPage() {
         return null;
     };
 
-    // 작업완료/메일재발송 버튼 → 발송될 메일을 미리보기 모달로 띄운다
-    const openEmailModal = async (order: Order, mode: 'complete' | 'resend') => {
+    // 작업완료/메일재발송/입금요청 버튼 → 발송될 메일을 미리보기 모달로 띄운다
+    const openEmailModal = async (order: Order, mode: 'complete' | 'resend' | 'deposit') => {
         if (isProcessing) return;
         setEmailOrderId(order.id);
         setEmailMode(mode);
@@ -594,7 +595,10 @@ export default function OrderHistoryPage() {
         setIsEmailModalOpen(true);
 
         try {
-            const res = await apiFetch(`/api/admin/orders/${order.id}/email-preview`);
+            const previewUrl = mode === 'deposit'
+                ? `/api/admin/orders/${order.id}/deposit-request`
+                : `/api/admin/orders/${order.id}/email-preview`;
+            const res = await apiFetch(previewUrl);
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '미리보기를 불러오지 못했습니다.');
 
@@ -610,9 +614,38 @@ export default function OrderHistoryPage() {
         }
     };
 
+    // 입금요청 모드: 상태 변경 없이 입금 요청 메일만 발송
+    const sendDepositRequestEmail = async () => {
+        if (!emailOrderId || isProcessing) return;
+        setIsProcessing(true);
+        try {
+            const res = await apiFetch(`/api/admin/orders/${emailOrderId}/deposit-request`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emailSubject, emailHtml })
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok || !result.success) {
+                throw new Error(result.error || '입금 요청 메일 발송에 실패했습니다.');
+            }
+            alert(`입금 요청 메일을 발송했습니다.\n받는 사람: ${result.recipientEmail || emailRecipient}`);
+            setIsEmailModalOpen(false);
+            fetchOrders();
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : '입금 요청 메일 발송에 실패했습니다.';
+            alert(message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     // 모달에서 수정한 내용으로 메일 발송 (+ 작업완료 모드면 상태도 완료 처리)
     const sendCompletionEmail = async (skipEmail = false) => {
         if (!emailOrderId || isProcessing) return;
+        if (emailMode === 'deposit') {
+            await sendDepositRequestEmail();
+            return;
+        }
         setIsProcessing(true);
         try {
             const res = await apiFetch(`/api/admin/orders/${emailOrderId}/status`, {
@@ -784,6 +817,16 @@ export default function OrderHistoryPage() {
                             {status === '주문신청' && (
                                 <>
                                     <Button className="flex-1" size="sm" variant="secondary" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                    <Button
+                                        className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openEmailModal(o, 'deposit')}
+                                        disabled={isProcessing}
+                                        title={o.deposit_requested_at ? `마지막 발송: ${format(new Date(o.deposit_requested_at), 'yy.MM.dd HH:mm')}` : undefined}
+                                    >
+                                        {o.deposit_requested_at ? '입금재요청' : '입금요청'}
+                                    </Button>
                                     <Button size="sm" variant="ghost" className="text-red-400 px-2" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                                 </>
                             )}
@@ -910,6 +953,21 @@ export default function OrderHistoryPage() {
                                         {status === '주문신청' && (
                                             <>
                                                 <Button size="sm" variant="secondary" className="w-20" onClick={() => confirmPayment(o.id)} disabled={isProcessing}>입금확인</Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="w-20 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                                                    onClick={() => openEmailModal(o, 'deposit')}
+                                                    disabled={isProcessing}
+                                                    title={o.deposit_requested_at ? `마지막 발송: ${format(new Date(o.deposit_requested_at), 'yy.MM.dd HH:mm')}` : undefined}
+                                                >
+                                                    {o.deposit_requested_at ? '입금재요청' : '입금요청'}
+                                                </Button>
+                                                {o.deposit_requested_at && (
+                                                    <span className="text-[10px] text-gray-400">
+                                                        요청 {format(new Date(o.deposit_requested_at), 'MM.dd HH:mm')}
+                                                    </span>
+                                                )}
                                                 <Button size="sm" variant="ghost" className="text-xs text-red-400 h-7 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteOrder(o)} disabled={isProcessing}>삭제</Button>
                                             </>
                                         )}
@@ -1393,10 +1451,16 @@ export default function OrderHistoryPage() {
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
                         <DialogTitle>
-                            {emailMode === 'resend' ? '안내 메일 재발송' : '작업완료 안내 메일 발송'}
+                            {emailMode === 'resend'
+                                ? '안내 메일 재발송'
+                                : emailMode === 'deposit'
+                                    ? '입금 요청 메일 발송'
+                                    : '작업완료 안내 메일 발송'}
                         </DialogTitle>
                         <DialogDescription>
-                            발송될 메일 내용을 확인하고 필요한 부분을 수정한 뒤 발송하세요.
+                            {emailMode === 'deposit'
+                                ? '입금 계좌와 금액이 포함된 입금 요청 메일입니다. 주문 상태는 변경되지 않습니다. 내용을 확인·수정한 뒤 발송하세요.'
+                                : '발송될 메일 내용을 확인하고 필요한 부분을 수정한 뒤 발송하세요.'}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1456,7 +1520,11 @@ export default function OrderHistoryPage() {
                         >
                             {isProcessing
                                 ? '발송 중...'
-                                : emailMode === 'resend' ? '메일 재발송' : '발송 및 작업완료'}
+                                : emailMode === 'resend'
+                                    ? '메일 재발송'
+                                    : emailMode === 'deposit'
+                                        ? '입금 요청 메일 발송'
+                                        : '발송 및 작업완료'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
