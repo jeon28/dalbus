@@ -195,7 +195,9 @@ function LegacyTidalInactiveContent() {
             });
 
             // 4. Combine and Sort
-            const combined = [...emptySlots, ...inactiveData];
+            // 마스터가 비어 있는 계정(Master ID 없음)은 목록에서 제외한다.
+            const hasMaster = (r: LegacyTidalHistory) => !!r.master_id && r.master_id.trim() !== '' && r.master_id !== '-';
+            const combined = [...emptySlots, ...inactiveData].filter(hasMaster);
             combined.sort((a, b) => {
                 if (showDeleted) {
                     const uA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
