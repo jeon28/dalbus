@@ -204,9 +204,13 @@ function LegacyTidalInactiveContent() {
                 );
                 if (activeMaster) usableAccountIds.add(acc.id);
             });
+            // 단, 비활성 상태인 마스터 행 자체는 남겨서 여기서 되돌릴 수 있게 한다.
+            const liveAccountIds = new Set((accountsData as AccountGroup[]).map(acc => acc.id));
             const hasMaster = (r: LegacyTidalHistory) => {
                 const accId = r.account_id || r.accounts?.id;
-                return !!accId && usableAccountIds.has(accId);
+                if (!accId) return false;
+                if (usableAccountIds.has(accId)) return true;
+                return !r.isEmpty && r.slot_number === 0 && liveAccountIds.has(accId);
             };
             const combined = [...emptySlots, ...inactiveData].filter(hasMaster);
             combined.sort((a, b) => {
