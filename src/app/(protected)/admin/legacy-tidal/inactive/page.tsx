@@ -204,13 +204,20 @@ function LegacyTidalInactiveContent() {
                 );
                 if (activeMaster) usableAccountIds.add(acc.id);
             });
-            // 단, 비활성 상태인 마스터 행 자체는 남겨서 여기서 되돌릴 수 있게 한다.
+            // 단, 마스터가 정상 등록되어 쓰이다 비활성으로 옮겨진 계정은
+            // 마스터·유저의 지난 내역(실제 기록)은 보여 주고 빈 슬롯만 숨긴다.
+            // 마스터가 애초에 비어 있는(1번 슬롯 기록 없음) 계정은 전부 숨긴다.
             const liveAccountIds = new Set((accountsData as AccountGroup[]).map(acc => acc.id));
+            const inactiveMasterAccountIds = new Set<string>();
+            (inactiveData as LegacyTidalHistory[]).forEach(r => {
+                const accId = r.account_id || r.accounts?.id;
+                if (accId && r.slot_number === 0 && liveAccountIds.has(accId)) inactiveMasterAccountIds.add(accId);
+            });
             const hasMaster = (r: LegacyTidalHistory) => {
                 const accId = r.account_id || r.accounts?.id;
                 if (!accId) return false;
                 if (usableAccountIds.has(accId)) return true;
-                return !r.isEmpty && r.slot_number === 0 && liveAccountIds.has(accId);
+                return !r.isEmpty && inactiveMasterAccountIds.has(accId);
             };
             const combined = [...emptySlots, ...inactiveData].filter(hasMaster);
             combined.sort((a, b) => {
