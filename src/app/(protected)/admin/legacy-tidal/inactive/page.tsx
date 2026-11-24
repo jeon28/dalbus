@@ -195,8 +195,19 @@ function LegacyTidalInactiveContent() {
             });
 
             // 4. Combine and Sort
-            // 마스터가 비어 있는 계정(Master ID 없음)은 목록에서 제외한다.
-            const hasMaster = (r: LegacyTidalHistory) => !!r.master_id && r.master_id.trim() !== '' && r.master_id !== '-';
+            // 마스터가 현재 지정(활성)되어 있지 않은 계정은 가용하지 않으므로 목록에서 제외한다.
+            // (과거 마스터가 비활성으로만 남아 있는 계정도 제외)
+            const usableAccountIds = new Set<string>();
+            (accountsData as AccountGroup[]).forEach(acc => {
+                const activeMaster = acc.order_accounts?.some(oa =>
+                    (oa.type === 'master' || oa.slot_number === 0) && oa.is_active === true && !oa.is_deleted
+                );
+                if (activeMaster) usableAccountIds.add(acc.id);
+            });
+            const hasMaster = (r: LegacyTidalHistory) => {
+                const accId = r.account_id || r.accounts?.id;
+                return !!accId && usableAccountIds.has(accId);
+            };
             const combined = [...emptySlots, ...inactiveData].filter(hasMaster);
             combined.sort((a, b) => {
                 if (showDeleted) {
